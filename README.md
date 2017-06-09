@@ -73,12 +73,21 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 
 ### Examples
 
-#### XXXX
+#### Risk-based portfolio allocations
 
 ```js
-XXX
-```
+PortfolioAllocation.equalWeights(5); 
+// EW portfolio
 
+PortfolioAllocation.equalRiskBudgetWeights([0.1, 0.2]); 
+// ERB portfolio
+
+PortfolioAllocation.equalRiskContributionWeights([[0.1, 0.5], [0.5, 0.2]]); 
+// ERC portfolio
+
+PortfolioAllocation.riskBudgetingWeights([[0.1, 0.5], [0.5, 0.2]], [0.25, 0.75]); 
+// RB portfolio
+```
 
 
 ## How to contribute ?
