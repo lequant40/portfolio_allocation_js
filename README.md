@@ -73,7 +73,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 
 ### Examples
 
-#### XXX
+#### XXXX
 
 ```js
 XXX
