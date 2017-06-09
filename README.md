@@ -82,10 +82,10 @@ PortfolioAllocation.equalWeights(5);
 PortfolioAllocation.equalRiskBudgetWeights([0.1, 0.2]); 
 // ERB portfolio
 
-PortfolioAllocation.equalRiskContributionWeights([[0.1, 0.5], [0.5, 0.2]]); 
+PortfolioAllocation.equalRiskContributionWeights([[0.1, 0], [0, 0.2]]); 
 // ERC portfolio
 
-PortfolioAllocation.riskBudgetingWeights([[0.1, 0.5], [0.5, 0.2]], [0.25, 0.75]); 
+PortfolioAllocation.riskBudgetingWeights([[0.1, 0], [0, 0.2]], [0.25, 0.75]); 
 // RB portfolio
 ```
 
