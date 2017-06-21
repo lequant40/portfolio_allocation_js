@@ -19,11 +19,21 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
 
 ## Supported portfolio allocation algorithms
 
-- Equally weighted (EW) portfolio (a.k.a., naive portfolio, 1/N portfolio...)
-- Equal risk budget (ERB) portfolio (a.k.a., naive risk parity portfolio)
-- Equal risk contribution (ERC) portfolio
-- Risk budgeting (RB) portfolio
+- Equal weights (EW)
+  The 1/N portfolio allocation algorithm has been popularized by DeMiguel and al. in their research paper *Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?*.
 
+- Equal risk budgets (ERB)
+  Also known as naive risk parity, this portfolio allocation algorithm has been analysed by Carvalho and al. in the research paper *Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description*.
+
+- Equal risk contributions (ERC) and Risk budgeting (RB)
+  Both portfolio allocation algorithms have been extensively studied by Thierry Roncalli and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*,...), the former being a specific case of the latter.
+
+- Most diversified portfolio (MDP) (on-going)
+  This portfolio allocation algorithm is described in the research paper *Toward Maximum Diversification* by Choueifaty and al., and uses the authors' diversification ratio as the criterion for portfolio construction.
+
+- Minimum correlation (MCA) and Proportional Minimum Variance (MVA) heuristics (on-going)
+  Both algorithms were discovered by [David Varadi](https://cssanalytics.wordpress.com/), the former being meant as an approximation of the MDP and the latter as an approximation of the GMV portfolio.
+  
 
 ## Usage
 
@@ -87,6 +97,15 @@ PortfolioAllocation.equalRiskContributionWeights([[0.1, 0], [0, 0.2]]);
 
 PortfolioAllocation.riskBudgetingWeights([[0.1, 0], [0, 0.2]], [0.25, 0.75]); 
 // RB portfolio
+
+PortfolioAllocation.mostDiversifiedWeights([[0.1, 0], [0, 0.2]], {eps: 1e-10, maxIter: 10000});
+// MDP portfolio
+
+PortfolioAllocation.minCorrWeights([[0.1, 0], [0, 0.2]]);
+// MCA portfolio
+
+PortfolioAllocation.minVarWeights([[0.1, 0], [0, 0.2]]);
+// MVA portfolio
 ```
 
 
