@@ -1,4 +1,4 @@
-# PortfolioAllocation v0.0.1 ([Changelog](changelog.md))
+# PortfolioAllocation v0.0.2 ([Changelog](changelog.md))
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 

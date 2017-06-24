@@ -132,7 +132,7 @@ QUnit.test('Risk budgeting portfolio', function(assert) {
     // Random data, n assets case, 0 correlation, c.f. p 7 of reference
     // The associated matrix is always definite positive as long as all variances are strictly positive
 	{
-		var nbAssets = Math.floor(Math.random()*(50-3+1) + 3); // max 50 min 3
+		var nbAssets = Math.floor(Math.random()*(20-3+1) + 3); // max 20 min 3
 		
 		// Generate a n*n covariance matrix with 0 correlation
 		var sigma = new Array(nbAssets);

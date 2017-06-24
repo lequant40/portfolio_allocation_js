@@ -394,9 +394,6 @@ Matrix_.prototype = {
 		// Return
 		return obj;
 	},
-	
-
-
 };
 
 
@@ -553,6 +550,47 @@ Matrix_.diagonal = function(arr) {
     return obj;
 };
 
+
+/**
+* @function fillSymetric
+*
+* @summary Returns a symetric matrix constructed from a function.
+*
+* @description This function computes a diagonal square matrix (a_ij),i=1..n,j=1..n from a function, 
+* with coefficients a_ij satisfying a_ij = a_ji = fct(i,j).
+*
+* The function fct is only called for indices i such that j >= i.
+*
+* @param {number} n, the order of the matrix to create, a strictly positive integer.
+* @param {function(number, number): number} fct the function to call on each (i,j) pair of indexes with j >= i,
+* which should take 2 arguments: row index i=1..n, column index j=i..n and which
+* should return a number, which will be inserted into the matrix as its a_ij coefficient.
+* @return {Matrix_} a n by n symetric matrix with its elements computed by the fonction fct.
+*
+* @example
+* fillSymetric(2, function(i,j) { return 0; });
+* // == Matrix_([[0,0], [0,0]])
+*/
+Matrix_.fillSymetric = function(n, fct) {
+	// Result matrix instantiation
+	var obj = Object.create(Matrix_.prototype);
+	obj.nbRows = n;
+	obj.nbColumns = n;
+	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	
+	// Computation of the elements of A
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < i; ++j) {
+			obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
+		}
+		for (var j = i; j < obj.nbRows; ++j) {
+			obj.data[i * obj.nbColumns + j] = fct(i+1 ,j+1);
+		}	
+	}
+	
+	// Return
+    return obj;
+};
 /**
  * @file Functions related to vector object.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
@@ -1127,6 +1165,162 @@ function normcdf_(x) {
 
 	// The formula linking Phi and the Taylor expansion above if Phi = 1/2 + normal density * B, c.f. page 5 of the reference.
 	return 0.5 + s * Math.exp(-0.5 * q - 0.91893853320467274178)
+}
+
+
+/**
+* @function covariance_
+*
+* @summary Compute the covariance of two serie of values.
+*
+* @description This function returns the covariance of two series of values [x_1,...,x_p] and [y_1,...,y_p], 
+* which is defined as the arithmetic mean of the p values (x_1-m_x)*(y_1-m_y),...,(x_p-m_x)*(y_p-m_y), 
+* where m_x is the arithmetic mean of the p values x_1,...,x_p and m_y is the arithmetic mean of the p values y_1,...,y_p.
+*
+* The algorithm implemented uses a two pass formula in order to reduce the computation error, c.f. the reference.
+*
+* @see <a href="http://dl.acm.org/citation.cfm?doid=365719.365958">Peter M. Neely (1966) Comparison of several algorithms for computation of means, standard deviations and correlation coefficients. Commun ACM 9(7):496–499.</a>
+*
+* @param {Array.<number>} x an array of real numbers.
+* @param {Array.<number>} y an array of real numbers of the same length as x.
+* @return {number} the covariance of the values of the arrays x and y.
+*
+* @example
+* covariance_([4, 7, 13, 16], [4, 7, 13, 16]); 
+* // 22.5
+*/
+function covariance_(x, y) {
+	// Initialisations
+	var nn = x.length;
+
+	// Compute the mean of the input numeric arrays (first pass)
+	var meanX = mean_(x);
+	var meanY = mean_(y);
+
+	// Compute the sum of the product of the deviations plus the correction factor (second pass)
+	// C.f. P_4 formula of the reference
+	var sumProdDiff = 0.0;
+	var sumDiffX = 0.0;
+	var sumDiffY = 0.0;
+	for (var i=0; i<nn; ++i) {
+		var diffX = (x[i] - meanX);
+		var diffY = (y[i] - meanY);
+		sumProdDiff += diffX * diffY;
+		sumDiffX += diffX;
+		sumDiffY += diffY;
+	}
+
+	// Compute the corrected sum of the product of the deviations from the means
+	var C = sumProdDiff - ((sumDiffX * sumDiffY) / nn);
+
+	// Return the corrected covariance
+	return C/nn;
+}
+
+
+/**
+* @function sampleCovariance_
+*
+* @summary Compute the sample covariance of two serie of values.
+*
+* @description This function returns the sample covariance of two series of values [x_1,...,x_p] and [y_1,...,y_p], 
+* which is defined as the covariance of two series of values [x_1,...,x_p] and [y_1,...,y_p] multiplied by p/(p-1).
+*
+* The algorithm implemented uses a two pass formula in order to reduce the computation error, c.f. the function covariance_.
+*
+* @param {Array.<number>} x an array of real numbers.
+* @param {Array.<number>} y an array of real numbers of the same length as x.
+* @return {number} the covariance of the values of the arrays x and y.
+*
+* @example
+* sampleCovariance_([4, 7, 13, 16], [4, 7, 13, 16]); 
+* // 30
+*/
+function sampleCovariance_(x, y) {
+	var nn = x.length;
+	return covariance_(x,y) * nn/(nn - 1);
+}
+
+
+/**
+ * @file Functions related to helpers for portfolio allocation.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+
+
+/**
+* @function Helpers
+*
+* @summary Construct a portfolio allocation helper object, unused.
+*
+* @description This function constructs a portfolio allocation helper object, unused.
+* 
+* @return {this} the constructed portfolio allocation helper, unused.
+*
+* @example
+* Helpers();
+*/
+function Helpers() {
+	// Return
+	return this;
+}
+
+
+/**
+* @function covarianceMatrix
+*
+* @summary Returns the covariance matrix of a series of values.
+*
+* @description This function computes the covariance matrix of a series of values, provided as 
+* a variable number of arrays of real numbers of the same length.
+*
+* @param {...Array.<number>} var_args, arrays of real numbers of the same length.
+* @return {Array.<Array.<number>>} an array of array of real numbers representing the covariance matrix
+* of the input series of values, organized by rows and then by columns.
+*
+* @example
+* covarianceMatrix([0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]);
+* // [[0.00036,  -0.00053], [-0.00053, 0.00107]]
+*/
+Helpers.covarianceMatrix = function(var_args) {
+	// Construct the covariance matrix
+	var arrs = arguments;	
+	var cov = Matrix_.fillSymetric(arrs.length, function(i, j) { 
+		return covariance_(arrs[i-1], arrs[j-1]); 
+	});
+	
+	// Return it
+	return cov.toDoubleArray();
+}
+
+
+/**
+* @function sampleCovarianceMatrix
+*
+* @summary Returns the sample covariance matrix of a series of values.
+*
+* @description This function computes the sample covariance matrix of a series of values, provided as 
+* a variable number of arrays of real numbers of the same length.
+*
+* @param {...Array.<number>} var_args, arrays of real numbers of the same length.
+* @return {Array.<Array.<number>>} an array of array of real numbers representing the sample covariance matrix
+* of the input series of values, organized by rows and then by columns.
+*
+* @example
+* sampleCovarianceMatrix([0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]);
+* // [[0.00053, -0.0008], [-0.0008, 0.0016]]
+*/
+Helpers.sampleCovarianceMatrix = function(var_args) {
+	// Construct the sample covariance matrix
+	var arrs = arguments;
+	var cov = Matrix_.fillSymetric(arrs.length, function(i, j) { 
+		return sampleCovariance_(arrs[i-1], arrs[j-1]); 
+	});
+	
+	// Return it
+	return cov.toDoubleArray();
 }
 /**
  * @file Functions related to equal risk budget portfolio.

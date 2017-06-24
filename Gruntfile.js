@@ -75,7 +75,7 @@ module.exports = function(grunt) {
 	
 	concat: {
 	  portfolio_allocation: {
-	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/vector.js', 'lib/stats/misc.js', 'lib/allocation/*.js', 'lib/footer.js'],
+	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/vector.js', 'lib/stats/misc.js', 'lib/helpers/*.js', 'lib/allocation/*.js', 'lib/footer.js'],
 	    dest: 'dist/portfolio_allocation.dev.js',
 	  }
 	},
@@ -97,8 +97,8 @@ module.exports = function(grunt) {
     },
 	
 	qunit: { 
-      dev: ['test/index_matrix.html', 'test/index_vector.html', 'test/index_stats.html', 'test/index_allocation_dev.html'],
-	  dist: ['test/index_allocation_dist.html']
+      dev: ['test/index_matrix.html', 'test/index_vector.html', 'test/index_stats.html', 'test/index_helpers.html', 'test/index_allocation_dev.html'],
+	  dist: ['test/index_allocation_dist.html', 'test/index_helpers_dist.html']
     }
 
   });
@@ -129,7 +129,6 @@ module.exports = function(grunt) {
   //
   grunt.registerTask('deliver-gs', 'Builds the app into a distributable package for Google Sheets.', function() {
     // Starting from dist mode, remove header/footer
-    grunt.task.run('deliver');
 	grunt.task.run('strip_code:portfolio_allocation_gs');
 	
 	// Then change function definitions

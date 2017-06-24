@@ -162,3 +162,13 @@ QUnit.test('Diagonal matrix creation', function(assert) {
   assert.deepEqual(mat.toArray(), expectedMat.toArray(), 'Diagonal matrix creation');
 });
 
+
+QUnit.test('Symetric matrix creation', function(assert) {    
+  // Test using static data
+  var mat = PortfolioAllocation.Matrix.fillSymetric(2, function(i,j) { return i+j; });
+  var expectedMat = new PortfolioAllocation.Matrix([[2,3], [3,4]]);
+  assert.deepEqual(mat.toArray(), expectedMat.toArray(), 'Symetric matrix creation');
+});
+
+
+

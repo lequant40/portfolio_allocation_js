@@ -1,7 +1,7 @@
 {
   "name": "portfolio-allocation",
-  "version": "0.0.1",
-  "date": "2017-06-09",
+  "version": "0.0.2",
+  "date": "2017-06-24",
   "author": "Roman Rubsamen <roman.rubsamen@gmail.com>",
   "contributors": [],
   "description": "A JavaScript library to allocate portfolios of financial assets.",
