@@ -26,7 +26,7 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
   Also known as naive risk parity, this portfolio allocation algorithm has been analysed by Carvalho and al. in the research paper *Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description*.
 
 - Equal risk contributions (ERC) and Risk budgeting (RB)
-  Both portfolio allocation algorithms have been extensively studied by Thierry Roncalli and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*,...), the former being a specific case of the latter.
+  Both portfolio allocation algorithms have been extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*,...), the former being a specific case of the latter.
 
 - Most diversified portfolio (MDP)
   This portfolio allocation algorithm is described in the research paper *Toward Maximum Diversification* by Choueifaty and al., and uses the authors' diversification ratio as the criterion for portfolio construction.
