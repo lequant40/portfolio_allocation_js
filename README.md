@@ -28,10 +28,10 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
 - Equal risk contributions (ERC) and Risk budgeting (RB)
   Both portfolio allocation algorithms have been extensively studied by Thierry Roncalli and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*,...), the former being a specific case of the latter.
 
-- Most diversified portfolio (MDP) (on-going)
+- Most diversified portfolio (MDP)
   This portfolio allocation algorithm is described in the research paper *Toward Maximum Diversification* by Choueifaty and al., and uses the authors' diversification ratio as the criterion for portfolio construction.
 
-- Minimum correlation (MCA) and Proportional Minimum Variance (MVA) heuristics (on-going)
+- Minimum correlation (MCA) and Proportional Minimum Variance (MVA) heuristics
   Both algorithms were discovered by [David Varadi](https://cssanalytics.wordpress.com/), the former being meant as an approximation of the MDP and the latter as an approximation of the GMV portfolio.
   
 
