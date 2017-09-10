@@ -14,46 +14,91 @@
 /**
 * @function Matrix_
 *
-* @summary Construct a matrix object from an array of arrays of numbers.
+* @summary Construct a matrix object from several possible inputs: an array of arrays of numbers, an array of numbers or a matrix object.
 *
-* @description This function constructs an n by m matrix (a_ij),i=1..n,j=1..m from an array arr of n arrays of m real numbers, with coefficients a_ij 
-* satisfying a_ij = arr[i-1][j-1].
+* @description This function constructs an n by m matrix (a_ij),i=1..n,j=1..m from either:
+* - An array dblarr of n arrays of m real numbers, with coefficients a_ij satisfying a_ij = dblarr[i-1][j-1]
+* - An array arr of n real numbers, with coefficients a_ij satisfying a_ij = arr[i-1] with m=1 (i.e., the constructed matrix is a column matrix, that is, a vector)
+* - An n by m matrix (b_ij),i=1..n,j=1..m, with coefficients a_ij satisfying a_ij = b_ij
 * 
-* @param {Array.<Array.<number>>} arr an array of n arrays of m real numbers with n and m natural integers greater than or equal to 1.
+* @param {Array.<Array.<number>>|<Array.<number>|Matrix_} input either an array of n arrays of m real numbers, or an array of n real numbers or a n by m matrix object,
+* with n and m natural integers greater than or equal to 1.
 * @return {this} the constructed matrix.
 *
 * @example
 * Matrix_([[1,2,3], [4,5,6]]);
 */
-function Matrix_(arr) {
+function Matrix_(input) {
+	var that = this;
+	
+	function fromDoubleArray(dblarr) {
+		// Initialise the underlying variables
+		that.nbRows = dblarr.length;
+		that.nbColumns = dblarr[0].length;
+		that.data = typeof Float64Array === 'function' ? new Float64Array(that.nbRows * that.nbColumns) : new Array(that.nbRows * that.nbColumns);
+		
+		// Fill the matrix
+		for (var i = 0; i < that.nbRows; ++i) {
+			if (!(dblarr[i] instanceof Array)) {
+				throw new Error('unsupported input type');
+			}
+			if (dblarr[i].length !== that.nbColumns) {
+				throw new Error('unsupported input type');
+			}
+			for (var j = 0; j < that.nbColumns; ++j) {
+				that.data[i * that.nbColumns + j] = dblarr[i][j];
+			}
+		}
+		
+		// Return
+		return that;
+	}
+	
+	function fromArray(arr) {
+		// Initialise the underlying variables
+		that.nbRows = arr.length;
+		that.nbColumns = 1;
+		that.data = typeof Float64Array === 'function' ? new Float64Array(that.nbRows * that.nbColumns) : new Array(that.nbRows * that.nbColumns);
+		
+		// Fill the vector
+		for (var i = 0; i < that.nbRows; ++i) {
+			that.data[i * that.nbColumns] = arr[i];
+		}
+		
+		// Return
+		return that;
+	}
+	
+	function fromMatrix(mat) {
+		// Initialise the underlying variables
+		that.nbRows = mat.nbRows;
+		that.nbColumns = mat.nbColumns;
+		that.data = typeof Float64Array === 'function' ? new Float64Array(that.nbRows * that.nbColumns) : new Array(that.nbRows * that.nbColumns);
+		
+		// Fill the matrix
+		for (var i = 0; i < that.nbRows; ++i) {
+			for (var j = 0; j < that.nbColumns; ++j) {
+				that.data[i * that.nbColumns + j] = mat.data[i * mat.nbColumns + j];
+			}
+		}
+		
+		// Return
+		return that;
+	}
+	
 	// Checks
-	if (!(arr instanceof Array)) {
-		throw new Error('arr must be an array');
+	if (input instanceof Array && input[0] instanceof Array) { // Standard matrix
+		return fromDoubleArray(input);
 	}
-	if (!(arr[0] instanceof Array)) {
-		throw new Error('arr must be an array of arrays, arr[' + 0 + '] is not an array');
+	else if (input instanceof Array) { // Simplified constructor for a column matrix (i.e., a vector)
+		return fromArray(input);
 	}
-	
-	// Initialise the underlying variables
-	this.nbRows = arr.length;
-	this.nbColumns = arr[0].length;
-	this.data = typeof Float64Array === 'function' ? new Float64Array(this.nbRows * this.nbColumns) : new Array(this.nbRows * this.nbColumns);
-	
-    // Fill the matrix
-	for (var i = 0; i < this.nbRows; ++i) {
-		if (!(arr[i] instanceof Array)) {
-		throw new Error('arr must be an array of arrays, arr[' + i + '] is not an array');
-		}
-		if (arr[i].length !== this.nbColumns) {
-			throw new Error('arr contains arrays of irregular length: index 0 - ' + this.nbColmuns + ', index ' + i + ' - ' + arr[i].length);
-		}
-		for (var j = 0; j < this.nbColumns; ++j) {
-			this.data[i * this.nbColumns + j] = arr[i][j];
-		}
+	else if (input instanceof Matrix_) { // Avoid conversion from Matrix to arrays to Matrix
+		return fromMatrix(input);
 	}
-	
-	// Return
-	return this;
+	else {
+		throw new Error('unsupported input type');
+	}
 }
 
 
@@ -288,7 +333,94 @@ Matrix_.prototype = {
 	isSquare: function() {
 	    return this.nbRows === this.nbColumns;
 	},
+
+	/**
+	* @function isVector
+	*
+	* @summary Determines if the matrix is a (column) vector.
+	*
+	* @description This function determines if the number of columns of the matrix is equal to 1.
+	* 
+	* @memberof Matrix_
+	* @return {boolean} true if the matrix is a column vector, false otherwise.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,10]]).isVector();
+	* // false
+	*
+	* @example
+	* Matrix_([[1], [4]]).isVector();
+	* // true
+	*/
+	isVector: function() {
+	    return this.nbColumns === 1;
+	},
+
+	/**
+	* @function sum
+	*
+	* @summary Returns the sum of the elements of the matrix.
+	*
+	* @description This function computes the sum of the elements of the matrix.
+	* 
+	* @memberof Matrix_
+	* @return {number} the sum of the elements of the matrix.
+	*
+	* @example
+	* Matrix_([[1,2,3]]).sum();
+	* // 6
+	*/
+	sum: function() {
+		// Computation of sum a_ij, i=1..nbRows, j=1..nbColumns
+		var sum = 0;
+		for (var i = 0; i < this.nbRows; ++i) {
+			for (var j = 0; j < this.nbColumns; ++j) {
+				sum += this.data[i * this.nbColumns + j];
+			}
+		}
+		
+		// Return
+		return sum;
+	},
 	
+	/**
+	* @function normalize
+	*
+	* @summary Returns a matrix made of the elements of the original matrix divided by their common sum.
+	*
+	* @description This function computes a matrix (c_ij),i=1..n,j=1..m with elements c_ij satisfying c_ij = a_ij/(sum(a_kl),k=1..n,l=1..m),i=1..n,j=1..m, 
+	* with n the number of rows of the original matrix and m the number of columns of the original matrix.
+	* 
+	* @memberof Matrix_
+	* @return {Matrix_} the normalized matrix.
+	*
+	* @example
+	* Matrix_([[1,2,3]]).normalize();
+	* // Matrix_([[1/6,1/3,1/2]])
+	*/
+	normalize: function() {
+		// Result matrix instantiation
+		var obj = Object.create(Matrix_.prototype);
+		obj.nbRows = this.nbRows;
+		obj.nbColumns = this.nbColumns;
+		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+
+		// Computation of the sum of the matrix elements
+		var sum = this.sum();
+		if (sum === 0.0) {
+			throw new Error('sum of coefficients of matrix is null');
+		}
+		
+		// Normalization of the matrix
+		for (var i = 0; i < obj.nbRows; ++i) {
+			for (var j = 0; j < obj.nbColumns; ++j) {
+				obj.data[i * obj.nbColumns + j] = this.data[i * this.nbColumns + j] / sum; 
+			}
+		}
+		
+		// Return
+		return obj;
+	},
 
 	/**
 	* @function elemPower
@@ -308,7 +440,7 @@ Matrix_.prototype = {
 	*/
 	elemPower: function (p) {
 		// Result matrix instantiation
-		var obj = Object.create(this);
+		var obj = Object.create(Matrix_.prototype);
 		obj.nbRows = this.nbRows;
 		obj.nbColumns = this.nbColumns;
 		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
@@ -316,7 +448,7 @@ Matrix_.prototype = {
 		// Computation of the power p of the coefficients of A
 		for (var i = 0; i < obj.nbRows; ++i) {
 			for (var j = 0; j < obj.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] = Math.pow(this.data[i * obj.nbColumns + j], p);
+				obj.data[i * obj.nbColumns + j] = Math.pow(this.data[i * this.nbColumns + j], p);
 			}
 		}
 		
@@ -332,11 +464,11 @@ Matrix_.prototype = {
 	* @description This function returns, as a vector of n rows, the diagonal elements (a_ii), i=1..n from the original square matrix (a_ij),i=1..n,j=1..n.
 	*
 	* @memberof Matrix_
-	* @return {Vector_} a vector containing the diagonal coefficients of the original matrix.
+	* @return {Matrix_} a column matrix (i.e., vector) containing the diagonal coefficients of the original matrix.
 	*
 	* @example
 	* Matrix_([[1,2], [4,5]]).getDiagonal();
-	* // Vector_([1,5])
+	* // Matrix_([1,5])
 	*/
     getDiagonal: function () {
     	// Checks
@@ -345,10 +477,10 @@ Matrix_.prototype = {
     	}
     	
     	// Result vector instantiation
-    	var obj = Object.create(Vector_.prototype);
+    	var obj = Object.create(Matrix_.prototype);
     	obj.nbRows = this.nbRows;
     	obj.nbColumns = 1;
-    	obj.data = new Array(obj.nbRows);
+    	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
     	
     	// Extraction of diagonal elements of A
     	for (var i = 0; i < this.nbRows; ++i) {
@@ -379,7 +511,7 @@ Matrix_.prototype = {
 	*/
 	elemMap: function (fct) {
 		// Result matrix instantiation
-		var obj = Object.create(this);
+		var obj = Object.create(Matrix_.prototype);
 		obj.nbRows = this.nbRows;
 		obj.nbColumns = this.nbColumns;
 		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
@@ -387,7 +519,101 @@ Matrix_.prototype = {
 		// Computation of the fonction fct applied to the coefficients of A
 		for (var i = 0; i < obj.nbRows; ++i) {
 			for (var j = 0; j < obj.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] = fct(i+1, j+1, this.data[i * obj.nbColumns + j]);
+				obj.data[i * obj.nbColumns + j] = fct(i+1, j+1, this.data[i * this.nbColumns + j]);
+			}
+		}
+		
+		// Return
+		return obj;
+	},
+	
+    /**
+	* @function getSubmatrix
+	*
+	* @summary Returns a (possibly non contiguous) submatrix from the original matrix, keeping the elements whose row and column indexes are specified.
+	*
+	* @description This function computes a matrix (c_ij),i=1..p,j=1..q from the original matrix (a_ij),i=1..n,j=1..m and from the lists of row/column indexes to keep
+	* rindexes/cindexes, where p is equal to the length of rindexes and q is equal to the length of cindexes, with coefficients satisfying c_ij = a_rindexes[i]cindexes[j].
+	*
+	* @memberof Matrix_
+	* @param {Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..number of matrix rows
+    * @param {Array.<number>} cindexes the column indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..number of matrix columns
+	* @return {Matrix_} a matrix whose elements correspond to the elements of the original matrix whose row/column indexes belong to the input lists of row/column indexes to keep.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,6]]).getSubmatrix([1], [2, 3];
+	* // Matrix_([[2,3]])
+	*/
+    getSubmatrix : function(rindexes, cindexes) {
+    	// Check that indexes are arrays
+    	if (!(rindexes instanceof Array) || rindexes.length == 0) {
+    		throw new Error('first parameter must be a non empty array');
+    	}
+    	if (!(cindexes instanceof Array) || cindexes.length == 0) {
+    		throw new Error('second parameter must be a non empty array');
+    	}
+	
+    	// Check that the indexes are sorted arrays of distinct elements
+    	for (var i = 1; i < rindexes.length; ++i) {
+    	    if (rindexes[i-1] >= rindexes[i]) {
+    	        throw new Error('first parameter must be a sorted array');
+    	    }
+    	    
+    	}
+        for (var j = 1; j < cindexes.length; ++j) {
+    	    if (cindexes[j-1] >= rindexes[j]) {
+    	        throw new Error('second parameter must be a sorted array');
+    	    }
+    	    
+    	}
+    	
+    	// Result matrix instantiation
+    	var obj = Object.create(this);
+    	obj.nbRows = rindexes.length;
+    	obj.nbColumns = cindexes.length;
+    	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+    	
+    	// Computation of the elements of A
+    	for (var i = 0; i < obj.nbRows; ++i) {
+    		var rindex = rindexes[i] - 1; // row index of the original matrix
+    		
+    		for (var j = 0; j < obj.nbColumns; ++j) {
+    		    var cindex = cindexes[j] - 1; // column index of the original matrix
+    		    
+    			obj.data[i * obj.nbColumns + j] = this.data[rindex * this.nbColumns + cindex];
+    		}
+    	}
+    	
+    	// Return
+        return obj;
+    },
+	
+    /**
+	* @function transpose
+	*
+	* @summary Returns the transpose of the original matrix.
+	*
+	* @description This function computes the transpose matrix (c_ij),i=1..n,j=1..m of the original matrix (a_ij),i=1..n,j=1..m, with coefficients
+	* satisfying c_ij = a_ji.
+	*
+	* @memberof Matrix_
+	* @return {Matrix_} the transpose of the original matrix.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,6]]).transpose();
+	* // Matrix_([[1,4], [2,5], [3,6]])
+	*/
+	transpose: function () {
+		// Result matrix instantiation
+		var obj = Object.create(this);
+		obj.nbRows = this.nbColumns;
+		obj.nbColumns = this.nbRows;
+		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+		
+		// Computation of the transpose of A
+		for (var i = 0; i < obj.nbRows; ++i) {
+			for (var j = 0; j < obj.nbColumns; ++j) {
+				obj.data[i * obj.nbColumns + j] = this.data[j * this.nbColumns + i];
 			}
 		}
 		
@@ -461,7 +687,7 @@ Matrix_.areEqual = function (a, b, eps) {
 * 
 * @param {Matrix_} a an n by m matrix.
 * @param {Matrix_} a an m by p matrix.
-* @return {Vector_} the matrix product a*b, an m by p matrix.
+* @return {Matrix_} the matrix product a*b, an m by p matrix.
 *
 * @example
 * product(Matrix_([[1,2,3], [4,5,6]]), .Matrix_([[1,1], [2,2], [3,3]]));
@@ -480,9 +706,6 @@ Matrix_.product = function(a, b) {
 	if (a.nbColumns !== b.nbRows) {
 		throw new Error('Matrices sizes do not match: ' + '(' + a.nbRows + ',' + a.nbColumns + 
 		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
-	}
-	if (b.nbColumns === 1) {
-		throw new Error('Matrix vector multiplication unsupported');
 	}
 	
 	// Result matrix instantiation
@@ -583,7 +806,7 @@ Matrix_.fillSymetric = function(n, fct) {
 		for (var j = 0; j < i; ++j) {
 			obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
 		}
-		for (var j = i; j < obj.nbRows; ++j) {
+		for (var j = i; j < obj.nbColumns; ++j) {
 			obj.data[i * obj.nbColumns + j] = fct(i+1 ,j+1);
 		}	
 	}
@@ -591,220 +814,114 @@ Matrix_.fillSymetric = function(n, fct) {
 	// Return
     return obj;
 };
-/**
- * @file Functions related to vector object.
- * @author Roman Rubsamen <roman.rubsamen@gmail.com>
- */
 
- 
 
 
 /**
-* @function Vector_
+* @function zeros
 *
-* @summary Construct a vector object from an array of numbers.
+* @summary Returns a matrix made of zeros.
 *
-* @description This function constructs a vector (v_i),i=1..n of size n from an array arr of n real numbers, with coefficients v_i 
-* satisfying v_i = arr[i-1].
+* @description This function builds an n by m matrix (a_ij),i=1..n,j=1..m satisfying a_ij = 0,i=1..n,j=1..m.
 * 
-* @param {Array.<number>} arr an array of n real numbers with n natural integer greater than or equal to 1.
-* @return {this} the constructed vector.
+* @param {number} n the row length of the matrix to construct, natural integer greater than or equal to 1.
+* @param {number} m the column length of the matrix to construct, natural integer greater than or equal to 1.
+* @return {Matrix_} the constructed matrix.
 *
 * @example
-* Vector_([[1,2,3]);
+* zeros(3, 2);
+* // Matrix_([[0,0], [0,0], [0,0]])
 */
-function Vector_(arr) {
+Matrix_.zeros = function(n, m) {
 	// Checks
-	if (!(arr instanceof Array)) {
-		throw new Error('arr must be an array');
+	if (n < 1) {
+		throw new Error('input number of rows out of bounds: ' + n);
 	}
-
-	// Initialise the underlying variables
-	this.nbRows = arr.length;
-	this.nbColumns = 1;
-	this.data = typeof Float64Array === 'function' ? new Float64Array(this.nbRows * this.nbColumns) : new Array(this.nbRows * this.nbColumns);
-	
-    // Fill the vector
-	for (var i = 0; i < this.nbRows; ++i) {
-		this.data[i * this.nbColumns] = arr[i];
+	if (m < 1) {
+		throw new Error('input number of columns out of bounds: ' + m);
 	}
-	
-	// Return
-	return this;
-}
-Vector_.prototype = Object.create(Matrix_.prototype); // A vector inherit from all Matrix operations by default
-
-
-/**
-* @function normalize
-*
-* @summary Returns a vector made of the elements of the original vector normalized by their sum.
-*
-* @description This function computes a vector (v_i),i=1..n with elements v_i satisfying v_i = x_i/sum(x_j),j=1..n, 
-* with n the length of the original vector x.
-* 
-* @memberof Vector_
-* @return {Vector_} the normalized vector.
-*
-* @example
-* Vector_([1,2,3]).normalize();
-* // Vector_([1/6,1/3,1/2])
-*/
-Vector_.prototype.normalize = function() {
-	// Result vector instantiation
-	var obj = Object.create(Vector_.prototype);
-	obj.nbRows = this.nbRows;
-	obj.nbColumns = this.nbColumns;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-
-	// Computation of sum x_i, i=1..nbRows
-	var sum = this.sum();
-	if (sum === 0.0) {
-	    throw new Error('sum of coefficients of vector is null');
-	}
-	
-	// Normalization of the vector
-	for (var i = 0; i < this.nbRows; ++i) {
-		obj.data[i] = this.data[i] / sum; 
-	}
-	
-	// Return
-	return obj;
-};
-
-
-/**
-* @function areEqual
-*
-* @summary Determines if two vectors are identical.
-*
-* @description This function determines if two vectors x and y are identical, i.e. if x_i == y_i, i=1..n where
-* n is their common number of rows.
-*
-* In case an optional tolerance parameter eps is provided, the strict component by component equality condition x_i == y_i
-* is relaxed into |x_i - y_i| <= eps.
-* 
-* @param {Vector_} x, a vector.
-* @param {Vector_} y, a vector.
-* @param {number} eps, an optional real number; by default, eps is equal to zero.
-* @return {boolean} true if x and y are identical, false otherwise.
-*
-* @example
-* areEqual(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,2,3], [4,5,6]]));
-* // true
-*/
-Vector_.areEqual = function (x, y, eps) {
-	// Ensure x,y are vectors
-	if (!(x instanceof Vector_)) {
-		throw new Error('x must be a vector');
-	}
-	if (!(y instanceof Vector_)) {
-		throw new Error('y must be a vector');
-	}
-	
-    // Real computation is delegated to the equivalent Matrix method
-    return Matrix_.areEqual(x, y, eps);
-}
-
-
-/**
-* @function sum
-*
-* @summary Returns the sum of the elements of a vector.
-*
-* @description This function computes the sum of the elements of a vector.
-* 
-* @memberof Matrix_
-* @return {number} the sum of the elements of the vector x.
-*
-* @example
-* Vector_([1,2,3]).sum();
-* // 6
-*/
-Vector_.prototype.sum = function() {
-	// Computation of sum x_i, i=1..nbRows
-	var sum = 0;
-	for (var i = 0; i < this.nbRows; ++i) {
-		sum += this.data[i]; 
-	}
-	
-	// Return
-	return sum;
-};
-
-
-/**
-* @function vectorProduct
-*
-* @summary Returns the matrix-vector product.
-*
-* @description This function computes the matrix-vector product a*x, where a is a n by m matrix and x is a vector of size m.
-* 
-* @param {Matrix_} a an n by m matrix.
-* @param {Vector_} x a vector of size m.
-* @return {Vector_} the matix-vector product a*x.
-*
-* @example
-* vectorProduct(Matrix_([[1,2,3], [4,5,6]]), Vector_([1,2,3]));
-* // Vector_([14,32])
-*/
-Matrix_.vectorProduct = function(a, x) {
-	// Ensure a is a matrix, x is a vector
-	if (!(a instanceof Matrix_)) {
-		throw new Error('a must be a matrix');
-	}
-	if (!(x instanceof Vector_)) {
-		throw new Error('x must be a vector');
-	}
-	
-	// Checks
-	if (a.nbColumns !== x.nbRows) {
-		throw new Error('Matrice size does not match vector size: ' + '(' + a.nbRows + ',' + a.nbColumns + 
-		') - ' + '(' + x.nbRows + ',' + x.nbColumns + ')');
-	}
-	
-	// Result vector instantiation
-	var obj = Object.create(Vector_.prototype);
-	obj.nbRows = a.nbRows;
-	obj.nbColumns = 1;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-	
-	// Computation of A*x product
-	for (var i = 0; i < a.nbRows; ++i) {
-		obj.data[i] = 0;
 		
-		for (var j = 0; j < a.nbColumns; ++j) {
-			obj.data[i] += a.data[i * a.nbColumns + j] * x.data[j] ;
+	// Result matrix instantiation
+	var obj = Object.create(Matrix_.prototype);
+	obj.nbRows = n;
+	obj.nbColumns = m;
+	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	
+	// Initialisation of the elements of A to 0
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 0;
 		}
 	}
 	
-	// Return the vector
+	// Return
     return obj;
 }
 
 
 /**
-* @function hadamardProduct
+* @function ones
+*
+* @summary Returns a matrix made of ones.
+*
+* @description This function builds an n by m matrix (a_ij),i=1..n,j=1..m satisfying a_ij = 1,i=1..n,j=1..m.
+* 
+* @param {number} n the row length of the matrix to construct, natural integer greater than or equal to 1.
+* @param {number} m the column length of the matrix to construct, natural integer greater than or equal to 1.
+* @return {Matrix_} the constructed matrix.
+*
+* @example
+* ones(3, 2);
+* // Matrix_([[1,1], [1,1], [1,1]])
+*/
+Matrix_.ones = function(n, m) {
+	// Checks
+	if (n < 1) {
+		throw new Error('input number of rows out of bounds: ' + n);
+	}
+	if (m < 1) {
+		throw new Error('input number of columns out of bounds: ' + m);
+	}
+		
+	// Result matrix instantiation
+	var obj = Object.create(Matrix_.prototype);
+	obj.nbRows = n;
+	obj.nbColumns = m;
+	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	
+	// Initialisation of the elements of A to 0
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 1;
+		}
+	}
+	
+	// Return
+    return obj;
+}
+
+/**
+* @function vectorHadamardProduct
 *
 * @summary Returns the Hadamard product of two vectors.
 *
 * @description This function computes the Hadamard product x*y of two vectors x and y of the same size.
 * 
-* @param {Vector_} x a vector.
-* @param {Vector_} y a vector of same size as x.
-* @return {Vector_} the Hadamard product x*y.
+* @param {Matrix_} x a column matrix.
+* @param {Matrix_} y a column matrix of same size as x.
+* @return {Matrix_} the Hadamard product x*y.
 *
 * @example
-* hadamardProduct(Vector_([1,2,3]), Vector_([1,2,3]));
-* // Vector_([1,4,9])
+* vectorHadamardProduct(Vector_([1,2,3]), Vector_([1,2,3]));
+* // Matrix_([[1],[4],[9]])
 */
-Vector_.hadamardProduct = function(x, y) {
+Matrix_.vectorHadamardProduct = function(x, y) {
 	// Ensure x,y are vectors
-	if (!(x instanceof Vector_)) {
-		throw new Error('x must be a vector');
+	if (!x.isVector()) {
+		throw new Error('first argument must be a vector');
 	}
-	if (!(y instanceof Vector_)) {
-		throw new Error('y must be a vector');
+	if (!y.isVector()) {
+		throw new Error('second argument must be a vector');
 	}
 
 	// Checks
@@ -813,7 +930,7 @@ Vector_.hadamardProduct = function(x, y) {
 	}
 	
 	// Result vector instantiation
-	var obj = Object.create(Vector_.prototype);
+	var obj = Object.create(Matrix_.prototype);
 	obj.nbRows = x.nbRows;
 	obj.nbColumns = 1;
 	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
@@ -831,27 +948,27 @@ Vector_.hadamardProduct = function(x, y) {
 
 
 /**
-* @function dotProduct
+* @function vectorDotProduct
 *
-* @summary Returns the vector dot product.
+* @summary Returns the dot product of two vectors.
 *
 * @description This function computes the vector dot product <x/y>, where x and y are vectors of the same size.
 * 
-* @param {Vector_} x a vector.
-* @param {Vector_} y a vector of same size as x.
-* @return {number} the product <x/y>.
+* @param {Matrix_} x a column matrix.
+* @param {Matrix_} y a column matrix of same size as x.
+* @return {number} the dot product <x/y>.
 *
 * @example
-* dotProduct(Vector_([1,2,3]), Vector_([1,2,3]));
+* vectorDotProduct(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
 * // 14
 */
-Vector_.dotProduct = function(x, y) {
+Matrix_.vectorDotProduct = function(x, y) {
 	// Ensure x,y are vectors
-	if (!(x instanceof Vector_)) {
-		throw new Error('x must be a vector');
+	if (!x.isVector()) {
+		throw new Error('first argument must be a vector');
 	}
-	if (!(y instanceof Vector_)) {
-		throw new Error('y must be a vector');
+	if (!y.isVector()) {
+		throw new Error('second argument must be a vector');
 	}
 
 	// Checks
@@ -870,35 +987,220 @@ Vector_.dotProduct = function(x, y) {
 }
 
 
+
 /**
-* @function ones
+ * @file Functions related to covariance matrix computations for portfolio allocation.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+
+
+
+/**
+* @function covarianceMatrix
 *
-* @summary Returns a vector made of ones.
+* @summary Returns the covariance matrix of a series of values.
 *
-* @description This function builds a vector (v_i),i=1..n of size n and satisfying v_i = 1, i=1..n.
-* 
-* @param {number} n the row length of the vector to construct.
-* @return {Vector_} the constructed vector.
+* @description This function computes the covariance matrix of a series of values, provided as 
+* a variable number of arrays of real numbers of the same length.
+*
+* @param {...Array.<number>} var_args, arrays of real numbers of the same length.
+* @return {Matrix_} a Matrix object representing the covariance matrix of the input series of values.
 *
 * @example
-* ones(3);
-* // Vector_([1,1,1])
+* covarianceMatrix([0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]);
+* // == Matrix_([[0.00036,  -0.00053], [-0.00053, 0.00107]])
 */
-Vector_.ones = function(n) {
-	// Result vector instantiation
-	var obj = Object.create(Vector_.prototype);
-	obj.nbRows = n;
-	obj.nbColumns = 1;
+function covarianceMatrix(varg_args) {
+	// Construct the covariance matrix
+	var arrs = arguments;
+	
+	// Result matrix instantiation
+	var obj = Object.create(Matrix_.prototype);
+	obj.nbRows = arrs.length;
+	obj.nbColumns =  arrs.length;
 	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-	
-	// Vector filling
+
+	// Computation of the correlation matrix
 	for (var i = 0; i < obj.nbRows; ++i) {
-		obj.data[i] = 1;
+		// Copy from upper triangular part
+		for (var j = 0; j < i; ++j) {
+			obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
+		}
+		
+		// Computation part
+		for (var j = i; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = covariance_(arrs[i], arrs[j]);
+		}
 	}
+
+	// Add covariance matrix methods
+	addCovarianceMatrixMethods_(obj);
 	
-	// Return
+	// Return it
 	return obj;
 }
+
+/**
+* @function sampleCovarianceMatrix
+*
+* @summary Returns the sample covariance matrix of a series of values.
+*
+* @description This function computes the sample covariance matrix of a series of values, provided as 
+* a variable number of arrays of real numbers of the same length.
+*
+* @param {...Array.<number>} var_args, arrays of real numbers of the same length.
+* @return {Matrix_} a Matrix object representing the sample covariance matrix of the input series of values.
+*
+* @example
+* sampleCovarianceMatrix([0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]);
+* // == Matrix_([[0.00053, -0.0008], [-0.0008, 0.0016]])
+*/
+function sampleCovarianceMatrix(varg_args) {
+	// Construct the covariance matrix
+	var arrs = arguments;
+	
+	// Result matrix instantiation
+	var obj = Object.create(Matrix_.prototype);
+	obj.nbRows = arrs.length;
+	obj.nbColumns =  arrs.length;
+	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+
+	// Computation of the correlation matrix
+	for (var i = 0; i < obj.nbRows; ++i) {
+		// Copy from upper triangular part
+		for (var j = 0; j < i; ++j) {
+			obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
+		}
+		
+		// Computation part
+		for (var j = i; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = sampleCovariance_(arrs[i], arrs[j]);
+		}
+	}
+
+	// Add covariance matrix methods
+	addCovarianceMatrixMethods_(obj);
+	
+	// Return it
+	return obj;
+}
+
+/**
+* @function toCovarianceMatrix
+*
+* @summary Returns a copy of the original matrix to which is added the methods of a covariance matrix.
+*
+*@description This function computes a copy of the original matrix and adds the methods of a covariance matrix to it.
+*
+* @memberof Matrix_
+* @return {Matrix_} a copy of the original matrix to which is added the methods of a covariance matrix.
+*
+* @example
+* Matrix_([[1,0.1], [0.1,1]]).toCovarianceMatrix();
+* // == Matrix_([[1,0.1], [0.1,1]]) with covariance matrix methods
+*/
+Matrix_.prototype.toCovarianceMatrix = function() {
+	// Construct the covariance matrix
+	var cov = new Matrix_(this);
+	
+	// No checks: square, symetric, semidefinite positive, etc
+	
+	// Add covariance matrix methods
+	addCovarianceMatrixMethods_(this);
+	
+	// Return it
+	return this;
+}
+
+
+/**
+* @function addCovarianceMatrixMethods_
+*
+* @summary Add methods related to a covariance matrix to a Matrix object.
+*
+* @description This function adds methods related to a covariance matrix to a Matrix object.
+*
+* @param {Matrix_} a, a matrix.
+* @return {void}
+*
+* @example
+* addCovarianceMatrixMethods_(Matrix_([[1,0.1], [0.1,1]]));
+* // 
+*/
+function addCovarianceMatrixMethods_(matrix) {
+	var methods = {
+    	/**
+    	* @function getCorrelationMatrix
+    	*
+    	* @summary Returns the correlation matrix associated to a covariance matrix.
+    	*
+    	* @description This function computes a correlation matrix (c_ij),i=1..n,j=1..n from the original 
+    	* matrix (a_ij),i=1..n,j=1..n, with coefficients satisfying c_ij = a_ij/(a_ii * a_jj).
+    	*
+    	* @memberof Matrix_
+    	* @return {Matrix_} the correlation matrix associated to the covariance matrix.
+    	*
+    	* @example
+    	* fromDoubleArray([[1,0.1], [0.1,1]]).getCorrelationMatrix();
+    	* // Matrix_([[1,0.1], [0.1,1]])
+    	*/
+		'getCorrelationMatrix': function() { 
+			// Result matrix instantiation
+			var obj = Object.create(Matrix_.prototype);
+			obj.nbRows = this.nbRows;
+			obj.nbColumns =  this.nbColumns;
+			obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+
+			// Computation of the correlation matrix
+			for (var i = 0; i < obj.nbRows; ++i) {
+				// Standard devation of a_ii
+				var stdDevI = Math.sqrt(this.data[i * this.nbColumns + i]);
+				
+				// Copy from upper triangular part
+				for (var j = 0; j < i; ++j) {
+					obj.data[i * obj.nbColumns + j] = obj.data[j * this.nbColumns + i];
+				}
+				
+				// Computation part
+				for (var j = i; j < obj.nbColumns; ++j) {
+					// Standard devation of a_jj
+					var stdDevJ = Math.sqrt(this.data[j * this.nbColumns + j]);
+				
+					obj.data[i * obj.nbColumns + j] = this.data[i * this.nbColumns + j] / ( stdDevI * stdDevJ );
+				}
+			}
+
+			// Return
+			return obj;
+		},
+		
+    	/**
+    	* @function getVariancesVector
+    	*
+    	* @summary Returns the variances associated to a covariance matrix.
+    	*
+    	* @description This function returns, as a vector of n rows, the diagonal elements (a_ii), i=1..n from the original
+    	* square matrix (a_ij),i=1..n,j=1..n.
+    	*
+    	* @memberof Matrix_
+    	* @return {Vector_} the variances vector associated to the covariance matrix.
+    	*
+    	* @example
+    	* fromDoubleArray([[1,0.1], [0.1,1]]).getVariancesVector();
+    	* // Vector_([1,1])
+    	*/
+		'getVariancesVector': function() { 
+			return this.getDiagonal();
+		},
+	};
+
+  // Addition of the methods to the input matrix
+  for (var name in methods) {
+    matrix[name] = methods[name];
+  }
+};
 
 
 
@@ -967,6 +1269,193 @@ function rank_(x, order) {
 	// Returnt the computed ranks
 	return xRanks;
 }
+
+
+/**
+* @function ftca_
+*
+* @summary Compute a clustering representation of a universe of elements using the Fast Threshold Clustering Algorithm (FTCA).
+*
+* @description This function returns the clustering representation of a universe of n elements based on their correlation
+* and a correlation threshold, as computed by the FTCA algorithm of David Varadi described in the reference, initially created
+* to deal with financial assets.
+*
+* This algorithm has many desirable properties that traditional clustering algorithms do not:
+* 1) it produces fairly stable clusters
+* 2) it is fast and deterministic 
+* 3) it is easy to understand. 
+*
+* By default, David Varadi used a correlation threshold of 0.5 (approximately the level of statistical significance) to separate similar from dissimilar elements (assets).
+* The choice of the threshold will change the number and stability of the clusters, with higher thresholds showing more clusters and a greater change in membership than lower thresholds. 
+*
+* To be noted that the FTCA works similar to the Minimum Correlation Algorithm from the same author in that it uses the average correlation of each element (asset)
+* to all other elements (asset)s as a means of determining how closely or distantly related an element (asset) is to the universe of elements (assets) chosen.
+*
+* @see <a href="https://cssanalytics.wordpress.com/2013/11/26/fast-threshold-clustering-algorithm-ftca/">Fast Threshold Clustering Algorithm (FTCA)</a>
+* 
+* @param {Matrix_} correlationMatrix the correlation matrix (rho_ij),i,j=1..n of n elements, square n by n Matrix where n is a strictly positive natural integer.
+* @param {number} threshold the correlation threshold to use in the FTCA algorithm, a real number typically belonging to interval [-1, 1].
+* @return {Array.<Array.<number>>} the list of clusters as computed by the FTCA algorithm, array of m arrays of strictly positive integers representing the indexes of the elements in the considered universe, where m is the number of clusters, with the m arrays forming a partition of the set [1..n].
+*
+* @example
+* ftca_(new Matrix_([[1, 0], [0,1]]), 0.5);
+*  // [[2],[1]]
+*/
+function ftca_(correlationMatrix, threshold) {
+	// Decode the optional threshold
+	var threshold = threshold;
+	if (threshold === undefined) {
+		threshold = 0.5;
+	}
+	
+	// The list of output clusters, to be populated
+	var clusters = [];
+
+	// The list of elements indexes not assigned to any cluster, initialized with all elements indexes (initially, no clusters are existing)
+	var nbElements = correlationMatrix.nbRows;
+	var unassignedElementsIdx = new Array(nbElements);
+	for (var i = 0; i < unassignedElementsIdx.length; ++i) {
+		unassignedElementsIdx[i] = i + 1;
+	}
+
+	// While there are elements that have not been assigned to a cluster
+	while (unassignedElementsIdx.length != 0) {
+		// If only one element remaining then
+		if (unassignedElementsIdx.length === 1) {
+			// Add a new cluster
+			// Only member is the remaining element, set as not unassigned anymore
+			var newCluster = [unassignedElementsIdx[0]];
+			unassignedElementsIdx[0] = null;
+			
+			// Effectively add the new cluster into the list of clusters
+			clusters.push(newCluster);
+		}	
+		else {
+			// Get the (sub)correlation matix of the unassigned elements
+			var subCorrMat = correlationMatrix.getSubmatrix(unassignedElementsIdx, unassignedElementsIdx);
+			
+			// Compute the average correlation of each unassigned element to all the other unassigned elements
+			// Computation is done for each row
+			var subCorrMatRows = subCorrMat.toDoubleArray(function(i, j, val) {
+				return i != j;
+			});
+			var avgCorrelation = new Array(unassignedElementsIdx);
+			for (var i = 0; i < unassignedElementsIdx.length; ++i) {
+				avgCorrelation[i] = mean_(subCorrMatRows[i]);
+			}
+				
+			// Find the element with the Highest Average Correlation (HC) to all elements not yet been assigned to a Cluster
+			// Find the element with the Lowest Average Correlation (LC) to all elements not yet assigned to a Cluster
+			// Note: When only 2 elements are remaining, HC will be equal to LC
+			var hc = 0;
+			var hcIdx = -1;
+			var highestAvgCorrelation = -1;
+			var lc = 0;
+			var lcIdx = -1;
+			var lowestAvgCorrelation = 1;		
+			for (var i = 0; i < unassignedElementsIdx.length; ++i) {
+				if (avgCorrelation[i] >= highestAvgCorrelation) {
+					hc = unassignedElementsIdx[i];
+					hcIdx = i;
+					highestAvgCorrelation = avgCorrelation[i];
+				}
+				if (avgCorrelation[i] <= lowestAvgCorrelation) {
+					lc = unassignedElementsIdx[i];
+					lcIdx = i;
+					lowestAvgCorrelation = avgCorrelation[i];
+				}
+			}
+			
+			// If Correlation between HC and LC > Threshold
+			if (correlationMatrix.getValueAt(hc, lc) > threshold) {
+				// Add a new Cluster made of HC and LC and set these two elements as not unassigned anymore
+				// (Unless HC == LC, which can happen, for instance when there are only two elements remaining)
+				var newClusterHcLc = (hc === lc ? [hc] : [hc, lc]);
+				unassignedElementsIdx[hcIdx] = null;
+				unassignedElementsIdx[lcIdx] = null;
+				
+				// Add to Cluster all other elements that have yet been assigned to a Cluster and have an Average Correlation to HC and LC > Threshold
+				// Note: In Systematic Investor R code, all remaining elements are put inthe HcLc cluster, disregarding the condition on the correlation above.
+				for (var i = 0; i < unassignedElementsIdx.length; ++i) {
+					if (unassignedElementsIdx[i] !== null) { // Skip assigned elements (HC and LC)
+						var avgHcLcAssetCorrelation = (correlationMatrix.getValueAt(unassignedElementsIdx[i], hc) + correlationMatrix.getValueAt(unassignedElementsIdx[i], lc)) / 2;
+						if (avgHcLcAssetCorrelation  > threshold) {
+							newClusterHcLc.push(unassignedElementsIdx[i]);
+							
+							// Set the element as not unassigned anymore
+							unassignedElementsIdx[i] = null;
+						}
+					}
+				}
+			   
+				// Effectively add the new cluster into the list of clusters				
+				clusters.push(newClusterHcLc);
+			}
+			// Else
+			else {
+				// Add a Cluster made of HC and set this element as not unassigned anymore
+				var newClusterHc = [hc];
+				unassignedElementsIdx[hcIdx] = null;
+				
+				// Add to Cluster all other assets that have yet been assigned to a Cluster and have a Correlation to HC > Threshold
+				for (var i = 0; i < unassignedElementsIdx.length; ++i) {
+					if (unassignedElementsIdx[i] !== null) { // Skip assigned assets (HC)
+						if (correlationMatrix.getValueAt(unassignedElementsIdx[i], hc) > threshold) {
+							newClusterHc.push(unassignedElementsIdx[i]);
+							
+							// Set the element as not unassigned anymore
+							unassignedElementsIdx[i] = null;
+						}
+					}
+				}
+				
+				// Effectively add the new cluster into the list of clusters				
+				clusters.push(newClusterHc);
+
+				// Add a Cluster made of LC and set this element as not unassigned anymore
+				// (Unless HC == LC, which can happen, for instance when there are only two elements remaining)
+				if (hc !== lc) {
+					// Note: At this stage, to be noted that the LC element cannot have been assigned to the Hc cluster above if LC <> HC, since
+					// otherwise, it would mean corr(lc, hc) > threshold, which is incompatible with the "else" branch in which
+					// the code currently is; Lc cluster is thus always non empty.
+					var newClusterLc = [lc];
+					unassignedElementsIdx[lcIdx] = null;
+					
+					// Add to Cluster all other assets that have yet been assigned to a Cluster and have Correlation to LC > Threshold
+					for (var i = 0; i < unassignedElementsIdx.length; ++i) {
+						if (unassignedElementsIdx[i] !== null) { // Skip assigned assets (HC with its correlated assets, and LC)
+							if (correlationMatrix.getValueAt(unassignedElementsIdx[i], lc) > threshold) {
+								newClusterLc.push(unassignedElementsIdx[i]);
+								
+								// Set the element as not unassigned anymore
+								unassignedElementsIdx[i] = null;
+							}
+						}
+					}
+
+					// Effectively add the new cluster into the list of clusters				
+					clusters.push(newClusterLc);
+				}
+				
+				// Note: In Systematic Investor R code, it is possible for an element to belong to the two clusters Hc and Lc, in which case Hc is the final cluster,
+				// which is conform to the description of the reference.
+			}
+		}
+		
+		// Effectively remove the assigned elements indexes (now pointing to null)  from the list of unassigned elements
+		var newUnassignedElementsIdx = [];
+		for (var i = 0; i < unassignedElementsIdx.length; ++i) {
+			if (unassignedElementsIdx[i] !== null) {
+				newUnassignedElementsIdx.push(unassignedElementsIdx[i]);
+			}
+		}
+		unassignedElementsIdx = newUnassignedElementsIdx;
+	}
+
+	// Return the computed list of clusters
+	return clusters;
+}
+
 
 
 /**
@@ -1243,7 +1732,7 @@ function sampleCovariance_(x, y) {
 
 
 /**
- * @file Functions related to helpers for portfolio allocation.
+ * @file Functions related to cluster risk parity portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
@@ -1251,77 +1740,163 @@ function sampleCovariance_(x, y) {
 
 
 /**
-* @function Helpers
+* @function clusterRiskParityWeights
 *
-* @summary Construct a portfolio allocation helper object, unused.
+* @summary Compute the weights of the cluster risk parity portfolio.
 *
-* @description This function constructs a portfolio allocation helper object, unused.
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only 
+* cluster risk parity portfolio of n assets, as computed by the cluster risk parity algorithm described in 
+* the reference.
+*
+* This algorithm combines the use of a clustering method to isolate groups of assets and then allocate 
+* both within and across these groups using equal risk contribution (ERC) weights.
+*
+* To be noted that the choice of the clustering method is not detailled in the reference, so that two possibilites
+* are offered by this function:
+* - (Default) Using automatically the Fast Threshold Clustering Algorithm (FTCA) from David Varadi, c.f. the ftca_ function.
+* - Using a list of clusters provided by the user, typically constructed with the clustering algorithm of her choice
 * 
-* @return {this} the constructed portfolio allocation helper, unused.
+* This portfolio is unique, provided the covariance matrix of the assets is definite positive.
+* 
+* @see <a href="https://cssanalytics.wordpress.com/2013/01/03/cluster-risk-parity/">Cluster Risk Parity</a>
+* 
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square n by n Matrix or array of n arrays of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the tolerance parameter for the convergence of the ERC algorithms, a strictly positive real number; defaults to 1e-8.
+* @param {number} opt.maxIter the maximum number of iterations of the ERC algorithms, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.clusteringMode the method to use for the clusters computation, a string either equals to 'ftca' (usage of the list of clusters automatically constructed by the FTCA algorithm from David Varadi) or to 'manual' (usage of a list of clusters provided in input in the opt.clusters option); defaults to 'ftca'.
+* @param {number} opt.ftcaThreshold the correlation threshold to use in the FTCA algorithm in case opt.clusteringMode is equal to 'ftca', a real number beloning to [0,1]; defaults to 0.5.
+* @param {Array.<Array.<number>>} opt.clusters the list of clusters to use in the algorithm in case opt.clusteringMode is equal to 'manual', an array of m arrays of strictly positive integers representing the indexes of the assets in the considered universe, where m is the number of clusters, with the m arrays forming a partition of the set [1..n].
+* @return {Array.<number>} the weights corresponding to the cluster risk parity portfolio, array of n real numbers.
 *
 * @example
-* Helpers();
+* clusterRiskParityWeights([[0.1,0], [0,0.2]], {clusteringMode: 'none', clusters: [[1], [2]]});
+*  
 */
-function Helpers() {
-	// Return
-	return this;
-}
-
-
-/**
-* @function covarianceMatrix
-*
-* @summary Returns the covariance matrix of a series of values.
-*
-* @description This function computes the covariance matrix of a series of values, provided as 
-* a variable number of arrays of real numbers of the same length.
-*
-* @param {...Array.<number>} var_args, arrays of real numbers of the same length.
-* @return {Array.<Array.<number>>} an array of array of real numbers representing the covariance matrix
-* of the input series of values, organized by rows and then by columns.
-*
-* @example
-* covarianceMatrix([0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]);
-* // [[0.00036,  -0.00053], [-0.00053, 0.00107]]
-*/
-Helpers.covarianceMatrix = function(var_args) {
-	// Construct the covariance matrix
-	var arrs = arguments;	
-	var cov = Matrix_.fillSymetric(arrs.length, function(i, j) { 
-		return covariance_(arrs[i-1], arrs[j-1]); 
-	});
+function clusterRiskParityWeights (sigma, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
 	
-	// Return it
-	return cov.toDoubleArray();
-}
-
-
-/**
-* @function sampleCovarianceMatrix
-*
-* @summary Returns the sample covariance matrix of a series of values.
-*
-* @description This function computes the sample covariance matrix of a series of values, provided as 
-* a variable number of arrays of real numbers of the same length.
-*
-* @param {...Array.<number>} var_args, arrays of real numbers of the same length.
-* @return {Array.<Array.<number>>} an array of array of real numbers representing the sample covariance matrix
-* of the input series of values, organized by rows and then by columns.
-*
-* @example
-* sampleCovarianceMatrix([0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]);
-* // [[0.00053, -0.0008], [-0.0008, 0.0016]]
-*/
-Helpers.sampleCovarianceMatrix = function(var_args) {
-	// Construct the sample covariance matrix
-	var arrs = arguments;
-	var cov = Matrix_.fillSymetric(arrs.length, function(i, j) { 
-		return sampleCovariance_(arrs[i-1], arrs[j-1]); 
-	});
+	// Clustering options
+	var clusteringMode = opt.clusteringMode || 'ftca';
 	
-	// Return it
-	return cov.toDoubleArray();
+	// Convert sigma to matrix format
+	var sigma = new Matrix_(sigma).toCovarianceMatrix();
+	var nbAssets = sigma.nbRows;
+
+	
+	// ------
+	// Clustering logic
+	var clusters = [];
+	
+	// In case clusters are provided, check that they form a partition of the set [1..nbAssets]
+	if (clusteringMode === 'manual') {
+		// Decode the none clustering options
+		clusters = opt.clusters || [];
+		
+		// Prepare a partition of the set of integers [1..nbAssets]
+		var partition = new Array(nbAssets);
+		for (var i = 0; i < partition.length; ++i) {
+		    partition[i] = 0;
+		}
+		
+		// Count the number of times each asset index appears in the list of clusters
+	 	for (var j = 0; j < clusters.length; ++j) {
+	        // Detect empty clusters
+			if (clusters[j].length === 0) {
+				throw new Error('empty cluster at index: ' + j);
+			}
+			
+			// Detect out of bounds asset indexes
+			// Count the number of times each asset index appears in the list of clusters
+			for (var k = 0; k < clusters[j].length; ++k) {
+	            var assetIdx = clusters[j][k];
+	            if (assetIdx < 1 || assetIdx > nbAssets) {
+	                throw new Error('asset index out of bounds: ' + assetIdx);
+	            }
+	            else {
+	                partition[assetIdx-1]++;
+	            }
+	        }
+	    }
+		    
+		// Check that each integer in the set [1..nbAssets] is appears once and only once 
+		// in the list of clusters
+		for (var i = 0; i < partition.length; ++i) {
+		    if (partition[i] !== 1) {
+		        if (partition[i] === 0) {
+		            throw new Error('missing asset index: ' + (i+1));
+		        }
+		        else if (partition[i] > 1) {
+		            throw new Error('duplicate asset index: ' + (i+1));
+		        }
+		        else {
+		            throw new Error('unknown error');
+		        }
+		    }
+		}
+
+		// All checks passed
+	}
+	// Otherwise, compute the clusters using the Fast Threshold Clustering Algorithm from David Varadi
+	else if (clusteringMode === 'ftca') {
+		// Extract the correlation matrix from the covariance matrix
+		var corrMat = sigma.getCorrelationMatrix();
+		
+		// Compute the clusters using the FTCA algorithm
+		clusters = ftca_(corrMat, opt.ftcaThreshold);
+	}
+	else {
+		//
+		throw new Error('unsupported clustering method');
+	}
+	
+
+	// ------
+	// The cluster risk parity portfolio is constructed in three steps:
+	// 1 - Clusters creation (done above)
+	// 2 - Assets allocation within each cluster using ERC weights
+	// 3 - Portfolio allocation across all clusters using ERC weights and considering each cluster as a (synthetic) asset
+	
+	// 1 - N/A
+	var nbClusters = clusters.length;
+	
+	// Instantiate the matrix mapping the initial assets to the clusters space (e.g., a change of base matrix),
+	// to be populated with proper weights in step 2 below.
+	var assetsToClustersWeights = Matrix_.zeros(nbClusters, nbAssets); 
+	
+	// 2 - For each cluster:
+	for (var i = 0; i < nbClusters; ++i) {
+		// Extract the covariance matrix associated to the assets it contains 
+		var assetsIndexes = clusters[i].slice().sort(function(a, b) { return a - b; });
+		
+		var clusterSigma = sigma.getSubmatrix(assetsIndexes, assetsIndexes);
+		
+		// Compute ERC weights for these assets
+		var assetsWeights = equalRiskContributionWeights(clusterSigma, opt);
+		
+		// - Populate the change of base matrix for the current cluster with the computed ERC weights
+		for (var j = 0; j < assetsWeights.length; ++j) {
+			assetsToClustersWeights.setValueAt(i+1, assetsIndexes[j], assetsWeights[j]);
+		}
+	}
+	
+	// 3a - Compute the the covariance matrix associated to the weighted clusters space, using formula Var(A*X) = A * Var(X) * A'.
+	var clustersSigma = Matrix_.product(assetsToClustersWeights, Matrix_.product(sigma, assetsToClustersWeights.transpose()));
+	
+	// 3b - Compute ERC weights in the clusters space
+	var clustersWeights = equalRiskContributionWeights(clustersSigma, opt);
+	
+	// 3c - Compute original assets weights, using formula A' * Y
+	var weights = Matrix_.product(assetsToClustersWeights.transpose(), new Matrix_(clustersWeights));
+	
+	// Return them (already normalized)
+	return weights.toArray();
 }
+
+
 /**
  * @file Functions related to equal risk budget portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
@@ -1343,11 +1918,11 @@ Helpers.sampleCovarianceMatrix = function(var_args) {
 *
 * This portfolio is unique.
 *
-* This portfolio maximizes the Sharpe ratio if the Sharpe ratio for each stock is the same and all pair-wise correlations are equal.
+* This portfolio maximizes the Sharpe ratio if the assets mean returns are proportional to their volatilities and all pair-wise correlations are equal.
 * 
 * @see <a href="https://ssrn.com/abstract=1949003">Carvalho, Raul Leote de and Xiao, Lu and Moulin, Pierre, Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description (September 13, 2011). The Journal of Portfolio Management, vol. 38, no. 3, Spring 2012.</a>
 * 
-* @param {<Array.<number>} sigma the variance vector (sigma_i),i=1..n of the n assets in the considered universe, array of n real numbers statisfying sigma[i-1] = sigma_i.
+* @param {Matrix_|<Array.<number>} sigma the variance vector (sigma_i),i=1..n of the n assets in the considered universe, column Matrix (i.e., vector) or array of n real numbers statisfying sigma[i-1] = sigma_i.
 * @param {object} opt the optional parameters for the algorithm, unused.
 * @return {Array.<number>} the weights corresponding to the equal risk budget portfolio, array of n real numbers.
 *
@@ -1362,7 +1937,7 @@ function equalRiskBudgetWeights (sigma, opt) {
 	// ------
 	
 	// The output weights are defined as the normalized inverses of the assets standard deviations.
-	var weights = new Vector_(sigma).elemPower(-1/2).normalize();
+	var weights = new Matrix_(sigma).elemPower(-1/2).normalize();
 	
 	// Return the computed weights
 	return weights.toArray();
@@ -1391,6 +1966,8 @@ function equalRiskBudgetWeights (sigma, opt) {
 * This portfolio is a trade-off between the MV portfolio and the EW portfolio.
 * It can be viewed as an ERB portfolio tilted toward the assets less correlated with other assets.
 *
+* This portfolio maximizes the Sharpe ratio if the Sharpe ratio for each stock is the same and all pair-wise correlations are equal.
+*
 * This portfolio is a special case of the more generic risk budgeting portfolio, with all risk budgets
 * equal.
 *
@@ -1400,25 +1977,26 @@ function equalRiskBudgetWeights (sigma, opt) {
 * @see <a href="http://www.iijournals.com/doi/abs/10.3905/jpm.2010.36.4.060">Maillard, S., Roncalli, T., Teiletche, J.: The properties of equally weighted risk contribution portfolios. J. Portf. Manag. 36, 60–70 (2010)</a>
 * @see <a href="https://arxiv.org/abs/1311.4057">Théophile Griveau-Billion, Jean-Charles Richard, Thierry Roncalli; A Fast Algorithm for Computing High-dimensional Risk Parity Portfolios. eprint arXiv:1311.4057</a>
 * 
-* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
-* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
 * @return {Array.<number>} the weights corresponding to the equal risk contributions portfolio, array of n real numbers.
 *
 * @example
 * equalRiskContributionWeights([[0.1,0], [0,0.2]]);
 * // ~[0.59, 0.41]
 */
-function equalRiskContributionWeights (sigma, opt) {
+function equalRiskContributionWeights (sigma, opt) {	
 	// The ERC portfolio is a specific case of the more general risk budgeting portfolio, with equal risk budgets.
 	//
 	// Generate equal risk budgets: rb_i = 1/nbAssets, i=1..nbAssets
-	var nbAssets = sigma.length;
-	var rb = Vector_.ones(nbAssets).normalize();
+	var sigma = new Matrix_(sigma);
+	var nbAssets = sigma.nbRows;	
+	var rb = Matrix_.ones(nbAssets, 1).normalize();
 
 	// Compute the associated risk budgeting weights
-	return riskBudgetingWeights(sigma, rb.toArray(), opt);
+	return riskBudgetingWeights(sigma, rb, opt);
 }
 
 
@@ -1440,7 +2018,7 @@ function equalRiskContributionWeights (sigma, opt) {
 *
 * This portfolio is unique.
 *
-* This portfolio maximizes the Sharpe ratio if the returns and volatility are the same for all stocks and all pair-wise correlations are equal.
+* This portfolio maximizes the Sharpe ratio if the returns and volatilities are the same for all assets and all pair-wise correlations are equal.
 * 
 * @see <a href="https://academic.oup.com/rfs/article-abstract/22/5/1915/1592901/Optimal-Versus-Naive-Diversification-How">Victor DeMiguel, Lorenzo Garlappi, Raman Uppal; Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?. Rev Financ Stud 2009; 22 (5): 1915-1953. doi: 10.1093/rfs/hhm075</a>
 * 
@@ -1457,7 +2035,7 @@ function equalWeights (nbAssets, opt) {
 	// Check that nbAssets is a strictly positive natural integer
 
 	// Allocate the weights vector: all the weights are equal to 1/nbAssets
-	var weights = Vector_.ones(nbAssets).normalize();
+	var weights = Matrix_.ones(nbAssets, 1).normalize();
 
 	// Return the computed weights
 	return weights.toArray();
@@ -1482,7 +2060,7 @@ function equalWeights (nbAssets, opt) {
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 * 
-* This portfolio maximizes the Sharpe ratio if the Sharpe ratio for each stock is the same.
+* This portfolio maximizes the Sharpe ratio if the Sharpe ratio of each asset is the same.
 *
 * The algorithm used is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is definite positive.
@@ -1490,10 +2068,10 @@ function equalWeights (nbAssets, opt) {
 * @see <a href="http://www.iijournals.com/doi/abs/10.3905/JPM.2008.35.1.40">Toward Maximum Diversification by Y. Choueifaty, Y. Coignard, The Journal of Portfolio Management, Fall 2008, Vol. 35, No. 1: pp. 40-51</a>
 * @see <a href="https://ssrn.com/abstract=2595051">Richard, Jean-Charles and Roncalli, Thierry, Smart Beta: Managing Diversification of Minimum Variance Portfolios (March 2015)</a>
 * 
-* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
-* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
 * @return {Array.<number>} the weights corresponding to the most diversified portfolio, array of n real numbers.
 *
 * @example
@@ -1506,7 +2084,7 @@ function mostDiversifiedWeights (sigma, opt) {
 		opt = {};
 	}
 	var eps = opt.eps || 1e-8;
-	var maxIterations = opt.maxIter || 1000;
+	var maxIterations = opt.maxIter || 10000;
 	
 	// Convert sigma to matrix format
 	var sigma = new Matrix_(sigma);
@@ -1524,12 +2102,12 @@ function mostDiversifiedWeights (sigma, opt) {
 	var nbAssets = sigma.nbRows;
 	
 	// Initial point for the algorithm is an equal weight vector
-	var x = Vector_.ones(nbAssets).normalize();
+	var x = Matrix_.ones(nbAssets, 1).normalize();
 	
 	// Preparational computations
-	var sigma_x = Matrix_.vectorProduct(sigma, x); // SIGMA*x
-	var s_x = Math.sqrt(Vector_.dotProduct(sigma_x, x)); // sigma(x)
-	var dr = Vector_.dotProduct(stddevs, x) / s_x; // diversification ratio DR
+	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
+	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
+	var dr = Matrix_.vectorDotProduct(stddevs, x) / s_x; // diversification ratio DR
 	
 	// Main loop until convergence, guaranteed as per hypotheses on sigma
 	var iter = 0;
@@ -1563,11 +2141,11 @@ function mostDiversifiedWeights (sigma, opt) {
 			x.setValueAt(i, 1, xi_star_1);
 
     	      // Case #1 updated SIGMA*x and x'*SIGMA*x products
-    	    sigma_x = Matrix_.vectorProduct(sigma, x)
-    	    s_x = Math.sqrt(Vector_.dotProduct(sigma_x, x));
+    	    sigma_x = Matrix_.product(sigma, x)
+    	    s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x));
 			
 			  // Case #1 diversification ratio computation
-			var dr_star = Vector_.dotProduct(stddevs, x) / s_x; // Weighted average volatility of the portfolio divided by the volatility of the portfolio
+			var dr_star = Matrix_.vectorDotProduct(stddevs, x) / s_x; // Weighted average volatility of the portfolio divided by the volatility of the portfolio
 			
 			// Case #2 test
 			if (r1 > 0) {
@@ -1577,11 +2155,11 @@ function mostDiversifiedWeights (sigma, opt) {
 				x.setValueAt(i, 1, xi_star_2);
 				
 				// Case #2 updated SIGMA*x and x'*SIGMA*x products
-				var sigma_x_2 = Matrix_.vectorProduct(sigma, x)
-				var s_x_2 = Math.sqrt(Vector_.dotProduct(sigma_x_2, x));
+				var sigma_x_2 = Matrix_.product(sigma, x)
+				var s_x_2 = Math.sqrt(Matrix_.vectorDotProduct(sigma_x_2, x));
 				
 				// Case #2 diversification ratio computation
-				var dr_star_2 = Vector_.dotProduct(stddevs, x) / s_x_2;
+				var dr_star_2 = Matrix_.vectorDotProduct(stddevs, x) / s_x_2;
 				
 				// Selection between the two cases
 				// Note: Portfolio sparsity is priviledged in case of equality
@@ -1650,7 +2228,7 @@ function mostDiversifiedWeights (sigma, opt) {
 *
 * @see <a href="www.systematicportfolio.com/mincorr_paper.pdf">David Varadi, Michael Kapler, Henry Bee, Corey Rittenhouse, Sep. 2012, The Minimum Correlation Algorithm: A Practical Diversification Tool</a>
 *
-* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm, unused.
 * @return {Array.<number>} the weights corresponding to theminimum correlation (heuristic) portfolio, array of n real numbers.
 *
@@ -1659,15 +2237,13 @@ function mostDiversifiedWeights (sigma, opt) {
 * // ~[0.59, 0.41]
 */
 function minCorrWeights (sigma, opt) {
-	// Convert sigma to matrix format
-	var sigma = new Matrix_(sigma);
+	// Convert sigma to covariance matrix format
+	var sigma = new Matrix_(sigma).toCovarianceMatrix();
 	
 	// Extract the correlation matrix and the misc. variances-related vectors
-	// Note: this could be optimized to O(n) instead of O(n^2), if ever necessary
-	var variances = sigma.getDiagonal();
+	var variances = sigma.getVariancesVector();
 	var invStddevs = variances.elemPower(-1/2);
-	var matInvStddevs = Matrix_.diagonal(invStddevs.toArray());
-	var rho = Matrix_.product(matInvStddevs, Matrix_.product(sigma, matInvStddevs));
+	var rho = sigma.getCorrelationMatrix();
 
 	// TODO: Checks, if enabled	
 	
@@ -1676,7 +2252,7 @@ function minCorrWeights (sigma, opt) {
 	
 	// Specific case to be filtered out: number of assets is 2 (or 1, but this case is less useful)
 	if (nbAssets <= 2) {
-		return equalRiskBudgetWeights(variances.toArray(), opt);
+		return equalRiskBudgetWeights(variances, opt);
 	}
 	
 	// Step 2: Compute mean and sample standard deviation of the correlation matrix elements
@@ -1710,13 +2286,13 @@ function minCorrWeights (sigma, opt) {
 	// Step 5: Compute rank portfolio weight estimates
 	// Note: ranks are computed in descending order, c.f. the example of the reference
 	var ranks = rank_(rowsAverages, 0);
-	var weights = new Vector_(ranks).normalize();
+	var weights = new Matrix_(ranks, 1).normalize();
 	
 	// Step 6: Combine rank portfolio weight estimates with Adjusted Correlation Matrix
-	weights = Matrix_.vectorProduct(adjustedRho, weights).normalize();
+	weights = Matrix_.product(adjustedRho, weights).normalize();
 	
 	// Step 7: Scale portfolio weights by assets standard deviations
-	weights = Vector_.hadamardProduct(weights, invStddevs).normalize();
+	weights = Matrix_.vectorHadamardProduct(weights, invStddevs).normalize();
 	
 	// Return the computed weights
 	return weights.toArray();
@@ -1724,7 +2300,7 @@ function minCorrWeights (sigma, opt) {
 
 
 /**
- * @file Functions related to proportional minimum variance(heuristic) portfolio.
+ * @file Functions related to proportional minimum variance (heuristic) portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
@@ -1750,7 +2326,7 @@ function minCorrWeights (sigma, opt) {
 *
 * @see <a href="https://cssanalytics.wordpress.com/2013/04/05/minimum-variance-algorithm-mva-excel-sheet/">Minimum Variance Algorithm (MVA) Excel Sheet</a>
 *
-* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm, unused.
 * @return {Array.<number>} the weights corresponding to theminimum variance (heuristic) portfolio, array of n real numbers.
 *
@@ -1767,9 +2343,6 @@ function minVarWeights (sigma, opt) {
 	// ------
 	var nbAssets = sigma.nbRows;
 	
-	// Specific case to be filtered out: number of assets is 2 (or 1, but this case is less useful)
-	// TODO ?
-
 	// Step 1: Average pairwise covariance, and associated mean/standard deviation
 	var rowsElements = sigma.toDoubleArray();
 	var rowsAverages = new Array(nbAssets);
@@ -1780,13 +2353,13 @@ function minVarWeights (sigma, opt) {
 	var elementsStddev = sampleStddev_(rowsAverages);
 
 	// Step 2: Gaussian convertion, and proportional average covar weigth
-	var weights = new Vector_(rowsAverages).elemMap(function(i, j, val) { 
+	var weights = new Matrix_(rowsAverages, 1).elemMap(function(i, j, val) { 
 		return 1 - normcdf_((val - elementsMean)/elementsStddev);
 	}).normalize();
 	
 	// Step 3: Scale portfolio weights by assets variances
 	var invVariancesWeights = sigma.getDiagonal().elemPower(-1).normalize();
-	weights = Vector_.hadamardProduct(weights, invVariancesWeights).normalize();
+	weights = Matrix_.vectorHadamardProduct(weights, invVariancesWeights).normalize();
 	
 	// Return the computed weights
 	return weights.toArray();
@@ -1818,11 +2391,11 @@ function minVarWeights (sigma, opt) {
 * @see <a href="https://ssrn.com/abstract=2009778">Bruder, Benjamin and Roncalli, Thierry, Managing Risk Exposures Using the Risk Budgeting Approach (January 20, 2012).</a>
 * @see <a href="https://arxiv.org/abs/1311.4057">Théophile Griveau-Billion, Jean-Charles Richard, Thierry Roncalli; A Fast Algorithm for Computing High-dimensional Risk Parity Portfolios. eprint arXiv:1311.4057</a>
 * 
-* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {Array.<number>} rb the risk budgets, array of n real strictly positive numbers summing to one.
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
-* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
 * @return {Array.<number>} the weights corresponding to the risk budgeting portfolio, array of n real numbers.
 *
 * @example
@@ -1835,13 +2408,13 @@ function riskBudgetingWeights (sigma, rb, opt) {
 		opt = {};
 	}
 	var eps = opt.eps || 1e-8;
-	var maxIterations = opt.maxIter || 1000;
+	var maxIterations = opt.maxIter || 10000;
 	
 	// Convert sigma to matrix format
 	var sigma = new Matrix_(sigma);
 	
 	// Convert rb to vector format
-	var rb = new Vector_(rb);
+	var rb = new Matrix_(rb);
 
 	// TODO: Checks, if enabled
 	// Check that diagonal entries of sigma are strictly positive
@@ -1854,11 +2427,11 @@ function riskBudgetingWeights (sigma, rb, opt) {
 	var nbAssets = sigma.nbRows;
 	
 	// Initial point for the algorithm is an equal weight vector
-	var x = Vector_.ones(nbAssets).normalize();
+	var x = Matrix_.ones(nbAssets, 1).normalize();
 	
 	// Preparational computations
-	var sigma_x = Matrix_.vectorProduct(sigma, x); // SIGMA*x
-	var s_x = Math.sqrt(Vector_.dotProduct(sigma_x, x)); // sigma(x)
+	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
+	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
 	
 	// Main loop until convergence, guaranteed as per hypotheses on sigma and b
 	var iter = 0;
@@ -1878,7 +2451,7 @@ function riskBudgetingWeights (sigma, rb, opt) {
 			var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
 			var disc = b_p*b_p - a*c;
 			if (disc < 0) {
-			    throw new Error('discriminant not positive during iteration ' + iter + ', covariance matrix might not be psd');
+			    throw new Error('Discriminant not positive during iteration ' + iter + ', covariance matrix might not be definite positive');
 			}
     	    var q = -(b_p + sign_b_p * Math.sqrt(disc));
     	    var r1 = q/a;
@@ -1889,8 +2462,8 @@ function riskBudgetingWeights (sigma, rb, opt) {
     	    x.setValueAt(i,1,xi_star);
     	    
     	    // Compute the updated SIGMA*x and x'*SIGMA*x products for convergence condition evaluation + next loop evaluation
-    	    sigma_x = Matrix_.vectorProduct(sigma, x)
-    	    s_x = Math.sqrt(Vector_.dotProduct(sigma_x, x));
+    	    sigma_x = Matrix_.product(sigma, x)
+    	    s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x));
     	    
     	    // Update the convergence condition: |RC_i* - b_i| <= eps, i = 1..nbAssets
     	    var rci_star = x.getValueAt(i,1) * sigma_x.getValueAt(i,1) / s_x;

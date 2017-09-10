@@ -167,8 +167,30 @@ QUnit.test('Symetric matrix creation', function(assert) {
   // Test using static data
   var mat = PortfolioAllocation.Matrix.fillSymetric(2, function(i,j) { return i+j; });
   var expectedMat = new PortfolioAllocation.Matrix([[2,3], [3,4]]);
-  assert.deepEqual(mat.toArray(), expectedMat.toArray(), 'Symetric matrix creation');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Symetric matrix creation');
 });
 
 
+QUnit.test('Submatrix extraction', function(assert) {    
+  // Test using static data
+  var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6], [7,8,9]]);
+  var subMat = mat.getSubmatrix([1,3], [1, 3]);
+  var expectedMat = new PortfolioAllocation.Matrix([[1,3], [7,9]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(subMat, expectedMat), true, 'Submatrix extraction');
+});
 
+
+QUnit.test('Zeros matrix creation', function(assert) {    
+  // Test using static data
+  var mat = PortfolioAllocation.Matrix.zeros(3, 2);
+  var expectedMat = new PortfolioAllocation.Matrix([[0,0], [0,0], [0,0]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Zeros matrix creation');
+});
+
+QUnit.test('Transpose matrix', function(assert) {    
+  // Test using static data  
+  var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
+  var transpMat = mat.transpose();
+  var expectedMat = new PortfolioAllocation.Matrix([[1,4], [2,5], [3,6]]); 
+  assert.equal(PortfolioAllocation.Matrix.areEqual(transpMat, expectedMat), true, 'Transpose matrix');
+});

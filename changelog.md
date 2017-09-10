@@ -1,3 +1,7 @@
+### 0.0.3 - 10/09/2017
+- Misc. Matrix/Vector operations additions/refactor
+- New portfolio allocation method: Cluster Risk Parity, with a included clustering method: Fast Threshold Clustering Algorithm
+
 ### 0.0.2 - 24/06/2017
 
 - New portfolio allocation methods: most diversified portfolio, minimum correlation portfolio, proportional minimum variance portfolio

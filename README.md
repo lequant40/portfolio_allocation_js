@@ -1,4 +1,4 @@
-# PortfolioAllocation v0.0.2 ([Changelog](changelog.md))
+# PortfolioAllocation v0.0.3 ([Changelog](changelog.md))
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
@@ -23,18 +23,21 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
   The 1/N portfolio allocation algorithm has been popularized by DeMiguel and al. in their research paper *Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?*.
 
 - Equal risk budgets (ERB)
-  Also known as naive risk parity, this portfolio allocation algorithm has been analysed by Carvalho and al. in the research paper *Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description*.
+  Also known as naive risk parity, this algorithm has been analysed by Carvalho and al. in the research paper *Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description*.
 
 - Equal risk contributions (ERC) and Risk budgeting (RB)
-  Both portfolio allocation algorithms have been extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*,...), the former being a specific case of the latter.
+  Both algorithms have been extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*...), the former being a specific case of the latter.
 
 - Most diversified portfolio (MDP)
-  This portfolio allocation algorithm is described in the research paper *Toward Maximum Diversification* by Choueifaty and al., and uses the authors' diversification ratio as the criterion for portfolio construction.
+  This algorithm is described in the research paper *Toward Maximum Diversification* by Choueifaty and al., and uses the authors' diversification ratio as the criterion for portfolio construction.
 
-- Minimum correlation (MCA) and Proportional Minimum Variance (MVA) heuristics
-  Both algorithms were discovered by [David Varadi](https://cssanalytics.wordpress.com/), the former being meant as an approximation of the MDP and the latter as an approximation of the GMV portfolio.
+- Minimum correlation algorithm (MCA) and Proportional minimum variance algorithm (MVA)
+  Both algorithms were discovered by [David Varadi](https://cssanalytics.wordpress.com/), the former being meant as an approximation of the MDP and the latter as an approximation of the global minimum variance (GMV) portfolio.
+
+- Cluster risk parity portfolio (CRP)
+  This algorithm was discovered by [David Varadi](https://cssanalytics.wordpress.com/) and Michael Kapler(http://systematicinvestor.wordpress.com/), and combines the usage of clustering algorithms (for instance, the Fast Threshold Clustering Algorithm - FTCA - of David Varadi) with ERC.
+
   
-
 ## Usage
 
 ### Usage in Google Sheets
@@ -89,14 +92,8 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 PortfolioAllocation.equalWeights(5); 
 // EW portfolio
 
-PortfolioAllocation.equalRiskBudgetWeights([0.1, 0.2]); 
-// ERB portfolio
-
 PortfolioAllocation.equalRiskContributionWeights([[0.1, 0], [0, 0.2]]); 
 // ERC portfolio
-
-PortfolioAllocation.riskBudgetingWeights([[0.1, 0], [0, 0.2]], [0.25, 0.75]); 
-// RB portfolio
 
 PortfolioAllocation.mostDiversifiedWeights([[0.1, 0], [0, 0.2]], {eps: 1e-10, maxIter: 10000});
 // MDP portfolio
@@ -104,8 +101,8 @@ PortfolioAllocation.mostDiversifiedWeights([[0.1, 0], [0, 0.2]], {eps: 1e-10, ma
 PortfolioAllocation.minCorrWeights([[0.1, 0], [0, 0.2]]);
 // MCA portfolio
 
-PortfolioAllocation.minVarWeights([[0.1, 0], [0, 0.2]]);
-// MVA portfolio
+TODO
+// CRP portfolio
 ```
 
 
