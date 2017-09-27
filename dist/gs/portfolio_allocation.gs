@@ -271,7 +271,7 @@ Matrix_.prototype = {
 	setValueAt: function(i, j, val) {
 		// Bounds check
 		if (i < 1 || j < 1 || i > this.nbRows || j > this.nbColumns) {
-			throw Error(
+			throw new Error(
 			'index out of bounds when setting matrix value, (' + i + ',' + j +
 			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
 		}
@@ -302,7 +302,7 @@ Matrix_.prototype = {
 	getValueAt: function(i, j) {
 		// Bounds check
 		if (i < 1 || j < 1 || i > this.nbRows || j > this.nbColumns) {
-			throw Error(
+			throw new Error(
 			'index out of bounds when getting matrix value, (' + i + ',' + j +
 			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
 		}
@@ -579,7 +579,6 @@ Matrix_.prototype = {
     		
     		for (var j = 0; j < obj.nbColumns; ++j) {
     		    var cindex = cindexes[j] - 1; // column index of the original matrix
-    		    
     			obj.data[i * obj.nbColumns + j] = this.data[rindex * this.nbColumns + cindex];
     		}
     	}
@@ -593,8 +592,8 @@ Matrix_.prototype = {
 	*
 	* @summary Returns the transpose of the original matrix.
 	*
-	* @description This function computes the transpose matrix (c_ij),i=1..n,j=1..m of the original matrix (a_ij),i=1..n,j=1..m, with coefficients
-	* satisfying c_ij = a_ji.
+	* @description This function computes the transpose matrix (c_ij),i=1..n,j=1..m of the original matrix (a_ij),i=1..n,j=1..m,
+	* with coefficients satisfying c_ij = a_ji.
 	*
 	* @memberof Matrix_
 	* @return {Matrix_} the transpose of the original matrix.
@@ -619,6 +618,42 @@ Matrix_.prototype = {
 		
 		// Return
 		return obj;
+	},
+	
+	/**
+	* @function determinant
+	*
+	* @summary Returns the determinant of a square matrix.
+	*
+	* @description This function computes the determinant of a square matrix (a_ij),i=1..n,j=1..n,
+	* using a QR decomposition.
+	*
+	* @memberof Matrix_
+	* @return {number} the determinant of the matrix.
+	*
+	* @example
+	* Matrix_([[1,2], [3,4]]).determinant();
+	* // XX
+	*/
+	determinant: function () {
+    	// Checks
+    	if (!this.isSquare()) {
+    		throw new Error('matrix is not square: ' + '(' + this.nbRows + ',' + this.nbColumns + ')');
+    	}
+		
+		// Compute the Givens QR decomposition of the matrix
+		var qr = Matrix_.givensQRDecomposition(this);
+		
+		// By property of the Givens QR decomposition, the determinant of the matrix
+		// is then the product of the diagonal elements of the R matrix.
+		var r = qr[1];
+		var det = 1.0;
+		for (var i = 0; i < r.nbRows; ++i) {
+		        det *= r.data[i * r.nbColumns + i];
+		}
+
+		// Return it
+		return det;
 	},
 };
 
@@ -889,7 +924,7 @@ Matrix_.ones = function(n, m) {
 	obj.nbColumns = m;
 	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
 	
-	// Initialisation of the elements of A to 0
+	// Initialisation of the elements of A to 1.
 	for (var i = 0; i < obj.nbRows; ++i) {
 		for (var j = 0; j < obj.nbColumns; ++j) {
 			obj.data[i * obj.nbColumns + j] = 1;
@@ -899,6 +934,49 @@ Matrix_.ones = function(n, m) {
 	// Return
     return obj;
 }
+
+/**
+* @function eye
+*
+* @summary Returns a matrix made of ones on the main diagonal and zeros elsewhere, i.e., an identity matrix.
+*
+* @description This function builds an n by n matrix (a_ij),i=1..n,j=1..n satisfying a_ii = 1, i=1..n and
+* a_ij = 0, i=1..n,j=1..n,i<>j.
+* 
+* @param {number} n the row/column length of the matrix to construct, natural integer greater than or equal to 1.
+* @return {Matrix_} the constructed matrix.
+*
+* @example
+* eye(3);
+* // Matrix_([[1,0,0], [0,1,0], [0,0,1]])
+*/
+Matrix_.eye = function(n) {
+	// Checks
+	if (n < 1) {
+		throw new Error('input number of rows/columns out of bounds: ' + n);
+	}
+		
+	// Result matrix instantiation
+	var obj = Object.create(Matrix_.prototype);
+	obj.nbRows = n;
+	obj.nbColumns = n;
+	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	
+	// Initialisation of the elements of A.
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < i; ++j) {
+			obj.data[i * obj.nbColumns + j] = 0;
+		}
+		obj.data[i * obj.nbColumns + i] = 1;
+		for (var j = i+1; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 0;
+		}	
+	}
+	
+	// Return
+    return obj;
+}
+
 
 /**
 * @function vectorHadamardProduct
@@ -986,6 +1064,141 @@ Matrix_.vectorDotProduct = function(x, y) {
 	return dotProd;
 }
 
+
+/**
+* @function givensQRDecomposition
+*
+* @summary Returns a QR decomposition of a matrix, using Givens rotations.
+*
+* @description This function computes a QR decomposition of a matrix A, using Givens rotations 
+* as described in the algorithm 5.2.4 (and above discussion therein) of the first reference.
+* 
+* To be noted, though that the 'givens' internal function used in this method is not the same
+* as the one described in the first reference, but rather is the continuous one described
+* in the algorithm 4 of the second reference.
+* 
+* @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
+* @see <a href="http://www.netlib.org/lapack/lawnspdf/lawn150.pdf">Anderson, Edward (4 December 2000). Discontinuous Plane Rotations and the Symmetric Eigenvalue Problem. LAPACK Working Note. University of Tennessee at Knoxville and Oak Ridge National Laboratory.</a>
+*
+* @param {Matrix_} an m by n matrix, with m >= n.
+* @return {<Array.<Matrix_>} an array of two matrices - Q at array index 0 and R at array index 1 - satisfying the following properties:
+* Q is an m by m matrix 
+* R is an m by n matrix
+* A = QR
+* Q is an orthogonal matrix, with a determinant equals to 1 (i.e., a rotation)
+* R is an upper triangular matrix
+*
+* @example
+* givensQRDecomposition(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
+* // XX
+*/
+Matrix_.givensQRDecomposition = function(a) {
+	/**
+    * @function givens
+    *
+    * @description Given real numbers a and b, this function computes c = cos(theta), s = sin(theta) and r >= 0 
+    * satisfying [[c, s], [-s, c]]^T * [[a], [b]] = [[r], [0]].
+    * 
+    * C.f. the second refence for details.
+    * 
+    * @param {number} a, a real number
+    * @param {number} b, a real number
+    * @return {<Array.<number>} an array of three real numbers - c at array index 0, s at array index 1 and r at array index 2 -, satisfying the matrix equation above.
+    * 
+    * @example
+    * givens(X, y);
+    * // XX
+    */
+	function givens(a, b) {
+		var c = NaN;
+		var s = NaN;
+		var r = NaN;
+		
+		if (b == 0) {
+			c = (a >= 0) ? 1 : -1; // Emulates sign(a)
+			s = 0;
+			r = Math.abs(a);
+		}
+		else if (a == 0) {
+			c = 0;
+			s = ((b >= 0) ? 1 : -1); // Emulates sign(b)
+			r = Math.abs(b);
+		}
+		else if (Math.abs(a) > Math.abs(b)) {
+			var t = b/a;
+			var u = ((a >= 0) ? 1 : -1) * Math.sqrt(1 + t*t);
+			c = 1/u;
+			s = t*c;
+			r = a*u;
+		}
+		else {
+			var t = a/b;
+			var u = ((b >= 0) ? 1 : -1) * Math.sqrt(1 + t*t);
+			s = 1/u;
+			c = t*s;
+			r = b*u;
+		}
+		
+		return [c, -s, r]; // Compared to the second reference, the sign of s is altered so that it is made compatible with the notations of the first reference.
+	}
+
+
+	// Initializations
+	var m = a.nbRows;
+	var n = a.nbColumns;
+
+	// Checks
+	if (m < n) {
+		throw new Error('matrix has more columns than rows: ' + '(' + m + ') v.s. ' + '(' + n + ')');
+	}
+	
+	// Create a copy of A so that it is not overwritten
+	var rr = new Matrix_(a); // Represents R
+	
+	// Create the matrix that will hold Q
+	var qq = Matrix_.eye(m); // Represents Q
+	
+	// Core of the algorithm
+	for (var j = 1; j <= n; ++j) {
+		for (var i = m; i >= j+1; --i) {
+			// This loop iteration will set R(i,j) to 0 using an appropriate Givens rotation
+			
+			// Builds G(i-1, i, theta)	
+			var a = rr.data[(i-2) * rr.nbColumns + (j-1)]; // R(i-1, j)
+			var b = rr.data[(i-1) * rr.nbColumns + (j-1)]; // R(i, j)
+			var givensArr = givens(a, b);
+			var c = givensArr[0];
+			var s = givensArr[1];
+			var r = givensArr[2];
+			
+			// Update R (left multiply R with the transpose of the Givens rotation, c.f. 5.1.9 of the first reference)		
+				// Loop below unrolled for k = j, since R(i,j) must be made zero (this can help avoiding "fake" non-zeroes)
+			rr.data[(i-2) * rr.nbColumns + (j-1)] = r; // R(i-1, j) = r
+			rr.data[(i-1) * rr.nbColumns + (j-1)] = 0; // R(i, j) = 0
+
+				// Loop resumed at k = j+1
+			
+			for (var k = j+1; k <= n; ++k) {
+				var t1 = rr.data[(i-2) * rr.nbColumns + (k-1)]; // t1 = R(i-1, k)
+				var t2 = rr.data[(i-1) * rr.nbColumns + (k-1)]; // t2 = R(i, k)
+				rr.data[(i-2) * rr.nbColumns + (k-1)] = c*t1 - s*t2; // R(i-1, k) = ...
+				rr.data[(i-1) * rr.nbColumns + (k-1)] = s*t1 + c*t2; // R(i, k) = ...
+			}
+			
+			// Update Q (right multiply Q with the Givens rotation, c.f. 5.1.9 of the first reference)
+			for (var k = 1; k <= m; ++k) {
+				var t1 = qq.data[(k-1) * qq.nbColumns + (i-2)] // t1 = Q(k,i-1)
+				var t2 = qq.data[(k-1) * qq.nbColumns + (i-1)] // t2 = Q(k,i)
+				qq.data[(k-1) * qq.nbColumns + (i-2)] = c*t1 - s*t2; // Q(k,i-1) = ...
+				qq.data[(k-1) * qq.nbColumns + (i-1)] = s*t1 + c*t2; // Q(k,i) = ...
+			}
+			
+		}
+	}
+	
+	// Return the computed [Q, R] pair;
+	return [qq, rr];
+}
 
 
 /**
@@ -1181,11 +1394,11 @@ function addCovarianceMatrixMethods_(matrix) {
     	*
     	* @summary Returns the variances associated to a covariance matrix.
     	*
-    	* @description This function returns, as a vector of n rows, the diagonal elements (a_ii), i=1..n from the original
+    	* @description This function returns, as a matrix of n rows, the diagonal elements (a_ii), i=1..n from the original
     	* square matrix (a_ij),i=1..n,j=1..n.
     	*
     	* @memberof Matrix_
-    	* @return {Vector_} the variances vector associated to the covariance matrix.
+    	* @return {Matrix_} the variances vector associated to the covariance matrix.
     	*
     	* @example
     	* fromDoubleArray([[1,0.1], [0.1,1]]).getVariancesVector();
@@ -1194,6 +1407,39 @@ function addCovarianceMatrixMethods_(matrix) {
 		'getVariancesVector': function() { 
 			return this.getDiagonal();
 		},
+		
+    	/**
+    	* @function standardizedGeneralizedVariance
+    	*
+    	* @summary Returns the standardized generalized variance of a covariance matrix.
+    	*
+    	* @description This function computes the standardized generalized variance of a covariance matrix,
+    	* as described in the reference.
+    	*
+    	* @see <a href="http://dx.doi.org/10.1016/0047-259X(87)90153-9">Ashis SenGupta, Tests for standardized generalized variances of multivariate normal populations of possibly different dimensions, Journal of Multivariate Analysis, Volume 23, Issue 2, 1987, Pages 209-219</a>
+    	* 
+    	* @memberof Matrix_
+    	* @return {number} the standardized generalized variance of the covariance matrix.
+    	*
+    	* @example
+    	* Matrix_([[1,2], [2,1]]).standardizedGeneralizedVariance();
+    	* // XX
+    	*/
+    	'standardizedGeneralizedVariance': function () {
+        	// Compute the determinant of the matrix
+        	var det = this.determinant();
+    		
+    		// Check for positivity
+    		if (det < 0) {
+    		    throw new Error('covariance matrix is not positive semi-definite');
+    		}
+    		
+    		// Compute the SGV if the determinant is positive, as per the formula of the reference.
+    		var sgv = Math.pow(det, 1/this.nbRows);
+    		
+    		// Return it
+    		return sgv;
+    	},
 	};
 
   // Addition of the methods to the input matrix
@@ -1770,7 +2016,7 @@ function sampleCovariance_(x, y) {
 * @return {Array.<number>} the weights corresponding to the cluster risk parity portfolio, array of n real numbers.
 *
 * @example
-* clusterRiskParityWeights([[0.1,0], [0,0.2]], {clusteringMode: 'none', clusters: [[1], [2]]});
+* clusterRiskParityWeights([[0.1,0], [0,0.2]], {clusteringMode: 'manual', clusters: [[1], [2]]});
 *  
 */
 function clusterRiskParityWeights (sigma, opt) {
@@ -1793,7 +2039,7 @@ function clusterRiskParityWeights (sigma, opt) {
 	
 	// In case clusters are provided, check that they form a partition of the set [1..nbAssets]
 	if (clusteringMode === 'manual') {
-		// Decode the none clustering options
+		// Decode the manual clustering options
 		clusters = opt.clusters || [];
 		
 		// Prepare a partition of the set of integers [1..nbAssets]
@@ -2051,6 +2297,162 @@ function equalWeights (nbAssets, opt) {
 
 
 /**
+* @function globalMinimumVarianceWeights
+*
+* @summary Compute the weights of the global minimum variance portfolio.
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only
+* global minimum variance portfolio of n assets, defined as the weights which minimizes the variance of the portfolio.
+*
+* This portfolio lies on the Markowitz efficient frontier.
+*
+* This portfolio is unique, provided the covariance matrix of the assets is definite positive.
+* 
+* The algorithm used is a cyclical coordinate descent, c.f. the reference, whose convergence is guaranteed
+* if the covariance matrix of the assets is definite positive.
+*
+* @see <a href="https://ssrn.com/abstract=2595051">Richard, Jean-Charles and Roncalli, Thierry, Smart Beta: Managing Diversification of Minimum Variance Portfolios (March 2015)</a>
+* 
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @return {Array.<number>} the weights corresponding to the global minimum variance portfolio, array of n real numbers.
+*
+* @example
+* globalMinimumVarianceWeights([[0.0400, 0.0100], [0.0100, 0.0100]], {eps: 1e-10, maxIter: 10000});
+* // XX
+*/
+function globalMinimumVarianceWeights (sigma, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var eps = opt.eps || 1e-8;
+	var maxIterations = opt.maxIter || 10000;
+	
+	// Convert sigma to matrix format
+	var sigma = new Matrix_(sigma);
+	
+	// TODO: Checks, if enabled
+	// Check that diagonal entries of sigma are strictly positive
+	// Check that sigma is symmetric and positive definite
+	// Check that sigma and rb are rows compatible
+
+
+	// ------
+	var nbAssets = sigma.nbRows;
+	
+	// Initial point for the algorithm is an equal weight vector
+	var x = Matrix_.ones(nbAssets, 1).normalize();
+	
+	// Preparational computations
+	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
+	var var_x = Matrix_.vectorDotProduct(sigma_x, x); // sigma(x), the portfolio variance
+	var obj = 0.5 * var_x - x.sum();
+	
+	// Main loop until convergence, guaranteed as per hypotheses on sigma
+	var iter = 0;
+	var converged = false;
+	while (!converged) {
+        // By default, let's assume the new iteration will lead to the convergence of the algorithm
+    	converged = true;
+    	
+    	for (var i = 1; i <= nbAssets; ++i) {		
+			// Define the coefficients of the second order polynomial ax_i^2 + b_ix + c, c.f. the reference
+    	    var a = sigma.getValueAt(i,i); // sigma_i^2, always > 0
+    	    var b = sigma_x.getValueAt(i,1) - x.getValueAt(i,1) * sigma.getValueAt(i,i) - 1; // (SIGMA*x)_i - x_i*sigma_i^2 - 1, might be any sign
+    	    var c = 0;
+    	    
+    	    // Note: what follows is not detailled in the reference, as lambda_erc is supposed there to be non zero.
+    	    //
+    	    // The equation ax_i^2 + bx_i + c = 0 has two roots: 0 and another one, possibly strictly negative, 0 or strictly positive:
+			// Case #1 - If the other root is 0 or strictly negative, x_i^* is then equal to 0
+			// Case #2 - If the other root is strictly positive, x_i^* is equal to the value minimizing the objective function in 1D
+
+			// Extract the "interesting" root of the equation ax_i^2 + bx_i = 0, using a stable numerical formula
+    	    var b_p = b/2; // reduced discriminant
+			var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
+    	    var q = -(b_p + sign_b_p * Math.abs(b_p));
+    	    var r1 = q/a;		
+			
+			// Case #1 always needs to be tested
+			var xi_star_1 = 0;
+			
+			  // Case #1 weights update
+			x.setValueAt(i, 1, xi_star_1);
+
+    	      // Case #1 updated SIGMA*x and x'*SIGMA*x products
+    	    sigma_x = Matrix_.product(sigma, x)
+    	    var_x = Matrix_.vectorDotProduct(sigma_x, x);
+			
+			  // Case #1 objective function computation
+			var obj_star = 0.5 * var_x - x.sum();
+			
+			// Case #2 test
+			if (r1 > 0) {
+				var xi_star_2 = r1;
+
+				// Case #2 weights update
+				x.setValueAt(i, 1, xi_star_2);
+				
+				// Case #2 updated SIGMA*x and x'*SIGMA*x products
+				var sigma_x_2 = Matrix_.product(sigma, x)
+				var var_x_2 = Matrix_.vectorDotProduct(sigma_x_2, x);
+				
+				// Case #2 objective function computation
+				var obj_star_2 = 0.5 * var_x_2 - x.sum();
+				
+				// Selection between the two cases
+				// Note: Portfolio sparsity is priviledged in case of equality
+				if (obj_star_2 < obj_star) {
+					// Case #2 weights update is already done
+					
+					// Update the products for convergence condition evaluation + next loop evaluation
+					sigma_x = sigma_x_2;
+					var_x = var_x_2;
+					obj_star = obj_star_2;
+				}
+				else {
+					// Case #1 weights re-update, as erased by case #2 test
+					x.setValueAt(i, 1, xi_star_1);
+					
+					// No update on the products, as case #1 is the default case
+				}
+			}
+
+    	    // Update the number of iterations
+    	    ++iter;
+    	    
+    	    // Check the number of iterations
+    	    if (iter >= maxIterations) {
+    	        throw new Error('maximum number of iterations reached: ' + maxIterations);
+    	    }
+        }
+		
+		// Update the convergence condition: |obj - obj*| <= eps
+		if (Math.abs(obj_star - obj) > eps) {
+			converged = false;
+			obj = obj_star;
+			
+		}
+	}
+	
+	// Return the computed weights, after normalization
+	x = x.normalize();
+	return x.toArray();
+}
+
+
+/**
+ * @file Functions related to most diversified portfolio.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+
+
+/**
 * @function mostDiversifiedWeights
 *
 * @summary Compute the weights of the most diversified portfolio.
@@ -2126,7 +2528,7 @@ function mostDiversifiedWeights (sigma, opt) {
     	    //
     	    // The equation ax_i^2 + bx_i + c = 0 has two roots: 0 and another one, possibly strictly negative, 0 or strictly positive:
 			// Case #1 - If the other root is 0 or strictly negative, x_i^* is then equal to 0
-			// Case #2 - If the other root is strictly positive, x_i^* is equal to the value maximization the diversification ratio in 1D
+			// Case #2 - If the other root is strictly positive, x_i^* is equal to the value maximizing the diversification ratio in 1D
 
 			// Extract the "interesting" root of the equation ax_i^2 + bx_i = 0, using a stable numerical formula
     	    var b_p = b/2; // reduced discriminant

@@ -523,5 +523,63 @@ QUnit.test('Cluster risk parity portfolio', function(assert) {
   }
 });
 
+
+QUnit.test('Global minimum variance portfolio', function(assert) {    
+  // Reference: Portfolio Optimization versus Risk-Budgeting Allocation, Thierry Roncalli, WG RISK ESSEC, January 18, 2012
+  // Examples using static data
+  {
+	  var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0396, 0.0398], [0.0398, 0.0400]]); 
+	  var expectedWeights =  [1, 0];
+	  for (var i = 0; i < expectedWeights.length; ++i) {
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #1 ' + i);
+	  }
+  }
+  {
+	  var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0396, 0.0414], [0.0396, 0.0484, 0.0455], [0.0414, 0.0455, 0.0529]]); 
+	  var expectedWeights =  [0.9565927119697761, 0.043407288030223846, 0];
+	  for (var i = 0; i < expectedWeights.length; ++i) {
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #2 ' + i);
+	  }
+  }
+  // TODO: This one does not pass; pending the Markowitz algorithm implementation to decide if the reference is false,
+  // as the volatility obtained by the computed portfolio is 0.1987534683949592, which is lower than the volatility of 0.2017 in the reference !
+  /*
+  {
+	  var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0374, 0.0391], [0.0374, 0.0484, 0.0430], [0.0391, 0.0430, 0.0529]]); 
+	  console.log(weights)
+	  var expectedWeights =  [0.7009, 0.2378, 0.0613];
+	  for (var i = 0; i < expectedWeights.length; ++i) {
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #3 ' + i);
+	  }
+  }
+  */
+  {
+	  var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0418, 0.0437], [0.0418, 0.0484, 0.0481], [0.0437, 0.0481, 0.0529]]); 
+	  var expectedWeights =  [1, 0, 0];
+	  for (var i = 0; i < expectedWeights.length; ++i) {
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #4 ' + i);
+	  }
+  }
   
+  // Reference: Understanding the Impact of Weights Constraints in Portfolio Theory, Thierry Roncalli
+  // Example using static data
+  {
+	  var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0225,0.0030,0.0150,0.0225], [0.0030,0.0400,0.0350,0.0240], [0.0150,0.0350,0.0625,0.0600], [0.0225,0.0240,0.0600,0.0900]]); 
+	  var expectedWeights =  [0.6548673025499347, 0.3451326974500652, 0, 0];
+	  for (var i = 0; i < expectedWeights.length; ++i) {
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #5 ' + i);
+	  }
+  }
+  	
+  // Reference: Private communication with TrendXplorer
+  // Example using static data
+  {
+	  var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.03401428,0.0333167,-0.00614739,0.00926415,-0.0064081],[0.0333167,0.06323421,-0.00855552,0.02245369,-0.00480642],[-0.00614739,-0.00855552,0.01444902,-0.00432445,0.00690744],[0.00926415,0.02245369,-0.00432445,0.02622712,0.0016983],[-0.0064081,-0.00480642,0.00690744,0.00169834,0.0116492]]); 
+	  var expectedWeights =  [0.22372329306378916, 0, 0.30887622610697146, 0.13382010508052292, 0.33358037574871646];
+	  for (var i = 0; i < expectedWeights.length; ++i) {
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #6 ' + i);
+	  }
+  }
+  
+});
 

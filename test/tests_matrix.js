@@ -187,10 +187,59 @@ QUnit.test('Zeros matrix creation', function(assert) {
   assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Zeros matrix creation');
 });
 
+QUnit.test('Identity matrix creation', function(assert) {    
+  // Test using static data
+  var mat = PortfolioAllocation.Matrix.eye(3);
+  var expectedMat = new PortfolioAllocation.Matrix([[1,0,0], [0,1,0], [0,0,1]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Identity matrix creation');
+});
+
 QUnit.test('Transpose matrix', function(assert) {    
   // Test using static data  
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
   var transpMat = mat.transpose();
   var expectedMat = new PortfolioAllocation.Matrix([[1,4], [2,5], [3,6]]); 
   assert.equal(PortfolioAllocation.Matrix.areEqual(transpMat, expectedMat), true, 'Transpose matrix');
+});
+
+
+QUnit.test('Givens QR decomposition', function(assert) {    
+  // Test using static data  
+  {
+	  //var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6], [7,8,9]]);
+	  var mat = new PortfolioAllocation.Matrix([[1,2,0], [1,1,1], [2,1,0]]);
+	  
+	  // Computation of a QR decomposition
+	  var qr = PortfolioAllocation.Matrix.givensQRDecomposition(mat);
+	  var q = qr[0];
+	  var r = qr[1];
+	  
+	  //console.log(q.toString());
+	  //console.log(r.toString());
+	  
+	  var qqp = PortfolioAllocation.Matrix.product(q, q.transpose());
+	  //console.log(qqp.toString());//OK
+	  
+	  var qtimesr = PortfolioAllocation.Matrix.product(q, r);
+	  //console.log(qtimesr.toString()); // OK
+	  
+	  // Expected matrices were verified with Matlab
+	  var expectedQMat = new PortfolioAllocation.Matrix([[1,4], [2,5], [3,6]]); 
+	  var expectedRMat = new PortfolioAllocation.Matrix([[1,4], [2,5], [3,6]]);
+	  
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(expectedQMat, expectedRMat), true, 'Givens QR decomposition');
+  }
+  
+  // TODO: Test using random data: check Q,R dimensions, check Q*R = A, check R upper triangular, check Q orthogonal: Q*q^t = Identity (m)
+  
+  // TODO: Test error case
+});
+
+
+QUnit.test('Determinant computation', function(assert) {    
+  // Test using static data  
+  var mat = new PortfolioAllocation.Matrix([[-2,2,-3], [-1,1,3], [2,0,-1]]);
+  var expectedValue = 18;
+
+  assert.equal(Math.abs(mat.determinant() - expectedValue) <= 1e-16, true, 'Determinant computation');
 });
