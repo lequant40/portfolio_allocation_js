@@ -336,8 +336,6 @@ QUnit.test('Minimum correlation heuristic portfolio', function(assert) {
   // Example of the appendix, with MinCorr 2 example being inversed with MinCorr example...
   {
 	  // Data
-	  //var corr = [[1.0000, 0.90, 0.85], [0.90, 1.0000, 0.70], [0.85, 0.70, 1.0000]];
-	  //var vars = [0.14*0.14, 0.18*0.18, 0.22*0.22];
 	  var sigma = [[0.019600000000000, 0.022680000000000, 0.026180000000000], [0.022680000000000, 0.032400000000000, 0.027720000000000], [0.026180000000000, 0.027720000000000, 0.048400000000000]];
 	  var nbAssets = sigma.length;
 
@@ -583,3 +581,49 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
   
 });
 
+
+
+QUnit.test('Grid search portfolio', function(assert) {    
+	// Test unsupported optimisation method
+	{
+	    
+        assert.throws(function() { 
+    		PortfolioAllocation.gridSearchWeights(2,  function (arr) { return 1; }, {optimisationMethod: 'none'}) },
+    		new Error('unsupported optimisation method'),
+    		"Grid search portfolio - Unsupported optimisation method");
+	}
+		
+	// Test rational grid search using static data
+	{
+		// Objective function: portfolio variance, for three assets
+		// Covariance matrix taken from GMV test case #2
+		function portfolio_variance_three_assets(arr) { 
+			var covMat = [[0.0400, 0.0396, 0.0414], [0.0396, 0.0484, 0.0455], [0.0414, 0.0455, 0.0529]];
+			
+			return arr[0]*arr[0]*covMat[0][0] + arr[1]*arr[1]*covMat[1][1] + arr[2]*arr[2]*covMat[2][2] +
+			       2*arr[0]*arr[1]*covMat[0][1] + 2*arr[0]*arr[2]*covMat[0][2] + 2*arr[1]*arr[2]*covMat[1][2];
+		}
+		
+		// From GMV test case #2, expected (exact) weights are [0.9565927119697761, 0.043407288030223846, 0];
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets), 
+	                	PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 3}}), 
+		                'Grid search portfolio - Default values');
+
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 3}}), 
+	                	[[1,0,0]], 
+		                'Grid search portfolio - Values #1');
+
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 10}}), 
+	                	[[1,0,0]], 
+		                'Grid search portfolio - Values #2');
+		                
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 100}}), 
+	                	[[0.96,0.04,0]], 
+		                'Grid search portfolio - Values #3');
+		                
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 1000}}), 
+	                	[[0.957,0.043,0]], 
+		                'Grid search portfolio - Values #4');
+	}
+
+});

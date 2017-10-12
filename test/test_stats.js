@@ -51,6 +51,3 @@ QUnit.test('FTCA computation', function(assert) {
   }
   
 });
-
-
-  

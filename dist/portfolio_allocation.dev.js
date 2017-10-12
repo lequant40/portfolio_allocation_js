@@ -1462,6 +1462,128 @@ function addCovarianceMatrixMethods_(matrix) {
 
 
 /**
+ * @file Misc. combinatorics functions.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+/* Start Wrapper private methods - Unit tests usage only */
+self.nexcom_ = function(n, k) { return nexcom_(n, k); }
+self.binomial_ = function(n, k) { return binomial_(n, k); }
+/* End Wrapper private methods - Unit tests usage only */
+ 
+ 
+/**
+* @function nexcom_
+*
+* @summary Returns the next composition of a non negative integer.
+*
+* @description This function computes the next k-composition of a non-negative integer n, 
+* using the algorithm NEXCOM described in section 5 of the first reference.
+*
+* The initial k-composition computed by the function is n00...0, and each subsequent call to the function
+* will result in a new k-composition until the final k-composition 00...0n is reached.
+*
+* A subsequent call to the function when the final k-composition 00...0n has been reached will result in
+* the recomputation of all the k-compositions of n, starting from the initial k-composition n00...0.
+*
+* @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
+* @see <a href="*https://en.wikipedia.org/wiki/Composition_(combinatorics)">Composition (combinatorics)</a>
+*
+* @param {number} n a non-negative integer whose composition are desired.
+* @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
+* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
+* and arr[1] an array of k elements containing the computed k-composition of n.
+*
+* @example
+* nexcom_(6, 3); nexcom_(6, 3);
+* // [true, [6,0,0]]; [true, [5,1,0]];
+*/
+function nexcom_(n, k) {
+	// Variable mtc has been statified for ease of use reasons
+	if (nexcom_.mtc === undefined) {
+		nexcom_.mtc = false;
+	}
+	
+	// NEXTCOM computation logic
+	if (nexcom_.mtc) { // There is still a composition to generate
+		if (nexcom_.t > 1) {
+			nexcom_.h = 0;
+		}
+		nexcom_.h++;
+		nexcom_.t = nexcom_.r[nexcom_.h - 1];
+		nexcom_.r[nexcom_.h - 1] = 0;
+		nexcom_.r[0] = nexcom_.t - 1;
+		nexcom_.r[nexcom_.h]++;		
+	}
+	else  { // No more composition to generate, so, (re) generation of the first composition, equals to n00...0
+		nexcom_.r = new Array(k);
+		nexcom_.r[0] = n;
+
+		// Variables h and t need to be static 
+		nexcom_.t = n;
+		nexcom_.h = 0;
+		
+		for (var i = 1; i <= k-1; ++i) {
+			nexcom_.r[i] = 0;
+		}
+	}
+	
+	// NEXTCOM end logic
+	nexcom_.mtc = (nexcom_.r[k-1] != n);
+		
+	// Return the value of the mtc variable, so that calls to nexcom_ function
+	// can be chained in a while loop
+	// Return a copy of the r array, so that callers can alter it
+	return [nexcom_.mtc, nexcom_.r.slice()];
+}
+
+/**
+* @function binomial_
+*
+* @summary Returns a binomial coefficient.
+*
+* @description This function computes the k-th binomial coefficient of order n, which is
+* the coefficient of the x^k term in the polynomial expansion of the binomial power (1 + x)^n.
+*
+* This coefficient is also the number of ways to choose a subset of k elements,
+* disregarding their order, from a set of n elements.
+*
+* The algorithm used is a multiplicative formula, c.f. the reference.
+*
+* @see <a href="*https://en.wikipedia.org/wiki/Binomial_coefficient">Binomial coefficient</a>
+*
+* @param {number} n a non-negative integer.
+* @param {number} k a non-negative integer, with 0 <= k <= n.
+* @return {number} the computed binomial coefficient.
+*
+* @example
+* binomial_(7, 5);
+* // 21
+*/
+function binomial_(n, k) {
+    // Checks
+    if (n < 0) {
+        throw new Error('n must be a positive integer');
+    }
+    if (k < 0) {
+        throw new Error('k must be a positive integer');
+    }
+    if (k > n) {
+        throw new Error('k must be less than or equal to n');
+    }
+	  
+	// Compute the binomial coefficient using the multiplicative formula of the reference.
+	var val = 1;
+    for (var i = 1; i <= k; ++i) {
+        val *= (n + 1 - i);
+		val /= i; // Note: separating the computation of val in two steps guarantees (unless compiler optimisations) that val is an integer.
+    }
+	
+	// Return it
+    return val;
+}
+     
+/**
  * @file Misc. statistical functions.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -1472,7 +1594,6 @@ self.ftca_ = function(correlationMatrix, threshold) { return ftca_(correlationMa
 /* End Wrapper private methods - Unit tests usage only */
  
  
-
 
 /**
 * @function rank_
@@ -1993,6 +2114,83 @@ function sampleCovariance_(x, y) {
 
 
 /**
+ * @file Misc. optimisation functions.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+/* Start Wrapper private methods - Unit tests usage only */
+self.simplexRationalGirdSearch_ = function(fct, n, k) { return simplexRationalGirdSearch_(fct, n, k); }
+/* End Wrapper private methods - Unit tests usage only */
+ 
+ 
+/**
+* @function simplexRationalGirdSearch_
+*
+* @summary Compute the point(s) minimizing a real-valued arbitrary function of several real variables
+* defined on the unit simplex, using an exhaustive search algorithm on a grid made of rational points belonging to the unit simplex.
+*
+* @description This function returns the list of points x = (x_1,...,x_n) belonging to the unit simplex of R^n which 
+* minimize an arbitrary real-valued function fct of n real variables defined on the unit simplex of R^n, 
+* using an exhaustive search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the reference.
+
+* To be noted that per lemma 1 of the reference, the number of points on such a rational grid is equal to
+* factorial(n + k - 1) / (factorial(k - 1) * factorial(n)), i.e., binomial(n+k-1, n-1), 
+* so that this method can be of limited use, even for small n.
+*
+* For instance, n=5 and k=100 already result in 4598126 points on which to evaluate fct.
+*
+* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
+*
+* @param {function} fct a real-valued function of n real variables defined on the unit simplex of R^n, 
+* which must take as first input argument an array of n real numbers corresponding to a point on the unit simplex of R^n 
+* and which must return as output a real number.
+* @param {number} n the number of variables of the function fct, natural integer superior or equal to 1.
+* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function fct, a natural integer superior or equal to 1.
+* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to a point of R^n 
+* minimizing the function fct on the k-th rational grid of the unit simplex of R^n.
+*
+*/
+function simplexRationalGirdSearch_(fct, n, k) {
+	// Initialize the current minimum value and the current list of associated grid points
+	var minValue = Number.MAX_VALUE;
+	var minValueGridPoints = [];
+
+	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference,
+	// using all the k-compositions of the integer n.
+	do {
+		// Generate a new composition
+		var nextComposition = nexcom_(k, n);
+		
+		// Compute the current rational grid point by normalizing the generated k-composition
+		var weights = nextComposition[1];
+		for (var i = 0; i < weights.length; ++i) {
+			weights[i] = weights[i] / k;
+		}
+	  
+		// Evaluate the function fct at the current grid point
+		var fctValue = fct(weights);
+	  
+		// If the function value at the current grid point is lower than the current minimum value, this value
+		// becomes the new minimum value and the current grid point becomes the new (unique for now) associated grid point.
+		if (fctValue < minValue) {
+			minValue = fctValue;
+			minValueGridPoints = [weights];
+		}
+		// In case of equality of the function value at the current grid point with the current minimum value, 
+		// the current grid point is added to the list of grid points associated to the current minimum value.
+		else if (fctValue == minValue) {
+			minValueGridPoints.push(weights);
+		}
+		// Otherwise, nothing needs to be done	  
+	}
+	while (nextComposition[0]);
+	
+	// Return the list of grid points associated to the minimum value of fct
+	return minValueGridPoints;
+}
+
+
+/**
  * @file Functions related to cluster risk parity portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -2024,10 +2222,13 @@ function sampleCovariance_(x, y) {
 * @see <a href="https://cssanalytics.wordpress.com/2013/01/03/cluster-risk-parity/">Cluster Risk Parity</a>
 * 
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square n by n Matrix or array of n arrays of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
-* @param {object} opt the optional parameters for the algorithm.
+* @param {object} opt the optional parameters for the algorithms used by the function.
 * @param {number} opt.eps the tolerance parameter for the convergence of the ERC algorithms, a strictly positive real number; defaults to 1e-8.
 * @param {number} opt.maxIter the maximum number of iterations of the ERC algorithms, a strictly positive natural integer; defaults to 10000.
-* @param {number} opt.clusteringMode the method to use for the clusters computation, a string either equals to 'ftca' (usage of the list of clusters automatically constructed by the FTCA algorithm from David Varadi) or to 'manual' (usage of a list of clusters provided in input in the opt.clusters option); defaults to 'ftca'.
+* @param {number} opt.clusteringMode the method to use for the clusters computation, a string either equals to:
+* - 'ftca': usage of the list of clusters automatically constructed by the FTCA algorithm from David Varadi
+* - 'manual': usage of a list of clusters provided in input in the opt.clusters option
+* ; defaults to 'ftca'.
 * @param {number} opt.ftcaThreshold the correlation threshold to use in the FTCA algorithm in case opt.clusteringMode is equal to 'ftca', a real number beloning to [0,1]; defaults to 0.5.
 * @param {Array.<Array.<number>>} opt.clusters the list of clusters to use in the algorithm in case opt.clusteringMode is equal to 'manual', an array of m arrays of strictly positive integers representing the indexes of the assets in the considered universe, where m is the number of clusters, with the m arrays forming a partition of the set [1..n].
 * @return {Array.<number>} the weights corresponding to the cluster risk parity portfolio, array of n real numbers.
@@ -2445,21 +2646,20 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 					// No update on the products, as case #1 is the default case
 				}
 			}
-
-    	    // Update the number of iterations
-    	    ++iter;
-    	    
-    	    // Check the number of iterations
-    	    if (iter >= maxIterations) {
-    	        throw new Error('maximum number of iterations reached: ' + maxIterations);
-    	    }
         }
 		
 		// Update the convergence condition: |obj - obj*| <= eps
 		if (Math.abs(obj_star - obj) > eps) {
 			converged = false;
 			obj = obj_star;
-			
+		}
+
+		// Update the number of iterations
+		++iter;
+		
+		// Check the number of iterations
+		if (iter >= maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 	}
 	
@@ -2467,6 +2667,80 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	x = x.normalize();
 	return x.toArray();
 }
+
+
+/**
+ * @file Functions related to grid search portfolios.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function gridSearchWeights
+*
+* @summary Compute the weights of a portfolio minimizing an arbitrary objective function.
+*
+* @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only portfolio
+* of n assets minimizing an arbitrary real-valued objective function fct of n real variables defined on the unit simplex of R^n, 
+* which is the n-1 dimensional set of R^n containing the points x = (x_1,...,x_n) statisfying sum x_i = 1 and x_i >= 0, i = 1..n, 
+* c.f. the first reference.
+*
+* Since such a portfolio might not be unique, all the weights corresponding to the same minimum value of the function fct 
+* are provided in output.
+*
+* The minimization of the function fct is achieved through one of the following optimisation methods:
+* - Exhaustive grid search on a rational grid of the unit simplex of R^n, c.f. function simplexRationalGirdSearch_
+*
+* To be noted that finding the minimum value(s) of an arbitrary objective function on the unit simplex
+* is an NP-hard problem, c.f. the second reference, so that all the optimisation algorithms above are expected to
+* be non-polynomial in n.
+* 
+* @see <a href="https://en.wikipedia.org/wiki/Simplex">Simplex</a>
+* @see <a href="http://www.sciencedirect.com/science/article/pii/S0377221707004262">De Klerk, E., Den Hertog, D., Elabwabi, G.: On the complexity of optimization over the standard simplex. Eur. J Oper. Res. 191, 773–785 (2008)</a>
+*
+* @param {number} nbAssets the number of assets in the considered universe, natural integer superior or equal to 1.
+* @param {function} fct a real-valued objective function of n real variables to minimize on the unit simplex of R^n,
+* which must take as first input argument an array of n real numbers corresponding to the weights w1,...,wn of the n assets 
+* in the considered universe and which must return as output a real number.
+* @param {object} opt the optional parameters for the algorithms used by the function.
+* @param {string} opt.optimisationMethod the optimisation method to use in order to minimize the function fct, a string either equals to:
+* - 'rationalGridSearch': usage of an exhaustive grid search algorithm on a rational grid of the unit simplex of R^n
+* -
+* ; defaults to 'rationalGridSearch'.
+* @param {number} opt.exhaustiveSearch.k the indice of the rational grid of the unit simplex of R^n to use in case opt.optimisationMethod is equal to 'rationalGridSearch', 
+* c.f. function simplexRationalGirdSearch_, a natural integer greater than or equal to 1; defaults to n.
+* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to
+* the weights of a portfolio minimizing the function fct.
+*
+* @example
+* gridSearchWeights(3, function(arr) { return arr[0];}, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 2}});
+* // [[0,1,0],[0,0.5,0.5],[0,0,1]]
+*/
+self.gridSearchWeights = function (nbAssets, fct, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	opt.optimisationMethod = opt.optimisationMethod || 'rationalGridSearch';
+	
+	// Select the proper optimisation method
+	if (opt.optimisationMethod === 'rationalGridSearch') {
+		// Decode options for the rational grid search method
+		opt.rationalGridSearch = opt.rationalGridSearch || { k: nbAssets };
+		var k = opt.rationalGridSearch.k;
+		
+		// Call the rational grid search method
+		return simplexRationalGirdSearch_(fct, nbAssets, k);
+	}
+	else {
+	    throw new Error('unsupported optimisation method');
+	}
+}
+
 
 
 /**
@@ -2607,21 +2881,21 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 					// No update on the products, as case #1 is the default case
 				}
 			}
-    	    
-    	    // Update the convergence condition: |dr - dr*| <= eps
-    	    if (Math.abs(dr_star - dr) > eps) {
-    	        converged = false;
-    	        dr = dr_star;
-    	    }
-    	    
-    	    // Update the number of iterations
-    	    ++iter;
-    	    
-    	    // Check the number of iterations
-    	    if (iter >= maxIterations) {
-    	        throw new Error('maximum number of iterations reached: ' + maxIterations);
-    	    }
         }
+		
+        // Update the convergence condition: |dr - dr*| <= eps
+		if (Math.abs(dr_star - dr) > eps) {
+			converged = false;
+			dr = dr_star;
+		}
+		
+		// Update the number of iterations
+		++iter;
+		
+		// Check the number of iterations
+		if (iter >= maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
 	}
 	
 	// Return the computed weights, after normalization
@@ -2905,15 +3179,15 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
     	    if (Math.abs(rci_star - rb.getValueAt(i,1)) > eps) {
     	        converged = false;
     	    }
-    	    
-    	    // Update the number of iterations
-    	    ++iter;
-    	    
-    	    // Check the number of iterations
-    	    if (iter >= maxIterations) {
-    	        throw new Error('maximum number of iterations reached: ' + maxIterations);
-    	    }
         }
+		
+		// Update the number of iterations
+		++iter;
+		
+		// Check the number of iterations
+		if (iter >= maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
 	}
 	
 	// Return the computed weights, after normalization

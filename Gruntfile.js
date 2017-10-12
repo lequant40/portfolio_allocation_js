@@ -75,7 +75,7 @@ module.exports = function(grunt) {
 	
 	concat: {
 	  portfolio_allocation: {
-	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/vector.js', 'lib/matrix/covmatrix.js', 'lib/stats/misc.js', 'lib/allocation/*.js', 'lib/footer.js'],
+	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/vector.js', 'lib/matrix/covmatrix.js', 'lib/stats/*.js', 'lib/allocation/*.js', 'lib/footer.js'],
 	    dest: 'dist/portfolio_allocation.dev.js',
 	  }
 	},
@@ -97,7 +97,7 @@ module.exports = function(grunt) {
     },
 	
 	qunit: { 
-      dev: ['test/index_matrix.html', 'test/index_vector.html', 'test/index_stats.html', 'test/index_covmatrix_dev.html', 'test/index_allocation_dev.html'],
+      dev: ['test/index_matrix.html', 'test/index_vector.html', 'test/index_stats.html', 'test/index_combinatorics.html', 'test/index_optimisation.html', 'test/index_covmatrix_dev.html', 'test/index_allocation_dev.html'],
 	  dist: ['test/index_allocation_dist.html', 'test/index_covmatrix_dist.html']
     }
 
