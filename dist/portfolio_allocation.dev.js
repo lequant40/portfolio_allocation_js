@@ -1467,75 +1467,90 @@ function addCovarianceMatrixMethods_(matrix) {
  */
 
 /* Start Wrapper private methods - Unit tests usage only */
-self.nexcom_ = function(n, k) { return nexcom_(n, k); }
+self.compositionsIterator_ = compositionsIterator_;
 self.binomial_ = function(n, k) { return binomial_(n, k); }
 /* End Wrapper private methods - Unit tests usage only */
  
  
 /**
-* @function nexcom_
+* @function compositionsIterator_
 *
-* @summary Returns the next composition of a non negative integer.
+* @summary Returns an iterator to compute all the compositions of a non negative integer.
 *
-* @description This function computes the next k-composition of a non-negative integer n, 
+* @description This function constructs an iterator to compute all the k-compositions of a non-negative integer n, 
 * using the algorithm NEXCOM described in section 5 of the first reference.
-*
-* The initial k-composition computed by the function is n00...0, and each subsequent call to the function
-* will result in a new k-composition until the final k-composition 00...0n is reached.
-*
-* A subsequent call to the function when the final k-composition 00...0n has been reached will result in
-* the recomputation of all the k-compositions of n, starting from the initial k-composition n00...0.
 *
 * @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
 * @see <a href="*https://en.wikipedia.org/wiki/Composition_(combinatorics)">Composition (combinatorics)</a>
 *
 * @param {number} n a non-negative integer whose composition are desired.
 * @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
-* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
-* and arr[1] an array of k elements containing the computed k-composition of n.
+* @return {function} a function to be used as an iterator through its .next() method, sequentially computing all 
+* the k-compositions of n.
 *
 * @example
-* nexcom_(6, 3); nexcom_(6, 3);
+* var myIterator = new compositionsIterator_(6, 3);
+* myIterator.next(); myIterator.next();
 * // [true, [6,0,0]]; [true, [5,1,0]];
 */
-function nexcom_(n, k) {
-	// Variable mtc has been statified for ease of use reasons
-	if (nexcom_.mtc === undefined) {
-		nexcom_.mtc = false;
-	}
+function compositionsIterator_(n, k) {
+	// Initialize n and k
+	this.n = n;
+	this.k = k
 	
-	// NEXTCOM computation logic
-	if (nexcom_.mtc) { // There is still a composition to generate
-		if (nexcom_.t > 1) {
-			nexcom_.h = 0;
-		}
-		nexcom_.h++;
-		nexcom_.t = nexcom_.r[nexcom_.h - 1];
-		nexcom_.r[nexcom_.h - 1] = 0;
-		nexcom_.r[0] = nexcom_.t - 1;
-		nexcom_.r[nexcom_.h]++;		
-	}
-	else  { // No more composition to generate, so, (re) generation of the first composition, equals to n00...0
-		nexcom_.r = new Array(k);
-		nexcom_.r[0] = n;
+	// Variables required for NEXTCOM internal computations,
+	// initialized so as to generate the first composition upon
+	// the first call to .next() function.
+	this.mtc = false;
+	this.r = new Array(k);
+	this.t = this.n;
+	this.h = 0;
 
-		// Variables h and t need to be static 
-		nexcom_.t = n;
-		nexcom_.h = 0;
-		
-		for (var i = 1; i <= k-1; ++i) {
-			nexcom_.r[i] = 0;
+	/**
+	* @function next
+	*
+	* @summary Returns the next composition of a non negative integer.
+	*
+	* @description This function computes the next k-composition of n.
+	*
+	* The initial k-composition computed by the first call to this function is n00...0, and each subsequent call to 
+	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
+	*
+	* A subsequent call to this function when the final k-composition 00...0n has been reached will result in
+	* the recomputation of all the k-compositions of n, starting from the initial k-composition n00...0.
+	*
+	* @memberof compositionsIterator_
+	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
+	* and arr[1] an array of k elements containing the computed k-composition of n.
+	*
+	*/
+	this.next = function() {
+		if (this.mtc) { // There is still a composition to generate
+			if (this.t > 1) {
+				this.h = 0;
+			}
+			this.h++;
+			this.t = this.r[this.h - 1];
+			this.r[this.h - 1] = 0;
+			this.r[0] = this.t - 1;
+			this.r[this.h]++;		
 		}
-	}
-	
-	// NEXTCOM end logic
-	nexcom_.mtc = (nexcom_.r[k-1] != n);
+		else  { 
+		    // No more composition to generate, so, (re) generation of the first composition, equals to n00...0
+			this.r[0] = this.n;
+			for (var i = 1; i <= this.k-1; ++i) {
+				this.r[i] = 0;
+			}
+		}
 		
-	// Return the value of the mtc variable, so that calls to nexcom_ function
-	// can be chained in a while loop
-	// Return a copy of the r array, so that callers can alter it
-	return [nexcom_.mtc, nexcom_.r.slice()];
+		// End logic
+		this.mtc = (this.r[this.k-1] != this.n);
+		
+		// Return a copy of the r array, so that callers can alter it
+		return [this.mtc, this.r.slice()];
+	}
 }
+
 
 /**
 * @function binomial_
@@ -2157,9 +2172,10 @@ function simplexRationalGirdSearch_(fct, n, k) {
 
 	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference,
 	// using all the k-compositions of the integer n.
+	var nextCompositionIterator = new compositionsIterator_(k, n);
 	do {
-		// Generate a new composition
-		var nextComposition = nexcom_(k, n);
+		// Generate a new composition	
+		var nextComposition = nextCompositionIterator.next();
 		
 		// Compute the current rational grid point by normalizing the generated k-composition
 		var weights = nextComposition[1];
@@ -2706,7 +2722,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 * @param {function} fct a real-valued objective function of n real variables to minimize on the unit simplex of R^n,
 * which must take as first input argument an array of n real numbers corresponding to the weights w1,...,wn of the n assets 
 * in the considered universe and which must return as output a real number.
-* @param {object} opt the optional parameters for the algorithms used by the function.
+* @param {Object} opt the optional parameters for the algorithms used by the function.
 * @param {string} opt.optimisationMethod the optimisation method to use in order to minimize the function fct, a string either equals to:
 * - 'rationalGridSearch': usage of an exhaustive grid search algorithm on a rational grid of the unit simplex of R^n
 * -

@@ -12,8 +12,9 @@ QUnit.test('Next composition computation', function(assert) {
   {
 	  var expectedValues = [[true,[6,0,0]],[true, [5,1,0]],[true, [4,2,0]],[true, [3,3,0]],[true, [2,4,0]],[true, [1,5,0]],[true, [0,6,0]],[true, [5,0,1]],[true, [4,1,1]],[true, [3,2,1]],[true, [2,3,1]],[true, [1,4,1]],[true, [0,5,1]],[true, [4,0,2]],[true, [3,1,2]],[true, [2,2,2]],[true, [1,3,2]],[true, [0,4,2]],[true, [3,0,3]],[true, [2,1,3]],[true, [1,2,3]],[true, [0,3,3]],[true, [2,0,4]],[true, [1,1,4]],[true, [0,2,4]],[true, [1,0,5]],[true, [0,1,5]],[false, [0,0,6]]];
 	  
+	  var nextCompositionIterator = new PortfolioAllocation.compositionsIterator_(6, 3);
 	  for (var i = 0; i < expectedValues.length; ++i) {
-		var nextComposition = PortfolioAllocation.nexcom_(6, 3);
+		var nextComposition = nextCompositionIterator.next();
 		assert.deepEqual(nextComposition, expectedValues[i], 'Next composition - Test 1 #' + i);
 	  }  
   }
