@@ -1468,6 +1468,7 @@ function addCovarianceMatrixMethods_(matrix) {
 
 /* Start Wrapper private methods - Unit tests usage only */
 self.compositionsIterator_ = compositionsIterator_;
+self.subsetsIterator_ = subsetsIterator_;
 self.binomial_ = function(n, k) { return binomial_(n, k); }
 /* End Wrapper private methods - Unit tests usage only */
  
@@ -1496,7 +1497,7 @@ self.binomial_ = function(n, k) { return binomial_(n, k); }
 function compositionsIterator_(n, k) {
 	// Initialize n and k
 	this.n = n;
-	this.k = k
+	this.k = k;
 	
 	// Variables required for NEXTCOM internal computations,
 	// initialized so as to generate the first composition upon
@@ -1516,8 +1517,8 @@ function compositionsIterator_(n, k) {
 	* The initial k-composition computed by the first call to this function is n00...0, and each subsequent call to 
 	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
 	*
-	* A subsequent call to this function when the final k-composition 00...0n has been reached will result in
-	* the recomputation of all the k-compositions of n, starting from the initial k-composition n00...0.
+	* A subsequent call to this function when the final k-composition has been reached will result in
+	* the recomputation of all the k-compositions of n, starting from the initial k-composition.
 	*
 	* @memberof compositionsIterator_
 	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
@@ -1533,21 +1534,116 @@ function compositionsIterator_(n, k) {
 			this.t = this.r[this.h - 1];
 			this.r[this.h - 1] = 0;
 			this.r[0] = this.t - 1;
-			this.r[this.h]++;		
+			this.r[this.h]++;
 		}
 		else  { 
 		    // No more composition to generate, so, (re) generation of the first composition, equals to n00...0
 			this.r[0] = this.n;
-			for (var i = 1; i <= this.k-1; ++i) {
+			for (var i = 1; i <= this.k - 1; ++i) {
 				this.r[i] = 0;
 			}
 		}
 		
 		// End logic
-		this.mtc = (this.r[this.k-1] != this.n);
+		this.mtc = (this.r[this.k - 1] != this.n);
 		
 		// Return a copy of the r array, so that callers can alter it
 		return [this.mtc, this.r.slice()];
+	}
+}
+
+
+/**
+* @function subsetsIterator_
+*
+* @summary Returns an iterator to compute all the subsets of a set.
+*
+* @description This function constructs an iterator to compute all the subsets of the n-set {1,...,n}, 
+* using the algorithm NEXSUB described in section 1 of the first reference.
+*
+* @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
+* @see <a href="*https://en.wikipedia.org/wiki/Power_set">Power set</a>
+*
+* @param {number} n the number of elements of the n-set {1,...,n} whose subsets are desired.
+* @return {function} a function to be used as an iterator through its .next() method, sequentially computing all 
+* the subsets of the n-set {1,...,n}.
+*
+* @example
+* var myIterator = new subsetsIterator_(5);
+* myIterator.next(); myIterator.next();
+* // [true, []]; [true, [1]];
+*/
+function subsetsIterator_(n) {
+	// Initialize n
+	this.n = n;
+	
+	// Variables required for NEXSUB internal computations,
+	// initialized so as to generate the first subset upon
+	// the first call to .next() function.
+	this.mtc = false;
+	this.in = new Array(n);
+	this.ncard = 0;
+	
+	/**
+	* @function next
+	*
+	* @summary Returns the next subset of a set.
+	*
+	* @description This function computes the next subset of the n-set {1,...,n}.
+	*
+	* The initial subset computed by the first call to this function is the empty subset {}, and each subsequent call to 
+	* this function will result in a new subset until the final subset {1,...,n} is reached.
+	*
+	* A subsequent call to this function when the final subset {1,...,n} has been reached will result in
+	* the recomputation of all the subsets, re-starting from the initial subset.
+	*
+	* @memberof subsetsIterator_
+	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one subset
+	* of the n-set {1,...,n} remains to be computed and arr[1] an array containing the computed sorted subset
+	* of the n-set {1,...,n}.
+	*
+	*/
+	this.next = function() {
+		// The output array containing the computed subset
+		var nextSubset = [];
+		
+		if (this.mtc) { // There is still a subset to generate
+			var j = 0;
+			if (this.ncard % 2 != 0) {
+				j++;
+				while (this.in[j - 1] == 0) {
+					j++;
+				}
+			}
+			this.in[j] = 1 - this.in[j];
+			this.ncard = this.ncard + 2*this.in[j] - 1;
+
+			// Build the output array
+			nextSubset = new Array(this.ncard);
+			var idx = 0;
+			for (var i = 0; i <= this.n - 1; ++i) {
+				if (this.in[i] == 1) {
+					nextSubset[idx++] = i + 1;
+				}
+			}
+			
+			// End logic
+			this.mtc = (this.ncard != this.in[this.n -1]);
+		}
+		else  { 
+		    // No more subset to generate, so, (re) generation of the first subset, equals to {}
+			for (var i = 0; i <= this.n - 1; ++i) {
+				this.in[i] = 0;
+			}
+			
+			// The output array is already built in this case (empty)
+			
+			// Specific end logic
+			this.mtc = true;
+		}
+
+		// Return the computed array, not used anymore by this function
+		return [this.mtc, nextSubset];
 	}
 }
 
@@ -2207,6 +2303,79 @@ function simplexRationalGirdSearch_(fct, n, k) {
 
 
 /**
+* @file Functions related to computations on the unit simplex.
+* @author Roman Rubsamen <roman.rubsamen@gmail.com>
+*/
+
+
+/* Start Wrapper private methods - Unit tests usage only */
+self.closestRationalPoint_ = function(x, r) { return closestRationalPoint_(x, r); }
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function closestRationalPoint
+*
+* @summary Compute a rational point on the unit simplex that is the closest to a point on the unit simplex.
+*
+* @description Given a point x = (x_1,...,x_n) on the standard simplex of R^n, which is the n-1 dimensional set of R^n containing 
+* the points y = (y_1,...,y_n) statisfying sum y_i = 1 and y_i >= 0, i = 1..n, this function computes a proximal point xr = (xr_1,...,xr_n) on 
+* the r-th rational grid of the unit simplex of R^n, 1/r * I_n(r), with I_n(r) the set of N^n containing the points m = (m_1,...,m_n) 
+* statisfying sum m_i = r with r a strictly positive natural integer, so that the computed proximal point xr is one of the closest points to x 
+* on this grid with respect to any norm in a large class, c.f. the reference.
+*
+* @see <a href="https://link.springer.com/article/10.1007/s10898-013-0126-2">.M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258.</a>
+* 
+* @param {Array.<number>} x a point belonging to the standard simplex of R^n.
+* @param {number} r the indice of the rational grid of the unit simplex of R^n, 1/r * I_n(r), on which to compute the closest point to x.
+* @return {Array.<number>} the computed closest point to x on the r-th rational grid of the unit simplex of R^n.
+*
+* @example
+* closestRationalPoint_([], 20);
+* // XX
+*/
+function closestRationalPoint_(x, r) {
+	// TODO: Checks, if enabled
+
+	// Compute the integer and fractional parts of the coordinates of the input point multiplied by r, as described in paragraph 2 of the reference.
+	// In parallel, compute k as also defined in paragraph 2 of the reference. 
+	var k = r;
+	var xPartsWithIndexes = new Array(x.length);
+	for (var i = 0; i < x.length; ++i) {
+		//
+		var rx = r * x[i];
+		var integerPart = Math.floor(rx);
+		var fractionalPart = rx - integerPart;
+		
+		//
+		k -= integerPart;
+		
+		//
+		xPartsWithIndexes[i] = [integerPart, fractionalPart, i];
+	}
+
+	// Re-order the fractional parts in non-increasing order, c.f. theorem 1 of the reference.
+	xPartsWithIndexes.sort(function(a, b) {
+		return b[1] - a[1];
+	}); 
+
+	// Rounding rule: round the k largest fractional parts up to one and all other fractional parts down to zero,
+	// as described in paragraph 2 of the reference.
+	var xr = new Array(x.length);
+	for (var i = 0; i < k; ++i) {
+		var index = xPartsWithIndexes[i][2];
+		xr[index] = (xPartsWithIndexes[i][0] + 1) / r;
+	}
+	for (var i = k; i < xPartsWithIndexes.length; ++i) {
+		var index = xPartsWithIndexes[i][2];
+		xr[index] = xPartsWithIndexes[i][0] / r;
+	}
+
+	// Return the computed point
+	return xr;
+}
+
+/**
  * @file Functions related to cluster risk parity portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -2378,6 +2547,128 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 
 
 /**
+ * @file Functions related to equal risk bounding portfolio.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function equalRiskBoundingWeights
+*
+* @summary Compute the weights of the equal risk bounding portfolio.
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only portfolio
+* of n assets with equal risk bounding, defined as the weights with the property that the contribution 
+* of each asset to the risk of the portfolio is equal.
+*
+* This portfolio is unique, provided the covariance matrix of the assets is definite positive.
+* 
+* This portfolio is a trade-off between the MV portfolio and the EW portfolio.
+* It can be viewed as an ERB portfolio tilted toward the assets less correlated with other assets.
+*
+*When short selling is not allowed, there is a unique RP portfolio
+and it contains all assets in the market. In this case, the ERB approach might lead to the RP
+portfolio or it might lead to portfolios with smaller variance that do not contain all assets,
+and where the risk contributions of each asset included in the portfolio is strictly smaller
+than in the RP portfolio
+
+We show here that the Risk Parity approach
+is theoretically dominated by an alternative similar approach that does not actually require
+equally weighted risk contribution of all assets but only an equal upper bound on all such
+risks.
+This result implies that for every solution to the ERB model (6) there exists a subset P of
+the set N = {1, . . . , n} of indices such that only the assets with indices in P have nonzero
+weights, and such weights are those of the RP portfolio of the assets with indices in P. More
+formally, we have the following:
+* The algorithm used is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
+* if the covariance matrix of the assets is definite positive.
+*
+* Generate all subsets of the portfolios 2^n, so that for small n in the order of 15, will work in a reasonable time, but not for higher ns. (several mnutes for 20 assets)
+*
+* @see <a href="https://link.springer.com/article/10.1007/s10898-016-0477-6">Cesarone, F. & Tardella F., Equal Risk Bounding is better than Risk Parity for portfolio selection, J Glob Optim (2017) 68: 439</a>
+* 
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the tolerance parameter for the convergence of the underlying ERC algorithm, a strictly positive real number; defaults to 1e-8.
+* @param {number} opt.maxIter the maximum number of iterations of the underlying ERC algorithm, a strictly positive natural integer; defaults to 10000.
+* @return {Array.<number>} the weights corresponding to the equal risk bounding portfolio, array of n real numbers.
+*
+* @example
+* equalRiskBoundingWeights([[0.1,0], [0,0.2]]);
+* // XXX
+*/
+self.equalRiskBoundingWeights = function (sigma, opt) {	
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var eps = opt.eps || 1e-8;
+	var maxIterations = opt.maxIter || 10000;
+	
+	// Convert sigma to matrix format
+	var sigma = new Matrix_(sigma);
+	
+	// Determine the size of the universe
+	var nbAssets = sigma.nbRows;
+	
+	// Initialize the current minimum value of the risk contribution and the current list of associated assets/assets weights
+	var minRCValue = Number.MAX_VALUE; // 
+	var minRCAssetsIndexes = [];
+	var minRCAssetsWeights = [];
+
+	// Proceed to an exhaustive enumeration of all the subsets of the set {1,...,nbAssets},
+	// in order to find the x^ERB as detailled in section 3.3.1, formula 22, of the reference.
+	//
+	// Skip the empty set, for obvious reasons.
+	var nextSubsetIterator = new subsetsIterator_(nbAssets);
+	var nextSubset = nextSubsetIterator.next();
+	do {
+		// Generate a new subset	
+		var nextSubset = nextSubsetIterator.next();
+		
+		// Extract the associated assets indexes
+		var assetsIndexes = nextSubset[1];
+		
+		// Extract the covariance matrix of the associated assets
+		var subsetSigma = sigma.getSubmatrix(assetsIndexes, assetsIndexes);
+		
+		// Compute ERC weights for these assets
+		var assetsWeights = self.equalRiskContributionWeights(subsetSigma, opt);
+		
+		// Compute the risk contribution of the first asset
+		//
+		// Note: all risk contributions are equal, by definition of the ERC portfolio
+		assetsWeightsMatrix = new Matrix_(assetsWeights);
+		var rcValue =  assetsWeightsMatrix.getValueAt(1,1) * Matrix_.product(subsetSigma, assetsWeightsMatrix).getValueAt(1,1) // = x_1 * (Sigma*x)_1
+		
+		// If the risk contribution of the current subset is lower than the current minimum risk contribution, it
+		// becomes the new minimum risk contribution and the current subset becomes the new list of associated assets.
+		if (rcValue < minRCValue) {
+			minRCValue = rcValue;
+			minRCAssetsIndexes = assetsIndexes;
+			minRCAssetsWeights = assetsWeights;
+		}
+		// Otherwise, nothing needs to be done
+	}
+	while (nextSubset[0]);
+	
+	// At the end, map selected assets weight to full weights (all zero by default, those selected are the weights computed
+	// Compute original assets weights, following formula 22 of the reference
+	var weights = Matrix_.zeros(nbAssets, 1);
+	for (var i = 0; i < minRCAssetsIndexes.length; ++i) {
+		weights.setValueAt(minRCAssetsIndexes[i], 1, minRCAssetsWeights[i]);
+	}
+	
+	// Return the computed weights (already normalized)
+	return weights.toArray();
+}
+
+
+/**
  * @file Functions related to equal risk budget portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -2390,13 +2681,11 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 /**
 * @function equalRiskBudgetWeights
 *
-* @summary Compute the weights of the equally weighted risk budget portfolio.
+* @summary Compute the weights of the equal risk budget portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only portfolio
 * of n assets with equal risk budgets, defined as w_i = 1/sigma_i / (sum(1/sigma_j), j=1..n), i=1..n, with sigma_i the standard deviation 
 * of the asset i.
-*
-* These weights ensure that the risk budget of each asset, defined as the product of the asset’s weight and its standard deviation, is equal.
 *
 * This portfolio is unique.
 *
@@ -2439,7 +2728,7 @@ self.equalRiskBudgetWeights = function (sigma, opt) {
 /**
 * @function equalRiskContributionWeights
 *
-* @summary Compute the weights of the equally weighted risk contribution portfolio.
+* @summary Compute the weights of the equal risk contribution portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only portfolio
 * of n assets with equal risk contributions, defined as the weights with the property that the contribution 
@@ -2465,7 +2754,7 @@ self.equalRiskBudgetWeights = function (sigma, opt) {
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
-* @return {Array.<number>} the weights corresponding to the equal risk contributions portfolio, array of n real numbers.
+* @return {Array.<number>} the weights corresponding to the equal risk contribution portfolio, array of n real numbers.
 *
 * @example
 * equalRiskContributionWeights([[0.1,0], [0,0.2]]);
@@ -2709,7 +2998,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 * are provided in output.
 *
 * The minimization of the function fct is achieved through one of the following optimisation methods:
-* - Exhaustive grid search on a rational grid of the unit simplex of R^n, c.f. function simplexRationalGirdSearch_
+* - Deterministic grid search on a grid of rational points belonging to the unit simplex of R^n
 *
 * To be noted that finding the minimum value(s) of an arbitrary objective function on the unit simplex
 * is an NP-hard problem, c.f. the second reference, so that all the optimisation algorithms above are expected to
@@ -2717,6 +3006,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 * 
 * @see <a href="https://en.wikipedia.org/wiki/Simplex">Simplex</a>
 * @see <a href="http://www.sciencedirect.com/science/article/pii/S0377221707004262">De Klerk, E., Den Hertog, D., Elabwabi, G.: On the complexity of optimization over the standard simplex. Eur. J Oper. Res. 191, 773–785 (2008)</a>
+* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
 *
 * @param {number} nbAssets the number of assets in the considered universe, natural integer superior or equal to 1.
 * @param {function} fct a real-valued objective function of n real variables to minimize on the unit simplex of R^n,
@@ -2724,16 +3014,15 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 * in the considered universe and which must return as output a real number.
 * @param {Object} opt the optional parameters for the algorithms used by the function.
 * @param {string} opt.optimisationMethod the optimisation method to use in order to minimize the function fct, a string either equals to:
-* - 'rationalGridSearch': usage of an exhaustive grid search algorithm on a rational grid of the unit simplex of R^n
+* - 'deterministic': usage of a deterministic grid search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the third reference, where k is defined through the parameter opt.rationalGrid.k
 * -
-* ; defaults to 'rationalGridSearch'.
-* @param {number} opt.exhaustiveSearch.k the indice of the rational grid of the unit simplex of R^n to use in case opt.optimisationMethod is equal to 'rationalGridSearch', 
-* c.f. function simplexRationalGirdSearch_, a natural integer greater than or equal to 1; defaults to n.
+* ; defaults to 'deterministic'.
+* @param {number} opt.rationalGrid.k the indice k of the k-th rational grid of the unit simplex of R^n to use in case opt.optimisationMethod is equal to 'deterministic', a natural integer greater than or equal to 1; defaults to n.
 * @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to
 * the weights of a portfolio minimizing the function fct.
 *
 * @example
-* gridSearchWeights(3, function(arr) { return arr[0];}, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 2}});
+* gridSearchWeights(3, function(arr) { return arr[0];}, {optimisationMethod: 'deterministic', rationalGrid: {k: 2}});
 * // [[0,1,0],[0,0.5,0.5],[0,0,1]]
 */
 self.gridSearchWeights = function (nbAssets, fct, opt) {
@@ -2741,13 +3030,13 @@ self.gridSearchWeights = function (nbAssets, fct, opt) {
 	if (opt === undefined) {
 		opt = {};
 	}
-	opt.optimisationMethod = opt.optimisationMethod || 'rationalGridSearch';
+	opt.optimisationMethod = opt.optimisationMethod || 'deterministic';
 	
 	// Select the proper optimisation method
-	if (opt.optimisationMethod === 'rationalGridSearch') {
-		// Decode options for the rational grid search method
-		opt.rationalGridSearch = opt.rationalGridSearch || { k: nbAssets };
-		var k = opt.rationalGridSearch.k;
+	if (opt.optimisationMethod === 'deterministic') {
+		// Decode options for the deterministic grid search method
+		opt.rationalGrid = opt.rationalGrid || { k: nbAssets };
+		var k = opt.rationalGrid.k;
 		
 		// Call the rational grid search method
 		return simplexRationalGirdSearch_(fct, nbAssets, k);
@@ -2757,6 +3046,106 @@ self.gridSearchWeights = function (nbAssets, fct, opt) {
 	}
 }
 
+
+
+/**
+ * @file Functions related to minimum correlation (heuristic) portfolio.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function minCorrWeights
+*
+* @summary Compute the weights of the minimum correlation (heuristic) portfolio.
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only 
+* minimum correlation (heuristic) portfolio of n assets, as computed by the minimum correlation algorithm of the reference.
+*
+* This portfolio is unique.
+* 
+* This portfolio is meant to approximate the most diversified portfolio (MDP).
+*
+* The algorithm used is the minimum correlation algorithm (MCA), with primary benefits versus the conventional optimization methods:
+* - speed of computation and ease of calculation 
+* - greater robustness to estimation error
+* - superior risk dispersion
+*
+* @see <a href="www.systematicportfolio.com/mincorr_paper.pdf">David Varadi, Michael Kapler, Henry Bee, Corey Rittenhouse, Sep. 2012, The Minimum Correlation Algorithm: A Practical Diversification Tool</a>
+*
+* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {object} opt the optional parameters for the algorithm, unused.
+* @return {Array.<number>} the weights corresponding to theminimum correlation (heuristic) portfolio, array of n real numbers.
+*
+* @example
+* minCorrWeights([[0.1, 0], [0, 0.2]]);
+* // ~[0.59, 0.41]
+*/
+self.minCorrWeights = function (sigma, opt) {
+	// Convert sigma to covariance matrix format
+	var sigma = new Matrix_(sigma).toCovarianceMatrix();
+	
+	// Extract the correlation matrix and the misc. variances-related vectors
+	var variances = sigma.getVariancesVector();
+	var invStddevs = variances.elemPower(-1/2);
+	var rho = sigma.getCorrelationMatrix();
+
+	// TODO: Checks, if enabled	
+	
+	// ------
+	var nbAssets = rho.nbRows;
+	
+	// Specific case to be filtered out: number of assets is 2 (or 1, but this case is less useful)
+	if (nbAssets <= 2) {
+		return self.equalRiskBudgetWeights(variances, opt);
+	}
+	
+	// Step 2: Compute mean and sample standard deviation of the correlation matrix elements
+	// Note: only strict upper triangular part is considered, c.f. the example of the reference
+	var elemRho = rho.toArray(function(i, j, val) {
+		return j > i;
+	});
+	var elementsMean = mean_(elemRho);
+	var elementsStddev = sampleStddev_(elemRho);
+
+	// Step 3: Create Adjusted Correlation Matrix
+	var adjustedRho = rho.elemMap(function(i, j, val) { 
+			if (i == j) {
+				return 0; // Necessary for step 6
+			}
+			else {
+				return 1 - normcdf_((val - elementsMean)/elementsStddev);
+			}
+		});
+
+	// Step 4: Compute average value for each row (= column, as matrix is symetric) of the Adjusted Correlation Matrix
+	// Note: only non diagonal elements are considered, c.f. the example of the reference
+	var rowsElements = adjustedRho.toDoubleArray(function(i, j, val) {
+		return i != j;
+	});
+	var rowsAverages = new Array(nbAssets);
+	for (var i = 0; i < nbAssets; ++i) {
+		rowsAverages[i] = mean_(rowsElements[i]);
+	}
+	
+	// Step 5: Compute rank portfolio weight estimates
+	// Note: ranks are computed in descending order, c.f. the example of the reference
+	var ranks = rank_(rowsAverages, 0);
+	var weights = new Matrix_(ranks, 1).normalize();
+	
+	// Step 6: Combine rank portfolio weight estimates with Adjusted Correlation Matrix
+	weights = Matrix_.product(adjustedRho, weights).normalize();
+	
+	// Step 7: Scale portfolio weights by assets standard deviations
+	weights = Matrix_.vectorHadamardProduct(weights, invStddevs).normalize();
+	
+	// Return the computed weights
+	return weights.toArray();
+}
 
 
 /**
@@ -2921,106 +3310,6 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 
 
 /**
- * @file Functions related to minimum correlation (heuristic) portfolio.
- * @author Roman Rubsamen <roman.rubsamen@gmail.com>
- */
-
- 
-/* Start Wrapper private methods - Unit tests usage only */
-/* End Wrapper private methods - Unit tests usage only */
-
-
-/**
-* @function minCorrWeights
-*
-* @summary Compute the weights of the minimum correlation (heuristic) portfolio.
-*
-* @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only 
-* minimum correlation (heuristic) portfolio of n assets, as computed by the minimum correlation algorithm of the reference.
-*
-* This portfolio is unique.
-* 
-* This portfolio is meant to approximate the most diversified portfolio.
-*
-* The algorithm used is the minimum correlation algorithm (MCA), with primary benefits versus the conventional optimization methods:
-* - speed of computation and ease of calculation 
-* - greater robustness to estimation error
-* - superior risk dispersion
-*
-* @see <a href="www.systematicportfolio.com/mincorr_paper.pdf">David Varadi, Michael Kapler, Henry Bee, Corey Rittenhouse, Sep. 2012, The Minimum Correlation Algorithm: A Practical Diversification Tool</a>
-*
-* @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
-* @param {object} opt the optional parameters for the algorithm, unused.
-* @return {Array.<number>} the weights corresponding to theminimum correlation (heuristic) portfolio, array of n real numbers.
-*
-* @example
-* minCorrWeights([[0.1, 0], [0, 0.2]]);
-* // ~[0.59, 0.41]
-*/
-self.minCorrWeights = function (sigma, opt) {
-	// Convert sigma to covariance matrix format
-	var sigma = new Matrix_(sigma).toCovarianceMatrix();
-	
-	// Extract the correlation matrix and the misc. variances-related vectors
-	var variances = sigma.getVariancesVector();
-	var invStddevs = variances.elemPower(-1/2);
-	var rho = sigma.getCorrelationMatrix();
-
-	// TODO: Checks, if enabled	
-	
-	// ------
-	var nbAssets = rho.nbRows;
-	
-	// Specific case to be filtered out: number of assets is 2 (or 1, but this case is less useful)
-	if (nbAssets <= 2) {
-		return self.equalRiskBudgetWeights(variances, opt);
-	}
-	
-	// Step 2: Compute mean and sample standard deviation of the correlation matrix elements
-	// Note: only strict upper triangular part is considered, c.f. the example of the reference
-	var elemRho = rho.toArray(function(i, j, val) {
-		return j > i;
-	});
-	var elementsMean = mean_(elemRho);
-	var elementsStddev = sampleStddev_(elemRho);
-
-	// Step 3: Create Adjusted Correlation Matrix
-	var adjustedRho = rho.elemMap(function(i, j, val) { 
-			if (i == j) {
-				return 0; // Necessary for step 6
-			}
-			else {
-				return 1 - normcdf_((val - elementsMean)/elementsStddev);
-			}
-		});
-
-	// Step 4: Compute average value for each row (= column, as matrix is symetric) of the Adjusted Correlation Matrix
-	// Note: only non diagonal elements are considered, c.f. the example of the reference
-	var rowsElements = adjustedRho.toDoubleArray(function(i, j, val) {
-		return i != j;
-	});
-	var rowsAverages = new Array(nbAssets);
-	for (var i = 0; i < nbAssets; ++i) {
-		rowsAverages[i] = mean_(rowsElements[i]);
-	}
-	
-	// Step 5: Compute rank portfolio weight estimates
-	// Note: ranks are computed in descending order, c.f. the example of the reference
-	var ranks = rank_(rowsAverages, 0);
-	var weights = new Matrix_(ranks, 1).normalize();
-	
-	// Step 6: Combine rank portfolio weight estimates with Adjusted Correlation Matrix
-	weights = Matrix_.product(adjustedRho, weights).normalize();
-	
-	// Step 7: Scale portfolio weights by assets standard deviations
-	weights = Matrix_.vectorHadamardProduct(weights, invStddevs).normalize();
-	
-	// Return the computed weights
-	return weights.toArray();
-}
-
-
-/**
  * @file Functions related to proportional minimum variance (heuristic) portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -3040,7 +3329,7 @@ self.minCorrWeights = function (sigma, opt) {
 *
 * This portfolio is unique.
 * 
-* This portfolio is meant to approximate the global minimum variance portfolio.
+* This portfolio is meant to approximate the global minimum variance (GMV) portfolio.
 *
 * The algorithm used is the minimum variance algorithm (MVA), with primary benefits versus the conventional optimization methods:
 * - speed of computation and ease of calculation 
@@ -3105,7 +3394,7 @@ self.minVarWeights = function (sigma, opt) {
 * @summary Compute the weights of the risk budgeting portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only portfolio
-* of n assets with risk budgeting contraints, defined as the weights with the property that the contribution 
+* of n assets with risk budgeting contraints, defined as the weights with the property that the total contribution 
 * of each asset to the risk of the portfolio is equal to a pre-determined budget weight.
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.

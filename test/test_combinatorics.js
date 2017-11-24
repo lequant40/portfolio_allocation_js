@@ -20,8 +20,24 @@ QUnit.test('Next composition computation', function(assert) {
   }
 
 });
-  
-  
+
+
+QUnit.test('Next subset computation', function(assert) {    
+  // Reference: Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
+  // Test with the static data examples of section 1
+  {
+	  var expectedValues = [[true,[]], [true,[1]], [true,[1,2]], [true,[2]], [true,[2,3]], [true,[1,2,3]], [true,[1,3]],[true,[3]], [true,[3,4]], [true,[1,3,4]], [true,[1,2,3,4]], [true,[2,3,4]], [true,[2,4]], [true,[1,2,4]], [true,[1,4]], [true,[4]], [true,[4,5]], [true,[1,4,5]], [true,[1,2,4,5]], [true,[2,4,5]], [true,[2,3,4,5]], [true,[1,2,3,4,5]], [true,[1,3,4,5]], [true,[3,4,5]], [true,[3,5]], [true,[1,3,5]], [true,[1,2,3,5]], [true,[2,3,5]], [true,[2,5]], [true,[1,2,5]], [true,[1,5]], [false,[5]]];
+	  
+	  var nextSubsetIterator = new PortfolioAllocation.subsetsIterator_(5);
+	  for (var i = 0; i < expectedValues.length; ++i) {
+		var nextSubset = nextSubsetIterator.next();
+		assert.deepEqual(nextSubset, expectedValues[i], 'Next subset - Test 1 #' + i);
+	  }  
+  }
+
+});
+
+
 QUnit.test('Binomial coefficient computation', function(assert) {    
 	// Test with the static data examples
 	{

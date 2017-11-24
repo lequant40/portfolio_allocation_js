@@ -606,24 +606,94 @@ QUnit.test('Grid search portfolio', function(assert) {
 		
 		// From GMV test case #2, expected (exact) weights are [0.9565927119697761, 0.043407288030223846, 0];
 		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets), 
-	                	PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 3}}), 
+	                	PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 3}}), 
 		                'Grid search portfolio - Default values');
 
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 3}}), 
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 3}}), 
 	                	[[1,0,0]], 
 		                'Grid search portfolio - Values #1');
 
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 10}}), 
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 10}}), 
 	                	[[1,0,0]], 
 		                'Grid search portfolio - Values #2');
 		                
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 100}}), 
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 100}}), 
 	                	[[0.96,0.04,0]], 
 		                'Grid search portfolio - Values #3');
 		                
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'rationalGridSearch', rationalGridSearch: {k: 1000}}), 
+		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 1000}}), 
 	                	[[0.957,0.043,0]], 
 		                'Grid search portfolio - Values #4');
 	}
 
+});
+
+
+
+QUnit.test('Equal risk bounding portfolio', function(assert) {    
+  // Reference: Cesarone, F. & Tardella F., Equal Risk Bounding is better than Risk Parity for portfolio selection, J Glob Optim (2017) 68: 439
+  
+  // Example of Table 1
+  {
+	  // Data
+	  var sigma = [[1,-9/10, 3/5], [-9/10, 1,-1/5],[ 3/5, -1/5, 4]];
+	  var nbAssets = sigma.length;
+
+	  // Compute ERB weights
+	  var weights = PortfolioAllocation.equalRiskBoundingWeights(sigma);
+	  
+	  // Compare ERB weights to expected weights
+	  var expectedWeights = [0.5, 0.5, 0];
+	  for (var i = 0; i < nbAssets; ++i) { 
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'ERB - Values #1 ' + i);
+	  }
+  }
+  
+  // Example of Table 2
+  {
+	  // Data
+	  var sigma = [[1/100, 21/5000, -147/10000, 4/625, -31/2000], [21/5000, 1/25, -57/5000, -21/1250, 21/500], [-147/10000, -57/5000, 9/100, 36/625, 3/125], [4/625, -21/1250, 36/625, 4/25, 1/250], [-31/2000, 21/500, 3/125, 1/250,  1/4]];
+	  var nbAssets = sigma.length;
+
+	  // Compute ERB weights
+	  var weights = PortfolioAllocation.equalRiskBoundingWeights(sigma);
+	  
+	  // Compare ERB weights to expected weights
+	  var expectedWeights = [0.583, 0.157, 0.186, 0, 0.074];
+	  for (var i = 0; i < nbAssets; ++i) { 
+		assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'ERB - Values #2 ' + i);
+	  }
+  }
+
+  // Static example with 20 assets, to show the tractability of the ERB algorithm with this number of assets
+  // This takes around 5 minutes on a 2012 computer
+  /*
+  {
+      // Data
+	  var sigma = [[1.0000,0.3010,-0.2531,0.0497,-0.1286,0.0689,-0.0366,-0.0950,0.0502,-0.0342,0.0074,0.0107,-0.0971,0.2335,0.0807,-0.0024,-0.1245,0.0835,0.1783,-0.0989],
+				   [0.3010,1.0000,0.1298,0.0349,-0.0470,-0.1580,0.0884,-0.0551,0.0455,-0.0042,-0.1111,-0.0481,0.2739,-0.1916,-0.0774,0.0735,0.0239,0.0936,0.0030,-0.2237],
+				   [-0.2531,0.1298,1.0000,-0.0888,0.0696,-0.0881,0.1338,-0.1019,-0.2108,0.0422,-0.1493,-0.2719,0.1637,-0.2037,-0.2762,-0.0429,-0.1202,0.1024,0.1826,-0.2397],
+				   [0.0497,0.0349,-0.0888,1.0000,-0.0711,0.0303,-0.2361,-0.2027,0.2024,0.3856,-0.0313,0.1930,0.1567,-0.2357,0.0109,-0.1681,-0.0752,0.2626,0.0212,0.0834],
+				   [-0.1286,-0.0470,0.0696,-0.0711,1.0000,-0.2109,0.0067,0.0439,-0.2620,-0.2619,0.0822,0.1585,-0.1585,0.0025,-0.3311,-0.1409,-0.0738,-0.0535,-0.0684,0.2921],
+				   [0.0689,-0.1580,-0.0881,0.0303,-0.2109,1.0000,-0.1430,-0.2636,-0.0971,0.1451,-0.1107,-0.0961,-0.1054,-0.0189,0.0006,0.0678,0.1373,0.3409,-0.0739,0.1559],
+				   [-0.0366,0.0884,0.1338,-0.2361,0.0067,-0.1430,1.0000,-0.1179,0.1548,-0.0829,0.1414,-0.3829,-0.0553,0.0796,0.0092,0.0328,-0.1051,0.0139,-0.0700,0.1420],
+				   [-0.0950,-0.0551,-0.1019,-0.2027,0.0439,-0.2636,-0.1179,1.0000,-0.1681,0.1354,-0.0915,-0.1071,-0.1485,-0.0956,0.0881,-0.0646,0.1750,-0.2343,0.0476,-0.0378],
+				   [0.0502,0.0455,-0.2108,0.2024,-0.2620,-0.0971,0.1548,-0.1681,1.0000,0.0967,0.1938,-0.0046,0.3219,0.1068,0.0268,0.0781,0.0529,0.0346,0.1081,0.1386],
+				   [-0.0342,-0.0042,0.0422,0.3856,-0.2619,0.1451,-0.0829,0.1354,0.0967,1.0000,0.0773,-0.1698,-0.1185,-0.1201,0.1164,0.0458,-0.0040,-0.0958,-0.2451,0.0366],
+				   [0.0074,-0.1111,-0.1493,-0.0313,0.0822,-0.1107,0.1414,-0.0915,0.1938,0.0773,1.0000,-0.1579,-0.2839,0.0309,-0.1498,0.3240,-0.0849,-0.1001,0.0279,0.1015],
+				   [0.0107,-0.0481,-0.2719,0.1930,0.1585,-0.0961,-0.3829,-0.1071,-0.0046,-0.1698,-0.1579,1.0000,0.2488,0.1018,-0.0556,-0.0657,0.0473,-0.1634,-0.1715,0.0021],
+				   [-0.0971,0.2739,0.1637,0.1567,-0.1585,-0.1054,-0.0553,-0.1485,0.3219,-0.1185,-0.2839,0.2488,1.0000,0.0940,-0.1194,0.1852,-0.1272,-0.1893,0.0399,-0.0084],
+				   [0.2335,-0.1916,-0.2037,-0.2357,0.0025,-0.0189,0.0796,-0.0956,0.1068,-0.1201,0.0309,0.1018,0.0940,1.0000,0.1020,0.0104,-0.1762,-0.2871,0.1063,0.0213],
+				   [0.0807,-0.0774,-0.2762,0.0109,-0.3311,0.0006,0.0092,0.0881,0.0268,0.1164,-0.1498,-0.0556,-0.1194,0.1020,1.0000,0.0257,-0.1306,0.1000,-0.0951,-0.2423],
+				   [-0.0024,0.0735,-0.0429,-0.1681,-0.1409,0.0678,0.0328,-0.0646,0.0781,0.0458,0.3240,-0.0657,0.1852,0.0104,0.0257,1.0000,-0.2438,-0.2582,-0.2274,0.0310],
+				   [-0.1245,0.0239,-0.1202,-0.0752,-0.0738,0.1373,-0.1051,0.1750,0.0529,-0.0040,-0.0849,0.0473,-0.1272,-0.1762,-0.1306,-0.2438,1.0000,-0.0231,0.1164,0.0304],
+				   [0.0835,0.0936,0.1024,0.2626,-0.0535,0.3409,0.0139,-0.2343,0.0346,-0.0958,-0.1001,-0.1634,-0.1893,-0.2871,0.1000,-0.2582,-0.0231,1.0000,0.0632,0.0336],
+				   [0.1783,0.0030,0.1826,0.0212,-0.0684,-0.0739,-0.0700,0.0476,0.1081,-0.2451,0.0279,-0.1715,0.0399,0.1063,-0.0951,-0.2274,0.1164,0.0632,1.0000,-0.3556],
+				   [-0.0989,-0.2237,-0.2397,0.0834,0.2921,0.1559,0.1420,-0.0378,0.1386,0.0366,0.1015,0.0021,-0.0084,0.0213,-0.2423,0.0310,0.0304,0.0336,-0.3556,1.0000]]
+	  var nbAssets = sigma.length;
+				
+	  // Compute ERB weights
+	  var weights = PortfolioAllocation.equalRiskBoundingWeights(sigma);				
+  }
+  */
 });

@@ -2,7 +2,7 @@
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
-PortfolioAllocation is a JavaScript library to allocate portfolios of finantical assets, i.e. to compute the proportions of a given set of financial instruments (securities, bonds, exchange traded funds, mutual funds...) to hold in a portfolio so as to optimize specific quantitative criteria related to this portfolio.
+PortfolioAllocation is a JavaScript library to allocate portfolios of fincancial assets, i.e. to compute the proportions of a given set of financial instruments (stocks, bonds, exchange traded funds - ETFs, mutual funds...) to hold in a portfolio so as to optimize specific quantitative criteria related to this portfolio.
 
 PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalytics](https://github.com/lequant40/portfolio_analytics_js), and has been developed in JavaScript for the same reason: I heavily use [Google Sheets](https://www.google.com/sheets/about/) to analyse trading strategies on my blog [Le Quant 40](http://www.lequant40.com/), as well as in my personal trading, and Google Sheets is easily extensible thanks to [Google Apps Script](https://developers.google.com/apps-script/), a JavaScript-based language.
 
@@ -10,9 +10,8 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
 ## Features
 
 - Compatible with Google Sheets
-- Compatible with any browser supporting ECMAScript 5 (i.e., front-end development)
-- Compatible with [Node.js](https://nodejs.org/) (i.e., back-end development)
-- (Performances) Automatically uses JavaScript Typed Arrays if available
+- Compatible with any browser supporting ECMAScript 5 for front-end development
+- Compatible with [Node.js](https://nodejs.org/) for back-end development
 - Code continuously tested and integrated by [Travis CI](https://travis-ci.org/)
 - Code heavily documented using [JSDoc](http://usejsdoc.org/)
 
@@ -20,13 +19,13 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
 ## Supported portfolio allocation algorithms
 
 - Equal weights (EW)
-  The 1/N portfolio has been popularized by DeMiguel and al. in their research paper *Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?*.
+  It has been popularized by DeMiguel and al. in their research paper *Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?*.
 
 - Equal risk budgets (ERB)
   Also known as naive risk parity, it has been analysed by Carvalho and al. in the research paper *Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description*.
 
 - Equal risk contributions (ERC) and Risk budgeting (RB)
-  Extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*...), the ERC portfolio being a specific case of the RB portfolio.
+  Extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers (*The properties of equally weighted risk contribution portfolios*, *Managing Risk Exposures Using the Risk Budgeting Approach*...), with ERC a specific case of RB.
 
 - Most diversified portfolio (MDP)
   Described in the research paper *Toward Maximum Diversification* by [Yves Choueifaty](http://www.tobam.fr/yves-choueifaty/) and al., it uses the authors' diversification ratio as the criterion for portfolio construction.
@@ -35,15 +34,24 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
   Both algorithms were discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA being meant as an approximation of the MDP portfolio allocation algorithm and the MVA as an approximation of the GMV portfolio allocation algorithm.
 
 - Cluster risk parity (CRP)
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and [Michael Kapler](http://systematicinvestor.wordpress.com/), it combines the usage of clustering algorithms (for instance, the Fast Threshold Clustering Algorithm - FTCA - of David Varadi) with ERC.
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and [Michael Kapler](http://systematicinvestor.wordpress.com/), it combines the usage of a clustering algorithm (for instance, the Fast Threshold Clustering Algorithm - FTCA - of David Varadi) with the ERC portfolio allocation algorithm.
 
 - Global minimum variance (GMV) - ON-GOING
-  The global minimum variance portfolio is the portfolio located at the leftmost part of the Markowitz mean-variance efficient frontier, which makes it the portfolio with the smallest attainable volatility among all the mean-variance efficient portfolios.
+  Located at the leftmost part of the Markowitz mean-variance efficient frontier, the resulting portfolio possesses the smallest attainable variance among all the mean-variance efficient portfolios.
 
-- Grid search portfolio - ON-GOING 
-  The portfolio(s) obtained by numerically minimizing an arbitrary real-valued objective function of several real variables, typically representing the portfolio "desirability".
+- Grid search - ON-GOING 
+  The grid search portfolio(s) is(are) obtained by numerically minimizing an arbitrary real-valued objective function of several real variables, typically representing a portfolio "desirability" criterion.
    
+- Equal risk bounding (ERB) - ON-GOING 
+  Described in the research paper *Equal Risk Bounding is better than Risk Parity for portfolio selection* by Francesco Cesarone and Fabio Tardella, the ERB portfolio allocation algorithm is best described as an ERC portfolio allocation algorithm applied to a selected subset of the assets in the considered universe, resulting in a portfolio containing less assets and with a smaller variance.
+
   
+## Supported helper algorithms
+
+- Rational portfolio weights rounding algorithm - ON-GOING
+  This algorithm computes any closest rational approximation of a portfolio floating-point weights.
+
+
 ## Usage
 
 ### Usage in Google Sheets

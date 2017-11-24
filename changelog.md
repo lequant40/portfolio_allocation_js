@@ -1,3 +1,9 @@
+### 0.0.4 - XX/XX/2017
+- Misc. Matrix/Vector operations additions/refactor
+- New portfolio allocation methods: Equal Risk Bounding, Global Minimum Variance, Grid Search
+- New portfolio allocation helper method: "optimal" floating-point portfolio weights transformation to rational portfolio weights
+
+
 ### 0.0.3 - 10/09/2017
 - Misc. Matrix/Vector operations additions/refactor
 - New portfolio allocation method: Cluster Risk Parity, with a included clustering method: Fast Threshold Clustering Algorithm
