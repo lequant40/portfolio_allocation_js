@@ -1,4 +1,4 @@
-### 0.0.4 - XX/XX/2017
+### 0.0.4 - 01/12/2017
 - Misc. Matrix/Vector operations additions/refactor
 - New portfolio allocation methods: Equal Risk Bounding, Global Minimum Variance, Grid Search
 - New portfolio allocation helper method: "optimal" floating-point portfolio weights transformation to rational portfolio weights

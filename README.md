@@ -1,4 +1,4 @@
-# PortfolioAllocation v0.0.3 ([Changelog](changelog.md))
+# PortfolioAllocation v0.0.4 ([Changelog](changelog.md))
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
@@ -36,20 +36,20 @@ PortfolioAllocation is complementary to the JavaScript library [PortfolioAnalyti
 - Cluster risk parity (CRP)
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and [Michael Kapler](http://systematicinvestor.wordpress.com/), it combines the usage of a clustering algorithm (for instance, the Fast Threshold Clustering Algorithm - FTCA - of David Varadi) with the ERC portfolio allocation algorithm.
 
-- Global minimum variance (GMV) - ON-GOING
+- Global minimum variance (GMV)
   Located at the leftmost part of the Markowitz mean-variance efficient frontier, the resulting portfolio possesses the smallest attainable variance among all the mean-variance efficient portfolios.
 
-- Grid search - ON-GOING 
+- Grid search
   The grid search portfolio(s) is(are) obtained by numerically minimizing an arbitrary real-valued objective function of several real variables, typically representing a portfolio "desirability" criterion.
    
-- Equal risk bounding (ERB) - ON-GOING 
+- Equal risk bounding (ERB)
   Described in the research paper *Equal Risk Bounding is better than Risk Parity for portfolio selection* by Francesco Cesarone and Fabio Tardella, the ERB portfolio allocation algorithm is best described as an ERC portfolio allocation algorithm applied to a selected subset of the assets in the considered universe, resulting in a portfolio containing less assets and with a smaller variance.
 
   
 ## Supported helper algorithms
 
-- Rational portfolio weights rounding algorithm - ON-GOING
-  This algorithm computes any closest rational approximation of a portfolio floating-point weights.
+- Rational portfolio weights rounding algorithm
+  This algorithm computes the closest rational approximation of a portfolio floating-point weights.
 
 
 ## Usage

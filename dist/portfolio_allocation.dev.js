@@ -2309,32 +2309,31 @@ function simplexRationalGirdSearch_(fct, n, k) {
 
 
 /* Start Wrapper private methods - Unit tests usage only */
-self.closestRationalPoint_ = function(x, r) { return closestRationalPoint_(x, r); }
+self.simplexRationalRounding_ = function(x, r) { return simplexRationalRounding_(x, r); }
 /* End Wrapper private methods - Unit tests usage only */
 
 
 /**
-* @function closestRationalPoint
+* @function simplexRationalRounding_
 *
 * @summary Compute a rational point on the unit simplex that is the closest to a point on the unit simplex.
 *
-* @description Given a point x = (x_1,...,x_n) on the standard simplex of R^n, which is the n-1 dimensional set of R^n containing 
-* the points y = (y_1,...,y_n) statisfying sum y_i = 1 and y_i >= 0, i = 1..n, this function computes a proximal point xr = (xr_1,...,xr_n) on 
+* @description Given a point x = (x_1,...,x_n) on the standard simplex of R^n, this function computes a proximal point xr = (xr_1,...,xr_n) on 
 * the r-th rational grid of the unit simplex of R^n, 1/r * I_n(r), with I_n(r) the set of N^n containing the points m = (m_1,...,m_n) 
 * statisfying sum m_i = r with r a strictly positive natural integer, so that the computed proximal point xr is one of the closest points to x 
 * on this grid with respect to any norm in a large class, c.f. the reference.
 *
 * @see <a href="https://link.springer.com/article/10.1007/s10898-013-0126-2">.M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258.</a>
 * 
-* @param {Array.<number>} x a point belonging to the standard simplex of R^n.
-* @param {number} r the indice of the rational grid of the unit simplex of R^n, 1/r * I_n(r), on which to compute the closest point to x.
-* @return {Array.<number>} the computed closest point to x on the r-th rational grid of the unit simplex of R^n.
+* @param {Array.<number>} x a point belonging to the standard simplex of R^n, array of n real numbers.
+* @param {number} r the indice of the rational grid of the unit simplex of R^n, 1/r * I_n(r), on which to compute the closest point to x, natural integer greater than or equal to 1.
+* @return {Array.<number>} the computed closest point to x on the r-th rational grid of the unit simplex of R^n, array of n real numbers.
 *
 * @example
-* closestRationalPoint_([], 20);
-* // XX
+* simplexRationalRounding_([0.5759, 0.0671, 0.3570], 20);
+* // [0.6, 0.05, 0.35]
 */
-function closestRationalPoint_(x, r) {
+function simplexRationalRounding_(x, r) {
 	// TODO: Checks, if enabled
 
 	// Compute the integer and fractional parts of the coordinates of the input point multiplied by r, as described in paragraph 2 of the reference.
@@ -2998,7 +2997,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 * are provided in output.
 *
 * The minimization of the function fct is achieved through one of the following optimisation methods:
-* - Deterministic grid search on a grid of rational points belonging to the unit simplex of R^n
+* - Deterministic search on a grid of rational points belonging to the unit simplex of R^n
 *
 * To be noted that finding the minimum value(s) of an arbitrary objective function on the unit simplex
 * is an NP-hard problem, c.f. the second reference, so that all the optimisation algorithms above are expected to
@@ -3500,6 +3499,50 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 	return x.toArray();
 }
 
+
+/**
+* @file Functions related to (rational) rounding of floating-point portfolio weights.
+* @author Roman Rubsamen <roman.rubsamen@gmail.com>
+*/
+
+
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function roundedWeights
+*
+* @summary Compute the closest rational approximation of the weights of a portfolio.
+*
+* @description Given n (floating-point) weights w_1,...,w_n associated to a fully invested and long-only portfolio of n assets, 
+* this function returns n (rational) weights wr_1,...,wr_n associated to a fully invested and long-only portfolio of n assets
+* satisfying:
+* - k * wr_i is a natural integer, i=1..n
+* - wr_1,...,wr_n are the closest weights to w_1,...,w_n, in the sense defined in the reference.
+*
+* To be noted that typical values of k are 10 (rounding to 10%), 20 (rounding to 5%) and 100 (rounding to 1%).
+*
+* @see <a href="https://link.springer.com/article/10.1007/s10898-013-0126-2">.M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258.</a>
+* 
+* @param {Array.<number>} originalWeights the weights w_1,...,w_n associated to a fully invested and long-only portfolio of n assets, array of n real numbers.
+* @param {number} k the value to which the rounded weights will be a multiple of the inverse, natural integer greater than or equal to 1.
+* @return {Array.<number>} the rounded weights wr_1,...,wr_n, array of n real numbers.
+*
+* @example
+* roundedWeights([0.5759, 0.0671, 0.3570], 10);
+* // [0.6, 0.1, 0.3]
+* roundedWeights([0.5759, 0.0671, 0.3570], 20);
+* // [0.6, 0.05, 0.35]
+* roundedWeights([0.5759, 0.0671, 0.3570], 100);
+* // [0.57, 0.07, 0.36]
+*/
+self.roundedWeights = function (originalWeights, k) {
+	// ------
+	
+	// Direct call to the simplex rational rounding method
+	return simplexRationalRounding_(originalWeights, k);
+}
 
 /**
  * @file Footer
