@@ -27,7 +27,7 @@ self.Matrix = Matrix_;
 *
 * @description This function constructs an n by m matrix (a_ij),i=1..n,j=1..m from either:
 * - An array dblarr of n arrays of m real numbers, with coefficients a_ij satisfying a_ij = dblarr[i-1][j-1]
-* - An array arr of n real numbers, with coefficients a_ij satisfying a_ij = arr[i-1] with m=1 (i.e., the constructed matrix is a column matrix, that is, a vector)
+* - An array arr of n real numbers, with coefficients a_ij satisfying a_ij = arr[i-1] with m=1 (i.e., the constructed matrix is a column matrix, e.g. a vector)
 * - An n by m matrix (b_ij),i=1..n,j=1..m, with coefficients a_ij satisfying a_ij = b_ij
 * 
 * @param {Array.<Array.<number>>|<Array.<number>|Matrix_} input either an array of n arrays of m real numbers, or an array of n real numbers or a n by m matrix object,
@@ -102,7 +102,7 @@ function Matrix_(input) {
 	else if (input instanceof Array) { // Simplified constructor for a column matrix (i.e., a vector)
 		return fromArray(input);
 	}
-	else if (input instanceof Matrix_) { // Avoid conversion from Matrix to arrays to Matrix
+	else if (input instanceof Matrix_) { // Equivalent to a "clone" operation on the Matrix
 		return fromMatrix(input);
 	}
 	else {
@@ -169,7 +169,7 @@ Matrix_.prototype = {
 	* containing all the elements a_ij,j=1..nbColumns of the i-th row of the matrix satisfying fct(i, j, a_ij) == true
 	* where fct is an optional predicate function.
 	*
-	* In case fct is not provided, it defaults to always true, i.e., all the elements of the matrix are selected.
+	* In case fct is not provided, it defaults to true, i.e., all the elements of the matrix are selected.
 	* 
 	* @memberof Matrix_
 	* @param {function(number, number, number): number} fct the optional function to call on each element of the original matrix,
@@ -218,7 +218,7 @@ Matrix_.prototype = {
 	* containing all the elements a_ij,i=1..nbRows,j=1..nbColumns of the matrix satisfying fct(i, j, a_ij) == true
 	* where fct is an optional predicate function.
 	*
-	* In case fct is not provided, it defaults to always true, i.e., all the elements of the matrix are selected.
+	* In case fct is not provided, it defaults to true, i.e., all the elements of the matrix are selected.
 	*
 	* The order of the elements inside the array arr follows a row major organisation.
 	* 
@@ -388,7 +388,7 @@ Matrix_.prototype = {
 			}
 		}
 		
-		// Return
+		// Return the computed sum
 		return sum;
 	},
 	
@@ -427,59 +427,26 @@ Matrix_.prototype = {
 			}
 		}
 		
-		// Return
-		return obj;
-	},
-
-	/**
-	* @function elemPower
-	*
-	* @summary Returns a matrix made of the elements of the original matrix raised to a power.
-	*
-	* @description This function computes a matrix (c_ij),i=1..n,j=1..m from the original matrix (a_ij),i=1..n,j=1..m, with coefficients
-	* satisfying c_ij = a_ij^p.
-	*
-	* @memberof Matrix_
-	* @param {number} p the exposant to which raise the coefficients of the original matrix.
-	* @return {Matrix_} a matrix with the original matrix coefficients raised to the power p.
-	*
-	* @example
-	* Matrix_([[1,2,3], [4,5,6]]).elemPower(2);
-	* // Matrix_([[1,4,9], [16,25,36]])
-	*/
-	elemPower: function (p) {
-		// Result matrix instantiation
-		var obj = Object.create(Matrix_.prototype);
-		obj.nbRows = this.nbRows;
-		obj.nbColumns = this.nbColumns;
-		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-		
-		// Computation of the power p of the coefficients of A
-		for (var i = 0; i < obj.nbRows; ++i) {
-			for (var j = 0; j < obj.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] = Math.pow(this.data[i * this.nbColumns + j], p);
-			}
-		}
-		
-		// Return
+		// Return the computed matrix
 		return obj;
 	},
 	
 	/**
-	* @function getDiagonal
+	* @function diagonal
 	*
 	* @summary Returns the diagonal elements of a square matrix.
 	*
-	* @description This function returns, as a vector of n rows, the diagonal elements (a_ii), i=1..n from the original square matrix (a_ij),i=1..n,j=1..n.
+	* @description This function returns, as a column matrix (i.e., vector) of n elements, 
+	* the diagonal elements (a_ii), i=1..n from the original square matrix (a_ij),i=1..n,j=1..n.
 	*
 	* @memberof Matrix_
-	* @return {Matrix_} a column matrix (i.e., vector) containing the diagonal coefficients of the original matrix.
+	* @return {Matrix_} a column matrix (i.e., vector) containing the diagonal elements of the original matrix.
 	*
 	* @example
-	* Matrix_([[1,2], [4,5]]).getDiagonal();
+	* Matrix_([[1,2], [4,5]]).diagonal();
 	* // Matrix_([1,5])
 	*/
-    getDiagonal: function () {
+    diagonal: function () {
     	// Checks
     	if (!this.isSquare()) {
     		throw new Error('matrix is not square: ' + '(' + this.nbRows + ',' + this.nbColumns + ')');
@@ -496,7 +463,46 @@ Matrix_.prototype = {
     		obj.data[i] = this.data[i * (this.nbColumns + 1)] ;
     	}
     	
-    	// Return
+    	// Return the computed vector
+        return obj;
+    },
+	
+	/**
+	* @function getRow
+	*
+	* @summary Returns the row elements of a matrix.
+	*
+	* @description This function returns, as a column matrix (i.e., vector) of m elements, 
+	* the row elements (a_ij), j=1..m from the original matrix (a_ij),i=1..n,j=1..m.
+	*
+	* @memberof Matrix_
+	* @param {number} i the row index of the matrix for wich to return the elements, a natural integer belonging to 1..number of matrix rows.
+	* @return {Matrix_} a column matrix (i.e., vector) containing the elements of the i-th row of the original matrix.
+	*
+	* @example
+	* Matrix_([[1,2], [4,5]]).getRow(1);
+	* // Matrix_([1,2])
+	*/
+    getRow: function (i) {
+		// Bounds check
+		if (i < 1 || i > this.nbRows) {
+			throw new Error(
+			'index out of bounds when getting matrix row, (' + i + 
+			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
+		}
+    	
+    	// Result vector instantiation
+    	var obj = Object.create(Matrix_.prototype);
+    	obj.nbRows = this.nbColumns;
+    	obj.nbColumns = 1;
+    	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+    	
+    	// Extraction of the elements of the i-th row of A
+    	for (var j = 0; j < this.nbColumns; ++j) {
+    		obj.data[j] = this.data[(i-1) * this.nbColumns + j] ;
+    	}
+    	
+    	// Return the computed vector
         return obj;
     },
     
@@ -532,7 +538,7 @@ Matrix_.prototype = {
 			}
 		}
 		
-		// Return
+		// Return the computed matrix
 		return obj;
 	},
 	
@@ -592,7 +598,7 @@ Matrix_.prototype = {
     		}
     	}
     	
-    	// Return
+    	// Return the computed submatrix
         return obj;
     },
 	
@@ -625,16 +631,16 @@ Matrix_.prototype = {
 			}
 		}
 		
-		// Return
+		// Return the computed transpose of A
 		return obj;
 	},
 	
 	/**
 	* @function determinant
 	*
-	* @summary Returns the determinant of a square matrix.
+	* @summary Returns the determinant of the square matrix.
 	*
-	* @description This function computes the determinant of a square matrix (a_ij),i=1..n,j=1..n,
+	* @description This function computes the determinant of the square matrix (a_ij),i=1..n,j=1..n,
 	* using a QR decomposition.
 	*
 	* @memberof Matrix_
@@ -642,7 +648,7 @@ Matrix_.prototype = {
 	*
 	* @example
 	* Matrix_([[1,2], [3,4]]).determinant();
-	* // XX
+	* // -2
 	*/
 	determinant: function () {
     	// Checks
@@ -650,8 +656,8 @@ Matrix_.prototype = {
     		throw new Error('matrix is not square: ' + '(' + this.nbRows + ',' + this.nbColumns + ')');
     	}
 		
-		// Compute the Givens QR decomposition of the matrix
-		var qr = Matrix_.givensQRDecomposition(this);
+		// Compute the (Givens) QR decomposition of the matrix
+		var qr = Matrix_.qrDecomposition(this);
 		
 		// By property of the Givens QR decomposition, the determinant of the matrix
 		// is then the product of the diagonal elements of the R matrix.
@@ -661,9 +667,203 @@ Matrix_.prototype = {
 		        det *= r.data[i * r.nbColumns + i];
 		}
 
-		// Return it
+		// Return the computed determinant
 		return det;
 	},
+	
+	/**
+	* @function matrixNorm
+	*
+	* @summary Returns the norm of the matrix, considered as a matrix.
+	*
+	* @description This function computes different matrix norms, depending on the value of p:
+	* - The matrix norm induced by the vector 1-norm (largest column sum of absolute elements), if p equals to 'one'
+	* - The matrix norm induced by the vector infinity-norm (largest row sum of absolute elements), if p equals to 'infinity'
+	* - The matrix Frobenius norm (sqrt(trace(transpose(A) * A))), if p equals to 'frobenius'
+	*
+	* @see <a href="https://en.wikipedia.org/wiki/Matrix_norm">Matrix norm</a>
+	*
+	* @memberof Matrix_
+	* @param {string} p the matrix norm to compute as detailled in the description of this method, a string either equals to 'one', to 'infinity' or to 'frobenius'.
+	* @return {number} the computed norm.
+	*
+	* @example
+	* Matrix_([[1,2], [3,4]]).matrixNorm('one');
+	* // 7
+	*/
+	matrixNorm: function(p) {
+		// The supported matrix norms are 1-norm, infinity-norm and Frobenius norm
+		if (p == 'one') {
+            // Compute the largest column sum of the absolute elements of the matrix
+			var maxColSum = 0;
+            for (var j = 0; j < this.nbColumns; ++j) {
+                var colSum = 0;
+			    for (var i = 0; i < this.nbRows; ++i) {
+				    colSum += Math.abs(this.data[i * this.nbColumns + j]);
+			     }
+			     maxColSum = Math.max(maxColSum, colSum);
+            }
+            return maxColSum;
+		}
+		else if (p == 'infinity') {
+			// Compute the largest row sum of the absolute elements of the matrix
+		    var maxRowSum = 0;
+		    for (var i = 0; i < this.nbRows; ++i) {
+			    var rowSum = 0;
+			    for (var j = 0; j < this.nbColumns; ++j) {
+				    rowSum += Math.abs(this.data[i * this.nbColumns + j]);
+			    }
+			    maxRowSum = Math.max(maxRowSum, rowSum);
+		    }
+		    return maxRowSum;
+		}
+		else if (p == 'frobenius') {
+			// Compute the Frobenius norm, which is equal to the l^2 vector norm of the matrix
+			return this.vectorNorm('two');
+		}
+		else {
+			throw new Error('unsupported matrix norm: ' + p);
+		}
+	},
+	
+	/**
+	* @function vectorNorm
+	*
+	* @summary Returns the norm of the n by m matrix, considered as a vector of n*m elements.
+	*
+	* @description This function computes different vector norms, depending on the value of p:
+	* - The vector l^1 norm (a.k.a. Manhattan norm), if p equals to 'one'
+	* - The vector l^2 norm (a.k.a. Euclidean norm) matrix Frobenius norm (sqrt(trace(transpose(A) * A))), if p equals to 'two'
+	* - The vector l^infinity norm (a.k.a. Maximum norm), if p equals to 'infinity'
+	*
+	* @see <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)">Norm (mathematics)</a>
+	* @see Nicholas J. Higham. 2002. Accuracy and Stability of Numerical Algorithms (2nd ed.). Soc. for Industrial and Applied Math., Philadelphia, PA, USA. 
+	*
+	* @memberof Matrix_
+	* @param {string} p the vector norm to compute as detailled in the description of this method, a string either equals to 'one', to 'two' or to 'infinity'.
+	* @return {number} the computed norm.
+	*
+	* @example
+	* Matrix_([[1,2], [3,4]]).vectorNorm('one');
+	* // 10
+	*/
+	vectorNorm: function(p) {
+		// The supported vector norms are l^1, l^2 and l^infinity norms
+		if (p == 'one') {
+            // Compute the sum of the absolute values of the elements of the matrix
+			var absSum = 0;
+			for (var i = 0; i < this.nbRows; ++i) {
+				for (var j = 0; j < this.nbColumns; ++j) {
+					absSum += Math.abs(this.data[i * this.nbColumns + j]);
+				}
+			}
+			return absSum;
+		}
+		else if (p == 'two') {
+			// Compute the l^2 vector norm using an accurate algorithm by S. J. Hammarling
+			// C.f. problem 27.5 of the second reference
+			var t = 0;
+			var s = 1;
+			for (var i = 0; i < this.nbRows; ++i) {
+			    for (var j = 0; j < this.nbColumns; ++j) {
+				    var val = this.data[i * this.nbColumns + j];
+					var absVal = Math.abs(val);
+					if (absVal > t) {
+					    s = 1 + s * (t/val) * (t/val);
+						t = absVal;
+					}
+					else  {
+					    s = s + (val/t) * (val/t);
+					}
+				}
+			}
+			return t * Math.sqrt(s);
+		}
+		else if (p == 'infinity') {
+			// Compute the largest absolute value of the elements of the matrix
+		    var maxAbsVal = 0;
+		    for (var i = 0; i < this.nbRows; ++i) {
+			    for (var j = 0; j < this.nbColumns; ++j) {
+				    maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[i * this.nbColumns + j]));
+			    }
+		    }
+		    return maxAbsVal;
+		}
+		else {
+			throw new Error('unsupported vector norm: ' + p);
+		}
+	},
+	
+	/**
+	* @function rowVectorNorm
+	*
+	* @summary Returns the norm of a given row of the matrix.
+	*
+	* @description This function computes different vector norms of the i-th row of a matrix, depending on the value of p:
+	* - The matrix row l^1 norm (a.k.a. Manhattan norm), if p equals to 'one'
+	* - The matrix row l^2 norm (a.k.a. Euclidean norm) matrix Frobenius norm (sqrt(trace(transpose(A) * A))), if p equals to 'two'
+	* - The matrix row l^infinity norm (a.k.a. Maximum norm), if p equals to 'infinity'
+	*
+	* @see <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)">Norm (mathematics)</a>
+	* @see Nicholas J. Higham. 2002. Accuracy and Stability of Numerical Algorithms (2nd ed.). Soc. for Industrial and Applied Math., Philadelphia, PA, USA. 
+	*
+	* @memberof Matrix_
+	* @param {number} i the row index of the matrix for wich to compute the norm, a natural integer belonging to 1..number of matrix rows.
+	* @param {string} p the vector norm to compute as detailled in the description of this method, a string either equals to 'one', to 'two' or to 'infinity'.
+	* @return {number} the computed norm.
+	*
+	* @example
+	* Matrix_([[1,2], [3,4]]).rowVectorNorm(1, 'one');
+	* // 3
+	*/
+	rowVectorNorm: function(i, p) {
+		// Bounds check
+		if (i < 1 || i > this.nbRows) {
+			throw new Error(
+			'index out of bounds when getting matrix row, (' + i + 
+			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
+		}
+		
+		// The supported vector norms are l^1, l^2 and l^infinity norms
+		if (p == 'one') {
+            // Compute the sum of the absolute values of the elements of the row
+			var absSum = 0;
+			for (var j = 0; j < this.nbColumns; ++j) {
+				absSum += Math.abs(this.data[(i-1) * this.nbColumns + j]);
+			}
+			return absSum;
+		}
+		else if (p == 'two') {
+			// Compute the l^2 row norm using an accurate algorithm by S. J. Hammarling
+			// C.f. problem 27.5 of the second reference
+			var t = 0;
+			var s = 1;
+		    for (var j = 0; j < this.nbColumns; ++j) {
+				var val = this.data[(i-1) * this.nbColumns + j];
+				var absVal = Math.abs(val);
+				if (absVal > t) {
+					s = 1 + s * (t/val) * (t/val);
+					t = absVal;
+				}
+				else  {
+					s = s + (val/t) * (val/t);
+				}
+			}
+			return t * Math.sqrt(s);
+		}
+		else if (p == 'infinity') {
+			// Compute the largest absolute value of the elements of the row
+		    var maxAbsVal = 0;
+		    for (var j = 0; j < this.nbColumns; ++j) {
+			    maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[(i-1) * this.nbColumns + j]));
+		    }
+		    return maxAbsVal;
+		}
+		else {
+			throw new Error('unsupported vector norm: ' + p);
+		}
+	},
+	
 };
 
 
@@ -720,21 +920,100 @@ Matrix_.areEqual = function (a, b, eps) {
 	return true;
 };
 
+// TODO better
+Matrix_.axpy = function(a, x, y, out) {
+	// Ensure x,y are matrices
+	if (!(x instanceof Matrix_)) {
+		throw new Error('x must be a matrix');
+	}
+	if (!(y instanceof Matrix_)) {
+		throw new Error('y must be a matrix');
+	}
+	
+	// Checks
+	if (x.nbColumns !== y.nbColumns || x.nbRows !== y.nbRows) {
+		throw new Error('Matrices sizes do not match: ' + '(' + x.nbRows + ',' + x.nbColumns + 
+		') - ' + '(' + y.nbRows + ',' + y.nbColumns + ')');
+	}
+	
+	// Result matrix instantiation
+	var obj;
+	if (!out) {
+		obj = Object.create(Matrix_.prototype);
+		obj.nbRows = x.nbRows;
+		obj.nbColumns = x.nbColumns;
+		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	}
+	else if (!(out instanceof Matrix_)){
+		throw new Error('the provided output is not a matrix');
+	}
+	else if (out.nbRows !== x.nbRows || out.nbColumns !== x.nbColumns) {
+		throw new Error('the provided output matrix size does not match: ' + '(' + out.nbRows + ',' + out.nbColumns + 
+		') - ' + '(' + x.nbRows + ',' + x.nbColumns + ')');
+	}
+	else {
+		obj = out;
+	}
+	
+	// Computation of aX + Y
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = a * x.data[i * x.nbColumns + j] + y.data[i * y.nbColumns + j];
+		}
+	}
+	
+	// Return
+    return obj;
+};
+
+
+
+// TODO better
+Matrix_.copy = function(x, out) {
+	// Ensure x is a matrix
+	if (!(x instanceof Matrix_)) {
+		throw new Error('x must be a matrix');
+	}
+
+	// Result matrix instantiation
+	if (!out) {
+		return new Matrix_(x);
+	}
+	else if (!(out instanceof Matrix_)){
+		throw new Error('the provided output is not a matrix');
+	}
+	else if (out.nbRows !== x.nbRows || out.nbColumns !== x.nbColumns) {
+		throw new Error('the provided output matrix size does not match: ' + '(' + out.nbRows + ',' + out.nbColumns + 
+		') - ' + '(' + x.nbRows + ',' + x.nbColumns + ')');
+	}
+	else {
+		// Copy of X in place
+		for (var i = 0; i < out.nbRows; ++i) {
+			for (var j = 0; j < out.nbColumns; ++j) {
+				out.data[i * out.nbColumns + j] = x.data[i * x.nbColumns + j];
+			}
+		}
+		return out;
+	}
+};
+
+
 /**
 * @function product
 *
 * @summary Returns the matrix-matrix product.
 *
-* @description This function computes the matrix-matrix product a*b of matrices a and b, where a is a n by m matrix and b is a m by p matrix.
+* @description This function computes the matrix-matrix product a*b of matrices A and B,
+* where A is a n by m matrix and B is a m by p matrix.
 *
 * The algorithm implemented uses an IKJ form, cache aware.
 * 
-* @param {Matrix_} a an n by m matrix.
-* @param {Matrix_} a an m by p matrix.
-* @return {Matrix_} the matrix product a*b, an m by p matrix.
+* @param {Matrix_} A an n by m matrix.
+* @param {Matrix_} B an m by p matrix.
+* @return {Matrix_} the matrix product A*B, an m by p matrix.
 *
 * @example
-* product(Matrix_([[1,2,3], [4,5,6]]), .Matrix_([[1,1], [2,2], [3,3]]));
+* product(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,1], [2,2], [3,3]]));
 * // Matrix_([[14,14], [32,32]])
 */
 Matrix_.product = function(a, b) {
@@ -761,20 +1040,78 @@ Matrix_.product = function(a, b) {
 	// Computation of A*B product in IKJ format, cache aware
 	for (var i = 0; i < a.nbRows; ++i) {
 		for (var j = 0; j < b.nbColumns; ++j) {
-			obj.data[i * b.nbColumns + j] = 0;
+			obj.data[i * obj.nbColumns + j] = 0;
 		}
 	
 		for (var k = 0; k < a.nbColumns; ++k) {
 			var aik = a.data[i * a.nbColumns + k];
 			
 			for (var j = 0; j < b.nbColumns; ++j) {
-				obj.data[i * b.nbColumns + j] += aik * b.data[k * b.nbColumns + j];
+				obj.data[i * obj.nbColumns + j] += aik * b.data[k * b.nbColumns + j];
 			}
 		}
 	}
 	
 	// Return
     return obj;
+};
+
+/**
+* @function rowColumnProduct
+*
+* @summary Returns the product of a matrix row and a matrix column.
+*
+* @description This function computes the product A(i,:) * B(:,j) of the i-th row
+* of the matrix A with the j-th column of the matrix B, where A is a n by m matrix
+* and B is a m by p matrix.
+*
+* @param {Matrix_} A a n by m matrix.
+* @param {number} i the row index of the matrix A, a natural integer belonging to 1..n.
+* @param {Matrix_} B a m by p matrix.
+* @param {number} j the column index of the matrix B, a natural integer belonging to 1..m.
+* @return {number} the product A(i,:) * B(:,j), a real number.
+*
+* @example
+* rowColumnProduct(Matrix_([[1,2,3], [4,5,6]]), 1, Matrix_([[1,1], [2,2], [3,3]]), 1);
+* // 14
+*/
+Matrix_.rowColumnProduct = function(a, i, b, j) {
+	// Ensure a,b are matrices
+	if (!(a instanceof Matrix_)) {
+		throw new Error('a must be a matrix');
+	}
+	if (!(b instanceof Matrix_)) {
+		throw new Error('b must be a matrix');
+	}
+	
+	// Checks
+	if (a.nbColumns !== b.nbRows) {
+		throw new Error('Matrices sizes do not match: ' + '(' + a.nbRows + ',' + a.nbColumns + 
+		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+	
+	// Bounds check for a
+	if (i < 1 || i > a.nbRows) {
+		throw new Error(
+		'index out of bounds when getting matrix row, (' + i + 
+		') in size (' + a.nbRows + ',' + a.nbColumns + ')');
+	}
+	
+	// Bounds check for b
+	if (j < 1 || j > b.nbRows) {
+		throw new Error(
+		'index out of bounds when getting matrix column, (' + j + 
+		') in size (' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+	
+	// Computation of <A(i,:))/B(:,j)>
+	var rowColProd = 0;
+	for (var k = 0; k < a.nbColumns; ++k) {
+		rowColProd += a.data[(i-1) * a.nbColumns + k] * b.data[k * b.nbColumns + (j-1)]; 
+	}
+	
+	// Return the computed value
+	return rowColProd;
 };
 
 
@@ -784,7 +1121,7 @@ Matrix_.product = function(a, b) {
 * @summary Returns a diagonal matrix constructed from an array of numbers.
 *
 * @description This function computes a diagonal square matrix (a_ij),i=1..n,j=1..n from an array arr of n real numbers, 
-* with coefficients a_ij satisfying a_ij = 0,i <>j and a_ij = arr[i-1],i==j.
+* with coefficients a_ij satisfying a_ij = 0, i <> j and a_ij = arr[i-1], i==j.
 *
 * @param {Vector_} x a vector of size n.
 * @return {Matrix_} a n by n diagonal matrix with its diagonal elements corresponding to the elements of x.
@@ -1037,13 +1374,14 @@ Matrix_.vectorHadamardProduct = function(x, y) {
 /**
 * @function vectorDotProduct
 *
-* @summary Returns the dot product of two vectors.
+* @summary Returns the dot product of two column matrices (e.g. vectors).
 *
-* @description This function computes the vector dot product <x/y>, where x and y are vectors of the same size.
+* @description This function computes the dot product <x/y>, 
+* where x and y are two n by 1 column matrices (e.g. vectors).
 * 
-* @param {Matrix_} x a column matrix.
-* @param {Matrix_} y a column matrix of same size as x.
-* @return {number} the dot product <x/y>.
+* @param {Matrix_} x a n by 1 column matrix.
+* @param {Matrix_} y a n by 1 column matrix.
+* @return {number} the dot product <x/y>, a real number.
 *
 * @example
 * vectorDotProduct(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
@@ -1075,33 +1413,33 @@ Matrix_.vectorDotProduct = function(x, y) {
 
 
 /**
-* @function givensQRDecomposition
+* @function qrDecomposition
 *
 * @summary Returns a QR decomposition of a matrix, using Givens rotations.
 *
 * @description This function computes a QR decomposition of a matrix A, using Givens rotations 
 * as described in the algorithm 5.2.4 (and above discussion therein) of the first reference.
 * 
-* To be noted, though that the 'givens' internal function used in this method is not the same
-* as the one described in the first reference, but rather is the continuous one described
+* To be noted that the 'givens' internal function used in this method is not the same
+* as the one described in the first reference, but is the continuous one described
 * in the algorithm 4 of the second reference.
 * 
 * @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
 * @see <a href="http://www.netlib.org/lapack/lawnspdf/lawn150.pdf">Anderson, Edward (4 December 2000). Discontinuous Plane Rotations and the Symmetric Eigenvalue Problem. LAPACK Working Note. University of Tennessee at Knoxville and Oak Ridge National Laboratory.</a>
 *
-* @param {Matrix_} an m by n matrix, with m >= n.
+* @param {Matrix_} A an m by n matrix, with m >= n.
 * @return {<Array.<Matrix_>} an array of two matrices - Q at array index 0 and R at array index 1 - satisfying the following properties:
-* Q is an m by m matrix 
-* R is an m by n matrix
-* A = QR
-* Q is an orthogonal matrix, with a determinant equals to 1 (i.e., a rotation)
-* R is an upper triangular matrix
+* - Q is an m by m matrix 
+* - R is an m by n matrix
+* - A = QR
+* - Q is an orthogonal matrix, with a determinant equals to 1 (i.e., a rotation)
+* - R is an upper triangular matrix
 *
 * @example
-* givensQRDecomposition(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
+* qrDecomposition(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
 * // XX
 */
-Matrix_.givensQRDecomposition = function(a) {
+Matrix_.qrDecomposition = function(a) {
 	/**
     * @function givens
     *
@@ -1186,7 +1524,6 @@ Matrix_.givensQRDecomposition = function(a) {
 			rr.data[(i-1) * rr.nbColumns + (j-1)] = 0; // R(i, j) = 0
 
 				// Loop resumed at k = j+1
-			
 			for (var k = j+1; k <= n; ++k) {
 				var t1 = rr.data[(i-2) * rr.nbColumns + (k-1)]; // t1 = R(i-1, k)
 				var t2 = rr.data[(i-1) * rr.nbColumns + (k-1)]; // t2 = R(i, k)
@@ -1207,6 +1544,121 @@ Matrix_.givensQRDecomposition = function(a) {
 	
 	// Return the computed [Q, R] pair;
 	return [qq, rr];
+}
+
+
+/**
+* @function linsolveKaczmarz
+*
+* @summary X
+*
+* @description X.
+* 
+* @see <a href="https://www.sciencedirect.com/science/article/pii/002437959090207S">Hanke, M. and Niethammer, W. [1990], On the acceleration of Kaczmarz’smethod for inconsistent linear systems, Linear Algebra and its Applications 130, 83–98.</a>
+*
+* @param {Matrix_} A an m by n matrix, with m >= n.
+* @param {Matrix_} b an m by 1 matrix.
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @return {<Matrix_} an n by 1 matrix satisfying the following properties:
+* - Q is an m by m matrix 
+* - R is an m by n matrix
+* - A = QR
+* - Q is an orthogonal matrix, with a determinant equals to 1 (i.e., a rotation)
+* - R is an upper triangular matrix
+*
+* @example
+* linsolveKaczmarz(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
+* // XX
+*/
+Matrix_.linsolveKaczmarz = function(A, b, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var eps = opt.eps || 1e-16;
+	var maxIterations = opt.maxIter || 10000;
+	
+	// ------
+	
+	// Ensure a,b are matrices
+	if (!(A instanceof Matrix_)) {
+		throw new Error('a must be a matrix');
+	}
+	if (!(b instanceof Matrix_)) {
+		throw new Error('b must be a matrix');
+	}
+	
+	// Checks
+	if (A.nbColumns !== b.nbRows) {
+		throw new Error('Matrices sizes do not match: ' + '(' + A.nbRows + ',' + A.nbColumns + 
+		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+	if (b.nbColumns !== 1) {
+		throw new Error('b is not a vector: ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+	
+	// Initializations
+	var m = A.nbRows;
+	var n = A.nbColumns;
+	var x_km = new Matrix_.zeros(n, 1); // the previous iteration solution vector; x in the algorithm 2.1 of the reference
+	var x_k = new Matrix_.zeros(n, 1); // the current iteration solution vector; u in the algorithm 2.1 of the reference
+	
+	// Checks
+	if (m < n) {
+		throw new Error('matrix has more columns than rows: ' + '(' + m + ') v.s. ' + '(' + n + ')');
+	}
+	
+	// Preliminary computation of the squares of the 2-norms of the rows of A
+	var a_rows_two_norm_sq = new Array(m);
+	for (var i = 1; i <= m; ++i) {
+		var a_i_two_norm = A.rowVectorNorm(i, 'two');
+		a_rows_two_norm_sq[i-1] = a_i_two_norm * a_i_two_norm;
+	}
+	
+	// Main loop until convergence, guaranteed as per theorem 3.1 of the reference
+	var iter = 0;
+	var converged = false;
+	var delta_x = new Matrix_.zeros(n, 1); // the delta vector (current iteration solution vector minus previous iteration solution vector)
+	while (!converged) {
+		// Cycle through the m rows of A and orthogonally project the current iterate x_k onto
+		// the solution hyperplane of <A(i,:)/x_k> = b_i, i=1..m.		
+		for (var i = 1; i <= m; ++i) {
+			// Compute r, c.f. algorithm 2.1 of the reference: r = b(i) - <A(i,:)/x_k>
+			var r = b.data[(i-1) * b.nbColumns] - Matrix_.rowColumnProduct(A, i, x_k, 1);
+			
+			// Update x_k, c.f. algorithm 2.1 of the reference: x_k = x_k + r/||A(i,:)||_2^2 * A(i,:)
+			for (var j = 1; j <= n; ++j) { // this loop will compute the vector x_k
+				x_k.data[(j-1) * x_k.nbColumns] += r / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+			}
+		}
+		
+		// Check the convergence conditions: 
+		// - Absoute error: ||x_k - x_km||_abs <= eps 
+		// - Relative error ||x_k - x_km||_abs / ||x_k||_abs <= eps
+		delta_x = Matrix_.axpy(-1, x_km, x_k, delta_x);
+		var delta_x_inf_norm = delta_x.vectorNorm('infinity');
+		var x_k_inf_norm = x_k.vectorNorm('infinity');
+		if (delta_x_inf_norm <= eps && delta_x_inf_norm <= eps * x_k_inf_norm) {
+			converged = true;
+		}
+		
+		// Prepare the next iteration
+		// Update the previous iteration solution vector to the current iteration solution vector: x_km = x_k
+		x_km = Matrix_.copy(x_k, x_km);
+		
+		// Update the number of iterations
+		++iter;
+		
+		// Check the number of iterations
+		if (iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+	}
+	
+	// Return the computed solution
+	return x_k;
 }
 
 
@@ -1416,7 +1868,7 @@ function addCovarianceMatrixMethods_(matrix) {
     	* // Vector_([1,1])
     	*/
 		'getVariancesVector': function() { 
-			return this.getDiagonal();
+			return this.diagonal();
 		},
 		
     	/**
@@ -1700,12 +2152,54 @@ function binomial_(n, k) {
  */
 
 /* Start Wrapper private methods - Unit tests usage only */
+self.hypot_ = function(x, y) { return hypot_(x, y); }
 self.rank_ = function(x, order) { return rank_(x, order); }
 self.ftca_ = function(correlationMatrix, threshold) { return ftca_(correlationMatrix, threshold); }
 /* End Wrapper private methods - Unit tests usage only */
  
  
+/**
+* @function hypot_
+*
+* @summary Returns the square root of the sum of the squares of two numbers (i.e., the hypotenuse).
+*
+* @description This function computes the value of sqrt(abs(x)^2 + abs(y)^2) in a way
+* to avoid as much as possible underflow and overflow.
+*
+* @see <a href="https://en.wikipedia.org/wiki/Hypot#Implementation">Hypot</a>
+*
+* @param {number} x a real number.
+* @param {number} y a real number.
+* @return {number} the value of sqrt(abs(x)^2 + abs(y)^2), a real number.
+*
+* @example
+* hypot_(3, 4);
+* // 5
+*/
+function hypot_(x, y) {
+    // Initialization
+	var r = 0;
+    
+	// Main algorithm
+	var absX = Math.abs(x);
+	var absY = Math.abs(y);
+	if (absX > absY) {
+	   r = y/x;
+	   r = absX * Math.sqrt(1 + r*r);
+    } 
+	else if (y != 0) {
+	   r = x/y;
+	   r = absY * Math.sqrt(1 + r*r);
+    }
+	else {
+	   r = 0;
+    }
+    
+	// Return the computed value
+	return r;
+}
 
+ 
 /**
 * @function rank_
 *
@@ -2698,7 +3192,7 @@ self.equalRiskBudgetWeights = function (sigma, opt) {
 	// ------
 	
 	// The output weights are defined as the normalized inverses of the assets standard deviations.
-	var weights = new Matrix_(sigma).elemPower(-1/2).normalize();
+	var weights = new Matrix_(sigma).elemMap(function(i,j,val) { return 1/Math.sqrt(val); }).normalize();
 	
 	// Return the computed weights
 	return weights.toArray();
@@ -2953,7 +3447,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 		++iter;
 		
 		// Check the number of iterations
-		if (iter >= maxIterations) {
+		if (iter > maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 	}
@@ -3081,7 +3575,7 @@ self.minCorrWeights = function (sigma, opt) {
 	
 	// Extract the correlation matrix and the misc. variances-related vectors
 	var variances = sigma.getVariancesVector();
-	var invStddevs = variances.elemPower(-1/2);
+	var invStddevs = variances.elemMap(function(i,j,val) { return 1/Math.sqrt(val); });
 	var rho = sigma.getCorrelationMatrix();
 
 	// TODO: Checks, if enabled	
@@ -3188,7 +3682,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 	var sigma = new Matrix_(sigma);
 	
 	// Extract the standard deviations of the assets in vector format
-	var stddevs = sigma.getDiagonal().elemPower(1/2);
+	var stddevs = sigma.diagonal().elemMap(function(i,j,val) { return Math.sqrt(val); });
 
 	// TODO: Checks, if enabled
 	// Check that diagonal entries of sigma are strictly positive
@@ -3288,7 +3782,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 		++iter;
 		
 		// Check the number of iterations
-		if (iter >= maxIterations) {
+		if (iter > maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 	}
@@ -3360,7 +3854,7 @@ self.minVarWeights = function (sigma, opt) {
 	}).normalize();
 	
 	// Step 3: Scale portfolio weights by assets variances
-	var invVariancesWeights = sigma.getDiagonal().elemPower(-1).normalize();
+	var invVariancesWeights = sigma.diagonal().elemMap(function(i,j,val) { return 1/val; }).normalize();
 	weights = Matrix_.vectorHadamardProduct(weights, invVariancesWeights).normalize();
 	
 	// Return the computed weights
@@ -3480,7 +3974,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 		++iter;
 		
 		// Check the number of iterations
-		if (iter >= maxIterations) {
+		if (iter > maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 	}

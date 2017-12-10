@@ -86,14 +86,13 @@ QUnit.test('Matrix basic manipulations', function(assert) {
       assert.equal(sMat.isSquare(), true, 'Matrix is square');
       
       // Extract the matrix diagonal elements
-      var diag = sMat.getDiagonal();
+      var diag = sMat.diagonal();
       for (var i = 1; i <= sMat.nbRows; ++i) {
           assert.equal(diag.getValueAt(i, 1), sMat.getValueAt(i, i), 'Matrix diagonal elements');
       }
   }
 
 });
-
 
 QUnit.test('Matrix-matrix product', function(assert) {    
   // Test matrix-matrix product using static data
@@ -103,16 +102,23 @@ QUnit.test('Matrix-matrix product', function(assert) {
 
   var expectedResMat = new PortfolioAllocation.Matrix([[14,28], [32,64]]);
   assert.equal(PortfolioAllocation.Matrix.areEqual(prodMat, expectedResMat), true, 'Matrix-matrix product');
+  
+  // TODO: use random data
 });
 
-
-QUnit.test('Matrix element wise power', function(assert) {    
-  // Test matrix element wise power using static data
-  var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
-  var powerMat = mat.elemPower(2);
- 
-  var expectedResMat = new PortfolioAllocation.Matrix([[1,4,9], [16,25,36]]);
-  assert.equal(PortfolioAllocation.Matrix.areEqual(powerMat, expectedResMat), true, 'Matrix element wise power');
+QUnit.test('Matrix row - column product', function(assert) {    
+  // Test matrix row - column product using static data
+  var mat1 = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
+  var mat2 = new PortfolioAllocation.Matrix([[1,2], [2,4], [3,6]]);
+  var expectedResMat = new PortfolioAllocation.Matrix([[14,28], [32,64]]);
+  
+  for (var i = 1; i <= mat1.nbRows; ++i) {
+	  for (var j = 1; j <= mat2.nbColumns; ++j) {
+			assert.equal(PortfolioAllocation.Matrix.rowColumnProduct(mat1, i, mat2, j), expectedResMat.getValueAt(i,j), 'Matrix row - column product #(' + i + "," + j + ")");
+	  }
+  }
+  
+  // TODO: use random data
 });
 
 
@@ -179,6 +185,14 @@ QUnit.test('Submatrix extraction', function(assert) {
   assert.equal(PortfolioAllocation.Matrix.areEqual(subMat, expectedMat), true, 'Submatrix extraction');
 });
 
+QUnit.test('Matrix row extraction', function(assert) {    
+  // Test using static data
+  var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
+  var expected_row_1 =  new PortfolioAllocation.Matrix([1,2,3]);
+  var expected_row_2 =  new PortfolioAllocation.Matrix([4,5,6]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getRow(1), expected_row_1), true, 'Matrix row extraction #1');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getRow(2), expected_row_2), true, 'Matrix row extraction #2');
+});
 
 QUnit.test('Zeros matrix creation', function(assert) {    
   // Test using static data
@@ -206,22 +220,14 @@ QUnit.test('Transpose matrix', function(assert) {
 QUnit.test('Givens QR decomposition', function(assert) {    
   // Test using static data  
   {
-	  //var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6], [7,8,9]]);
 	  var mat = new PortfolioAllocation.Matrix([[1,2,0], [1,1,1], [2,1,0]]);
 	  
 	  // Computation of a QR decomposition
-	  var qr = PortfolioAllocation.Matrix.givensQRDecomposition(mat);
+	  var qr = PortfolioAllocation.Matrix.qrDecomposition(mat);
 	  var q = qr[0];
 	  var r = qr[1];
-	  
-	  //console.log(q.toString());
-	  //console.log(r.toString());
-	  
-	  var qqp = PortfolioAllocation.Matrix.product(q, q.transpose());
-	  //console.log(qqp.toString());//OK
-	  
+	  var qqp = PortfolioAllocation.Matrix.product(q, q.transpose());  
 	  var qtimesr = PortfolioAllocation.Matrix.product(q, r);
-	  //console.log(qtimesr.toString()); // OK
 	  
 	  // Expected matrices were verified with Matlab
 	  var expectedQMat = new PortfolioAllocation.Matrix([[1,4], [2,5], [3,6]]); 
@@ -242,4 +248,99 @@ QUnit.test('Determinant computation', function(assert) {
   var expectedValue = 18;
 
   assert.equal(Math.abs(mat.determinant() - expectedValue) <= 1e-16, true, 'Determinant computation');
+  
+  // TODO: Test random data
 });
+
+
+QUnit.test('Matrix norms computation', function(assert) {    
+  // Unsupported norm
+  {
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,2,8]]);
+      assert.throws(function() { mat.matrixNorm(2) },
+		                         new Error('unsupported matrix norm: 2'),
+		                         "Matrix norm computation - unsupported norm");
+  }
+		
+  // Test using static data  
+  {
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,2,8]]);
+      var expectedNorm1 = 19;
+      var expectedNormInf = 15;
+      var expectedNormFrobenius = Math.sqrt(3*3 + 5*5 + 7*7 + 2*2 + 6*6 + 4*4 + 2*2 + 8*8);
+
+      assert.equal(mat.matrixNorm('one'), expectedNorm1, 'Matrix 1-norm computation');
+      assert.equal(mat.matrixNorm('infinity'), expectedNormInf, 'Matrix infinity-norm computation');
+      assert.equal(mat.matrixNorm('frobenius'), expectedNormFrobenius, 'Matrix Frobenius-norm computation');
+  }
+  
+  // TODO: Test random data
+});
+
+QUnit.test('Matrix vector norms computation', function(assert) {    
+  // Unsupported norm
+  {
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,2,8]]);
+      assert.throws(function() { mat.vectorNorm(2) },
+		                         new Error('unsupported vector norm: 2'),
+		                         "Matrix vector norm computation - unsupported norm");
+  }
+		
+  // Test using static data  
+  {
+      var mat = new PortfolioAllocation.Matrix([[-1,2], [3,-4]]);
+      var expectedNorm1 = 10;
+      var expectedNormInf = 4;
+      var expectedNorm2 = Math.sqrt(30);
+
+      assert.equal(mat.vectorNorm('one'), expectedNorm1, 'Matrix vector 1-norm computation');
+      assert.equal(mat.vectorNorm('infinity'), expectedNormInf, 'Matrix vector infinity-norm computation');
+      assert.equal(mat.vectorNorm('two'), expectedNorm2, 'Matrix vector 2-norm computation');
+  }
+  
+  // TODO: Test random data
+});
+
+
+QUnit.test('Matrix row norms computation', function(assert) {    
+  // Unsupported norm
+  {
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,2,8]]);
+      assert.throws(function() { mat.rowVectorNorm(1, 2) },
+		                         new Error('unsupported vector norm: 2'),
+		                         "Matrix row norm computation - unsupported norm");
+  }
+		
+  // Test using static data  
+  {
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4]]);
+      var expectedRowsNorm1 = [15, 12];
+      var expectedRowsNormInf = [7, 6];
+      var expectedRowsNorm2 = [Math.sqrt(3*3 + 5*5 + 7*7), Math.sqrt(2*2 + 6*6 +4*4)];
+
+	  for(var i = 0; i < mat.nbRows; ++i) {
+		assert.equal(mat.rowVectorNorm(i+1, 'one'), expectedRowsNorm1[i], 'Matrix row 1-norm computation');
+		assert.equal(mat.rowVectorNorm(i+1, 'infinity'), expectedRowsNormInf[i], 'Matrix row infinity-norm computation');
+		assert.equal(Math.abs(mat.rowVectorNorm(i+1, 'two') - expectedRowsNorm2[i]) <= 1e-15, true, 'Matrix row 2-norm computation');
+	  }
+  }
+  
+  // TODO: Test random data
+});
+
+
+QUnit.test('Matrix linear system solving via Kaczmarz algorithms', function(assert) {    
+  // Test using static data
+  {
+      // Source: https://en.wikipedia.org/wiki/System_of_linear_equations
+	  var A = new PortfolioAllocation.Matrix([[3,2,-1], [2,-2,4], [-1, 0.5, -1]]);
+	  var b = new PortfolioAllocation.Matrix([1,-2,0]);
+      var expectedX = new PortfolioAllocation.Matrix([1, -2, -2]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #1');
+  }
+  
+  // TODO: Test random data
+});
+ 

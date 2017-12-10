@@ -6,6 +6,28 @@ QUnit.module('Statistics internal module', {
 });
 
 
+QUnit.test('Hypothenuse computation', function(assert) {    
+  // Tests with static data
+  {
+	  assert.ok(Math.abs(PortfolioAllocation.hypot_(3e200, 4e200) - 5e+200)/5e+200 <= 1e-15, 'Hypothenuse computation with no overflow');
+	  assert.equal(PortfolioAllocation.hypot_(3, 4), 5, 'Hypothenuse computation #1');
+	  assert.equal(PortfolioAllocation.hypot_(-2, 0), 2, 'Hypothenuse computation one zero argument #1');
+	  assert.equal(PortfolioAllocation.hypot_(0, -2), 2, 'Hypothenuse computation one zero argument #2');
+	  assert.equal(PortfolioAllocation.hypot_(0, 0), 0, 'Hypothenuse computation two zero arguments');
+  }  
+  
+  // Tests with the formula and random data
+  {
+	  var nbTests = 50;
+	  for (var i = 0; i < nbTests; ++i) {
+          var x = Math.random();
+		  var y = Math.random();
+		  var naiveHypothenuse = Math.sqrt(x*x + y*y);
+		  assert.ok(Math.abs(PortfolioAllocation.hypot_(x, y) - naiveHypothenuse) <= 1e-14, 'Hypothenuse computation #' + (i + 2));
+	  }
+  }
+});
+
 QUnit.test('Rank computation', function(assert) {    
   // Test with static data
   {
