@@ -269,9 +269,21 @@ QUnit.test('Matrix norms computation', function(assert) {
       var expectedNormInf = 15;
       var expectedNormFrobenius = Math.sqrt(3*3 + 5*5 + 7*7 + 2*2 + 6*6 + 4*4 + 2*2 + 8*8);
 
-      assert.equal(mat.matrixNorm('one'), expectedNorm1, 'Matrix 1-norm computation');
-      assert.equal(mat.matrixNorm('infinity'), expectedNormInf, 'Matrix infinity-norm computation');
-      assert.equal(mat.matrixNorm('frobenius'), expectedNormFrobenius, 'Matrix Frobenius-norm computation');
+      assert.equal(mat.matrixNorm('one'), expectedNorm1, 'Matrix 1-norm computation #1');
+      assert.equal(mat.matrixNorm('infinity'), expectedNormInf, 'Matrix infinity-norm computation #1');
+      assert.equal(mat.matrixNorm('frobenius'), expectedNormFrobenius, 'Matrix Frobenius-norm computation #1');
+  }
+
+  // Test using static data  
+  {
+      var mat = new PortfolioAllocation.Matrix([[0,0], [0,0]]);
+      var expectedNorm1 = 0;
+      var expectedNormInf = 0;
+      var expectedNormFrobenius = 0;
+
+      assert.equal(mat.matrixNorm('one'), expectedNorm1, 'Matrix 1-norm computation #2');
+      assert.equal(mat.matrixNorm('infinity'), expectedNormInf, 'Matrix infinity-norm computation #2');
+      assert.equal(mat.matrixNorm('frobenius'), expectedNormFrobenius, 'Matrix Frobenius-norm computation #2');
   }
   
   // TODO: Test random data
@@ -313,10 +325,10 @@ QUnit.test('Matrix row norms computation', function(assert) {
 		
   // Test using static data  
   {
-      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4]]);
-      var expectedRowsNorm1 = [15, 12];
-      var expectedRowsNormInf = [7, 6];
-      var expectedRowsNorm2 = [Math.sqrt(3*3 + 5*5 + 7*7), Math.sqrt(2*2 + 6*6 +4*4)];
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,0,0]]);
+      var expectedRowsNorm1 = [15, 12, 0];
+      var expectedRowsNormInf = [7, 6, 0];
+      var expectedRowsNorm2 = [Math.sqrt(3*3 + 5*5 + 7*7), Math.sqrt(2*2 + 6*6 +4*4), 0];
 
 	  for(var i = 0; i < mat.nbRows; ++i) {
 		assert.equal(mat.rowVectorNorm(i+1, 'one'), expectedRowsNorm1[i], 'Matrix row 1-norm computation');
@@ -330,6 +342,16 @@ QUnit.test('Matrix row norms computation', function(assert) {
 
 
 QUnit.test('Matrix linear system solving via Kaczmarz algorithms', function(assert) {    
+  // Limit case: null matrix; in this case, the least square solution is null as well
+  {
+	  var A = new PortfolioAllocation.Matrix([[0,0,0], [0,0,0], [0, 0, 0]]);
+	  var b = new PortfolioAllocation.Matrix([1,2,3]);
+      var expectedX = new PortfolioAllocation.Matrix([0, 0, 0]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #1');
+  }
+  
   // Test using static data
   {
       // Source: https://en.wikipedia.org/wiki/System_of_linear_equations
@@ -338,7 +360,7 @@ QUnit.test('Matrix linear system solving via Kaczmarz algorithms', function(asse
       var expectedX = new PortfolioAllocation.Matrix([1, -2, -2]);
 
 	  var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
-	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #1');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #2');
   }
   
   // TODO: Test random data

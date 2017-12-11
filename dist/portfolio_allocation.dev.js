@@ -674,7 +674,7 @@ Matrix_.prototype = {
 	/**
 	* @function matrixNorm
 	*
-	* @summary Returns the norm of the matrix, considered as a matrix.
+	* @summary Returns a norm of the matrix.
 	*
 	* @description This function computes different matrix norms, depending on the value of p:
 	* - The matrix norm induced by the vector 1-norm (largest column sum of absolute elements), if p equals to 'one'
@@ -729,7 +729,7 @@ Matrix_.prototype = {
 	/**
 	* @function vectorNorm
 	*
-	* @summary Returns the norm of the n by m matrix, considered as a vector of n*m elements.
+	* @summary Returns a norm of the matrix, considered as a vector of elements.
 	*
 	* @description This function computes different vector norms, depending on the value of p:
 	* - The vector l^1 norm (a.k.a. Manhattan norm), if p equals to 'one'
@@ -768,6 +768,9 @@ Matrix_.prototype = {
 			    for (var j = 0; j < this.nbColumns; ++j) {
 				    var val = this.data[i * this.nbColumns + j];
 					var absVal = Math.abs(val);
+					if (absVal == 0) {
+						continue;
+					}
 					if (absVal > t) {
 					    s = 1 + s * (t/val) * (t/val);
 						t = absVal;
@@ -797,7 +800,7 @@ Matrix_.prototype = {
 	/**
 	* @function rowVectorNorm
 	*
-	* @summary Returns the norm of a given row of the matrix.
+	* @summary Returns a norm of a row of the matrix.
 	*
 	* @description This function computes different vector norms of the i-th row of a matrix, depending on the value of p:
 	* - The matrix row l^1 norm (a.k.a. Manhattan norm), if p equals to 'one'
@@ -841,6 +844,9 @@ Matrix_.prototype = {
 		    for (var j = 0; j < this.nbColumns; ++j) {
 				var val = this.data[(i-1) * this.nbColumns + j];
 				var absVal = Math.abs(val);
+				if (absVal == 0) {
+					continue;
+				}
 				if (absVal > t) {
 					s = 1 + s * (t/val) * (t/val);
 					t = absVal;
@@ -920,7 +926,7 @@ Matrix_.areEqual = function (a, b, eps) {
 	return true;
 };
 
-// TODO better
+// TODO documentation + tests
 Matrix_.axpy = function(a, x, y, out) {
 	// Ensure x,y are matrices
 	if (!(x instanceof Matrix_)) {
@@ -968,7 +974,7 @@ Matrix_.axpy = function(a, x, y, out) {
 
 
 
-// TODO better
+// TODO documentation + tests
 Matrix_.copy = function(x, out) {
 	// Ensure x is a matrix
 	if (!(x instanceof Matrix_)) {
@@ -1550,23 +1556,21 @@ Matrix_.qrDecomposition = function(a) {
 /**
 * @function linsolveKaczmarz
 *
-* @summary X
+* @summary TODO
 *
-* @description X.
+* @description TODO
 * 
 * @see <a href="https://www.sciencedirect.com/science/article/pii/002437959090207S">Hanke, M. and Niethammer, W. [1990], On the acceleration of Kaczmarz’smethod for inconsistent linear systems, Linear Algebra and its Applications 130, 83–98.</a>
 *
 * @param {Matrix_} A an m by n matrix, with m >= n.
-* @param {Matrix_} b an m by 1 matrix.
+* @param {Matrix_} b an m by 1 column matrix (e.g., a vector).
 * @param {object} opt the optional parameters for the algorithm.
-* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
+* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-16.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
-* @return {<Matrix_} an n by 1 matrix satisfying the following properties:
-* - Q is an m by m matrix 
-* - R is an m by n matrix
-* - A = QR
-* - Q is an orthogonal matrix, with a determinant equals to 1 (i.e., a rotation)
-* - R is an upper triangular matrix
+* @return {<Matrix_} an n by 1 column matrix x^* (e.g., a vector) satisfying the following properties:
+* - If the linear system of equations Ax = b is square with A invertible, then x^* is the unique solution of this system
+* - If the linear system of equations Ax = b is overdetermined and consistent (i.e., b belongs to Range(A)), then x^* is the minimum euclidian norm solution of the least square problem min ||Ax - b||
+* - If the linear system of equations Ax = b is overdetermined and inconsistent (i.e., b does not belong to Range(A)), then x^* is a solution of the least square problem min ||Ax - b||
 *
 * @example
 * linsolveKaczmarz(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
@@ -1623,8 +1627,13 @@ Matrix_.linsolveKaczmarz = function(A, b, opt) {
 	var delta_x = new Matrix_.zeros(n, 1); // the delta vector (current iteration solution vector minus previous iteration solution vector)
 	while (!converged) {
 		// Cycle through the m rows of A and orthogonally project the current iterate x_k onto
-		// the solution hyperplane of <A(i,:)/x_k> = b_i, i=1..m.		
+		// the solution hyperplane of <A(i,:)/x_k> = b_i, i=1..m.
 		for (var i = 1; i <= m; ++i) {
+			// If the current row of A is null, skip the projection
+			if (a_rows_two_norm_sq[i-1] == 0) {
+			    continue;
+			}
+			
 			// Compute r, c.f. algorithm 2.1 of the reference: r = b(i) - <A(i,:)/x_k>
 			var r = b.data[(i-1) * b.nbColumns] - Matrix_.rowColumnProduct(A, i, x_k, 1);
 			
