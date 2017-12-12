@@ -139,15 +139,15 @@ QUnit.test('Matrix to string', function(assert) {
 });
 
 
-QUnit.test('Matrix to double array', function(assert) {    
+QUnit.test('Matrix to row array', function(assert) {    
   // Test using static data
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,10]]);
-  assert.deepEqual(mat.toDoubleArray(), [[1,2,3], [4,5,10]], 'Matrix to double array');
-  assert.deepEqual(mat.toDoubleArray(function(i,j,val) { return i==j; }), [[1], [5]], 'Matrix to doule array with function');
+  assert.deepEqual(mat.toRowArray(), [[1,2,3], [4,5,10]], 'Matrix to double array');
+  assert.deepEqual(mat.toRowArray(function(i,j,val) { return i==j; }), [[1], [5]], 'Matrix to doule array with function');
   
   // Test using the random matrix, using identity matrix(matrix to array) == matrix
   var nsMat = new PortfolioAllocation.Matrix(this.nsMatValues);
-  var nsMatArray = nsMat.toDoubleArray();
+  var nsMatArray = nsMat.toRowArray();
   assert.deepEqual(nsMatArray, this.nsMatValues, 'Array to matrix to array');
   assert.equal(PortfolioAllocation.Matrix.areEqual(nsMat, new PortfolioAllocation.Matrix(nsMatArray)), true, 'Matrix to double array to matrix');
 });
@@ -180,7 +180,7 @@ QUnit.test('Symetric matrix creation', function(assert) {
 QUnit.test('Submatrix extraction', function(assert) {    
   // Test using static data
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6], [7,8,9]]);
-  var subMat = mat.getSubmatrix([1,3], [1, 3]);
+  var subMat = mat.submatrix([1,3], [1, 3]);
   var expectedMat = new PortfolioAllocation.Matrix([[1,3], [7,9]]);
   assert.equal(PortfolioAllocation.Matrix.areEqual(subMat, expectedMat), true, 'Submatrix extraction');
 });
@@ -190,8 +190,8 @@ QUnit.test('Matrix row extraction', function(assert) {
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
   var expected_row_1 =  new PortfolioAllocation.Matrix([1,2,3]);
   var expected_row_2 =  new PortfolioAllocation.Matrix([4,5,6]);
-  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getRow(1), expected_row_1), true, 'Matrix row extraction #1');
-  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getRow(2), expected_row_2), true, 'Matrix row extraction #2');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.row(1), expected_row_1), true, 'Matrix row extraction #1');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.row(2), expected_row_2), true, 'Matrix row extraction #2');
 });
 
 QUnit.test('Zeros matrix creation', function(assert) {    
@@ -203,7 +203,7 @@ QUnit.test('Zeros matrix creation', function(assert) {
 
 QUnit.test('Identity matrix creation', function(assert) {    
   // Test using static data
-  var mat = PortfolioAllocation.Matrix.eye(3);
+  var mat = PortfolioAllocation.Matrix.identity(3);
   var expectedMat = new PortfolioAllocation.Matrix([[1,0,0], [0,1,0], [0,0,1]]);
   assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Identity matrix creation');
 });
@@ -248,6 +248,62 @@ QUnit.test('Determinant computation', function(assert) {
   var expectedValue = 18;
 
   assert.equal(Math.abs(mat.determinant() - expectedValue) <= 1e-16, true, 'Determinant computation');
+  
+  // TODO: Test random data
+});
+
+
+QUnit.test('Matrix copy', function(assert) {    
+  // Test using static data
+  {
+    // Original matrix to be copied, and expected copy
+    var originalMat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
+    var expectedCopyMat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
+    
+    // First copy: standard one
+    var copyMat = PortfolioAllocation.Matrix.copy(originalMat);
+    
+    // Second copy: using an already existing matrix
+    var outputMat = PortfolioAllocation.Matrix.zeros(originalMat.nbRows, originalMat.nbColumns);
+    var outputCopyMat = PortfolioAllocation.Matrix.copy(originalMat, outputMat);
+    
+    // Alteration of the original matrix to check that the copy is a real copy and not a reference
+    originalMat.setValueAt(1, 1, 0);
+    var originalUpdatedMat = new PortfolioAllocation.Matrix([[0,2,3], [4,5,6]]);
+    assert.equal(PortfolioAllocation.Matrix.areEqual(originalMat, originalUpdatedMat), true, 'Matrix copy #1/0');
+    
+    // Tests of the method behaviour
+    assert.equal(PortfolioAllocation.Matrix.areEqual(copyMat, expectedCopyMat), true, 'Matrix copy #1/3');
+    assert.equal(PortfolioAllocation.Matrix.areEqual(outputMat, outputCopyMat), true, 'Matrix copy #1/3');
+    assert.equal(PortfolioAllocation.Matrix.areEqual(outputCopyMat, expectedCopyMat), true, 'Matrix copy #1/2');
+  }
+  
+  // TODO: Test random data
+});
+
+
+QUnit.test('Matrix AXPBY', function(assert) {    
+  // Test using static data
+  {
+    // 
+    var mat1 = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
+	var a = -1;
+    var mat2 = new PortfolioAllocation.Matrix([[7,8,9], [10,11,12]]);
+	var b = 1;
+	var expectedMat = new PortfolioAllocation.Matrix([[6,6,6], [6,6,6]]);
+	
+	// First computation: standard one
+	var computedMat = PortfolioAllocation.Matrix.axpby(a, mat1, b, mat2);
+	
+	// Second computation: using an already existing matrix
+    var outputMat = PortfolioAllocation.Matrix.zeros(mat1.nbRows, mat1.nbColumns);
+	var outputComputedMat = PortfolioAllocation.Matrix.axpby(a, mat1, b, mat2, outputMat);
+	
+	// Tests of the method behaviour
+	assert.equal(PortfolioAllocation.Matrix.areEqual(computedMat, expectedMat), true, 'Matrix axpby #1/1');
+	assert.equal(PortfolioAllocation.Matrix.areEqual(outputMat, outputComputedMat), true, 'Matrix axpby #1/2');
+	assert.equal(PortfolioAllocation.Matrix.areEqual(outputComputedMat, expectedMat), true, 'Matrix axpby #1/3');
+  }
   
   // TODO: Test random data
 });
