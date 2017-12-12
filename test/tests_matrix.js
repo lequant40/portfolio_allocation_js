@@ -374,7 +374,7 @@ QUnit.test('Matrix row norms computation', function(assert) {
   // Unsupported norm
   {
       var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,2,8]]);
-      assert.throws(function() { mat.rowVectorNorm(1, 2) },
+      assert.throws(function() { mat.vectorNorm(2, 'row', 1) },
 		                         new Error('unsupported vector norm: 2'),
 		                         "Matrix row norm computation - unsupported norm");
   }
@@ -387,9 +387,9 @@ QUnit.test('Matrix row norms computation', function(assert) {
       var expectedRowsNorm2 = [Math.sqrt(3*3 + 5*5 + 7*7), Math.sqrt(2*2 + 6*6 +4*4), 0];
 
 	  for(var i = 0; i < mat.nbRows; ++i) {
-		assert.equal(mat.rowVectorNorm(i+1, 'one'), expectedRowsNorm1[i], 'Matrix row 1-norm computation');
-		assert.equal(mat.rowVectorNorm(i+1, 'infinity'), expectedRowsNormInf[i], 'Matrix row infinity-norm computation');
-		assert.equal(Math.abs(mat.rowVectorNorm(i+1, 'two') - expectedRowsNorm2[i]) <= 1e-15, true, 'Matrix row 2-norm computation');
+		assert.equal(mat.vectorNorm('one', 'row', i+1), expectedRowsNorm1[i], 'Matrix row 1-norm computation');
+		assert.equal(mat.vectorNorm('infinity', 'row', i+1), expectedRowsNormInf[i], 'Matrix row infinity-norm computation');
+		assert.equal(Math.abs(mat.vectorNorm('two', 'row', i+1) - expectedRowsNorm2[i]) <= 1e-15, true, 'Matrix row 2-norm computation');
 	  }
   }
   

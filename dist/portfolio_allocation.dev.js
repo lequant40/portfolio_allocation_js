@@ -675,18 +675,18 @@ Matrix_.prototype = {
 	/**
 	* @function matrixNorm
 	*
-	* @summary Returns a norm of the matrix.
+	* @summary Returns a matrix norm of the matrix.
 	*
-	* @description This function computes different matrix norms, depending on the value of p:
-	* - The matrix norm induced by the vector 1-norm (largest column sum of absolute elements), if p equals to 'one'
-	* - The matrix norm induced by the vector infinity-norm (largest row sum of absolute elements), if p equals to 'infinity'
-	* - The matrix Frobenius norm (sqrt(trace(transpose(A) * A))), if p equals to 'frobenius'
+	* @description This function computes a matrix norm of the matrix, the exact norm depending on the value of the parameter p:
+	* - 'one', for the matrix norm induced by the vector 1-norm (largest column sum of absolute elements)
+	* - 'infinity', for the matrix norm induced by the vector infinity-norm (largest row sum of absolute elements)
+	* - 'frobenius', for the matrix Frobenius norm (sqrt(trace(transpose(A) * A)))
 	*
 	* @see <a href="https://en.wikipedia.org/wiki/Matrix_norm">Matrix norm</a>
 	*
 	* @memberof Matrix_
 	* @param {string} p the matrix norm to compute as detailled in the description of this method, a string either equals to 'one', to 'infinity' or to 'frobenius'.
-	* @return {number} the computed norm.
+	* @return {number} the computed matrix norm.
 	*
 	* @example
 	* Matrix_([[1,2], [3,4]]).matrixNorm('one');
@@ -730,33 +730,86 @@ Matrix_.prototype = {
 	/**
 	* @function vectorNorm
 	*
-	* @summary Returns a norm of the matrix, considered as a vector of elements.
+	* @summary Returns a vector norm of the matrix or of a subset of the matrix.
 	*
-	* @description This function computes different vector norms, depending on the value of p:
-	* - The vector l^1 norm (a.k.a. Manhattan norm), if p equals to 'one'
-	* - The vector l^2 norm (a.k.a. Euclidean norm) matrix Frobenius norm (sqrt(trace(transpose(A) * A))), if p equals to 'two'
-	* - The vector l^infinity norm (a.k.a. Maximum norm), if p equals to 'infinity'
+	* @description This function computes a vector norm of the matrix or of a subset of the matrix, 
+	* the exact norm depending on the value of the parameter p:
+	* - 'one', for the vector l^1 norm (a.k.a. Manhattan norm)
+	* - 'two' for the vector l^2 norm (a.k.a. Euclidean norm)
+	* - 'infinity' for the vector l^infinity norm (a.k.a. Maximum norm)
+	*
+	* The value of the optional parameter subset determines the subset of the matrix to consider:
+	* - 'matrix', in order to compute a vector norm for the whole matrix.
+	* - 'row', in order to compute a vector norm for a specific row of the matrix.
+	*
+	* If the parameter subset is provided and is equal to 'row', the parameter idx correspond to the row index of the matrix
+	* for which to compute the vector norm.
 	*
 	* @see <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)">Norm (mathematics)</a>
 	* @see Nicholas J. Higham. 2002. Accuracy and Stability of Numerical Algorithms (2nd ed.). Soc. for Industrial and Applied Math., Philadelphia, PA, USA. 
 	*
 	* @memberof Matrix_
-	* @param {string} p the vector norm to compute as detailled in the description of this method, a string either equals to 'one', to 'two' or to 'infinity'.
-	* @return {number} the computed norm.
+	* @param {string} p the vector norm to compute, a string either equals to 'one', to 'two' or to 'infinity'.
+	* @param {string} subset the subset of the matrix for which to compute the vector norm, an optional string either equals to 'matrix' or to 'row'; defaults to 'matrix'.
+	* @param {number} idx if subset is equal to 'row', the row index of the matrix for which to compute the vector norm, a natural integer belonging to 1..nbRows.
+	* @return {number} the computed vector norm.
 	*
 	* @example
 	* Matrix_([[1,2], [3,4]]).vectorNorm('one');
 	* // 10
+	*
+	* @example
+	* Matrix_([[1,2], [3,4]]).vectorNorm('one', 'row', 1);
+	* // 3
 	*/
-	vectorNorm: function(p) {
+	vectorNorm: function(p, subset, idx) {
+		// Initializations
+		var idxStartRow;
+		var idxEndRow;
+		var idxStartColumn;
+		var idxEndColumn;
+		
+		// Supported subsets are 'matrix' and 'row'
+		if (subset === undefined || subset == 'matrix') {
+			// Indexes assignement
+			idxStartRow = 0;
+			idxEndRow = this.nbRows;
+			idxStartColumn = 0;
+			idxEndColumn = this.nbColumns;
+		}
+		else if (subset == 'row') {
+			if (idx !== undefined) {
+				// Checks
+				if (idx < 1 || idx > this.nbRows) { 
+					throw new Error('row index out of bounds: ' + idx);
+				}
+
+				// Indexes assignement
+				idxStartRow = idx-1;
+				idxEndRow = idx;
+				idxStartColumn = 0;
+				idxEndColumn = this.nbColumns;
+			}
+			else {
+				throw new Error('undefined row index');
+			}
+		}
+		else if (subset !== undefined) {
+			throw new Error('unsupported matrix subset: ' + subset);
+		}
+		
 		// The supported vector norms are l^1, l^2 and l^infinity norms
 		if (p == 'one') {
             // Compute the sum of the absolute values of the elements of the matrix
 			var absSum = 0;
-			for (var i = 0; i < this.nbRows; ++i) {
-				for (var j = 0; j < this.nbColumns; ++j) {
+			var i = idxStartRow;
+			while (i < idxEndRow) {
+				var j = idxStartColumn;
+				while (j < idxEndColumn) {
 					absSum += Math.abs(this.data[i * this.nbColumns + j]);
+					++j;
 				}
+				++i;
 			}
 			return absSum;
 		}
@@ -765,32 +818,39 @@ Matrix_.prototype = {
 			// C.f. problem 27.5 of the second reference
 			var t = 0;
 			var s = 1;
-			for (var i = 0; i < this.nbRows; ++i) {
-			    for (var j = 0; j < this.nbColumns; ++j) {
+			var i = idxStartRow;
+			while (i < idxEndRow) {
+				var j = idxStartColumn;
+				while (j < idxEndColumn) {
 				    var val = this.data[i * this.nbColumns + j];
 					var absVal = Math.abs(val);
-					if (absVal == 0) {
-						continue;
+					if (absVal != 0) {
+						if (absVal > t) {
+							s = 1 + s * (t/val) * (t/val);
+							t = absVal;
+						}
+						else  {
+							s = s + (val/t) * (val/t);
+						}
 					}
-					if (absVal > t) {
-					    s = 1 + s * (t/val) * (t/val);
-						t = absVal;
-					}
-					else  {
-					    s = s + (val/t) * (val/t);
-					}
+					++j;
 				}
+				++i;
 			}
 			return t * Math.sqrt(s);
 		}
 		else if (p == 'infinity') {
 			// Compute the largest absolute value of the elements of the matrix
 		    var maxAbsVal = 0;
-		    for (var i = 0; i < this.nbRows; ++i) {
-			    for (var j = 0; j < this.nbColumns; ++j) {
-				    maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[i * this.nbColumns + j]));
-			    }
-		    }
+			var i = idxStartRow;
+			while (i < idxEndRow) {
+				var j = idxStartColumn;
+				while (j < idxEndColumn) {
+					 maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[i * this.nbColumns + j]));
+					++j;
+				}
+				++i;
+			}
 		    return maxAbsVal;
 		}
 		else {
@@ -798,78 +858,6 @@ Matrix_.prototype = {
 		}
 	},
 	
-	/**
-	* @function rowVectorNorm
-	*
-	* @summary Returns a norm of a row of the matrix.
-	*
-	* @description This function computes different vector norms of the i-th row of a matrix, depending on the value of p:
-	* - The matrix row l^1 norm (a.k.a. Manhattan norm), if p equals to 'one'
-	* - The matrix row l^2 norm (a.k.a. Euclidean norm) matrix Frobenius norm (sqrt(trace(transpose(A) * A))), if p equals to 'two'
-	* - The matrix row l^infinity norm (a.k.a. Maximum norm), if p equals to 'infinity'
-	*
-	* @see <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)">Norm (mathematics)</a>
-	* @see Nicholas J. Higham. 2002. Accuracy and Stability of Numerical Algorithms (2nd ed.). Soc. for Industrial and Applied Math., Philadelphia, PA, USA. 
-	*
-	* @memberof Matrix_
-	* @param {number} i the row index of the matrix for wich to compute the norm, a natural integer belonging to 1..number of matrix rows.
-	* @param {string} p the vector norm to compute as detailled in the description of this method, a string either equals to 'one', to 'two' or to 'infinity'.
-	* @return {number} the computed norm.
-	*
-	* @example
-	* Matrix_([[1,2], [3,4]]).rowVectorNorm(1, 'one');
-	* // 3
-	*/
-	rowVectorNorm: function(i, p) {
-		// Bounds check
-		if (i < 1 || i > this.nbRows) {
-			throw new Error(
-			'index out of bounds when getting matrix row, (' + i + 
-			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
-		}
-		
-		// The supported vector norms are l^1, l^2 and l^infinity norms
-		if (p == 'one') {
-            // Compute the sum of the absolute values of the elements of the row
-			var absSum = 0;
-			for (var j = 0; j < this.nbColumns; ++j) {
-				absSum += Math.abs(this.data[(i-1) * this.nbColumns + j]);
-			}
-			return absSum;
-		}
-		else if (p == 'two') {
-			// Compute the l^2 row norm using an accurate algorithm by S. J. Hammarling
-			// C.f. problem 27.5 of the second reference
-			var t = 0;
-			var s = 1;
-		    for (var j = 0; j < this.nbColumns; ++j) {
-				var val = this.data[(i-1) * this.nbColumns + j];
-				var absVal = Math.abs(val);
-				if (absVal == 0) {
-					continue;
-				}
-				if (absVal > t) {
-					s = 1 + s * (t/val) * (t/val);
-					t = absVal;
-				}
-				else  {
-					s = s + (val/t) * (val/t);
-				}
-			}
-			return t * Math.sqrt(s);
-		}
-		else if (p == 'infinity') {
-			// Compute the largest absolute value of the elements of the row
-		    var maxAbsVal = 0;
-		    for (var j = 0; j < this.nbColumns; ++j) {
-			    maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[(i-1) * this.nbColumns + j]));
-		    }
-		    return maxAbsVal;
-		}
-		else {
-			throw new Error('unsupported vector norm: ' + p);
-		}
-	},
 	
 };
 
@@ -1626,7 +1614,7 @@ Matrix_.linsolveKaczmarz = function(A, b, opt) {
 	// Preliminary computation of the squares of the 2-norms of the rows of A
 	var a_rows_two_norm_sq = new Array(m);
 	for (var i = 1; i <= m; ++i) {
-		var a_i_two_norm = A.rowVectorNorm(i, 'two');
+		var a_i_two_norm = A.vectorNorm('two', 'row', i);
 		a_rows_two_norm_sq[i-1] = a_i_two_norm * a_i_two_norm;
 	}
 	
