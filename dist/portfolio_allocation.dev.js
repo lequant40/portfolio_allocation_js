@@ -41,11 +41,9 @@ function Matrix_(input) {
 	var that = this;
 	
 	function fromDoubleArray(dblarr) {
-		// Initialise the underlying variables
-		that.nbRows = dblarr.length;
-		that.nbColumns = dblarr[0].length;
-		that.data = typeof Float64Array === 'function' ? new Float64Array(that.nbRows * that.nbColumns) : new Array(that.nbRows * that.nbColumns);
-		
+		// Result matrix allocation
+		that = allocateMatrix_(dblarr.length, dblarr[0].length);
+	
 		// Fill the matrix
 		for (var i = 0; i < that.nbRows; ++i) {
 			if (!(dblarr[i] instanceof Array)) {
@@ -64,10 +62,8 @@ function Matrix_(input) {
 	}
 	
 	function fromArray(arr) {
-		// Initialise the underlying variables
-		that.nbRows = arr.length;
-		that.nbColumns = 1;
-		that.data = typeof Float64Array === 'function' ? new Float64Array(that.nbRows * that.nbColumns) : new Array(that.nbRows * that.nbColumns);
+		// Result matrix allocation
+		that = allocateMatrix_(arr.length, 1);
 		
 		// Fill the vector
 		for (var i = 0; i < that.nbRows; ++i) {
@@ -79,18 +75,11 @@ function Matrix_(input) {
 	}
 	
 	function fromMatrix(mat) {
-		// Initialise the underlying variables
-		that.nbRows = mat.nbRows;
-		that.nbColumns = mat.nbColumns;
-		that.data = typeof Float64Array === 'function' ? new Float64Array(that.nbRows * that.nbColumns) : new Array(that.nbRows * that.nbColumns);
-		
-		// Fill the matrix
-		for (var i = 0; i < that.nbRows; ++i) {
-			for (var j = 0; j < that.nbColumns; ++j) {
-				that.data[i * that.nbColumns + j] = mat.data[i * mat.nbColumns + j];
-			}
-		}
-		
+		// Both steps below are delegated to the matrix copy function:
+		// - Result matrix allocation
+		// - Matrix copy
+		that = Matrix_.copy(mat);
+
 		// Return
 		return that;
 	}
@@ -110,6 +99,47 @@ function Matrix_(input) {
 	}
 }
 
+/**
+* @function allocateMatrix_
+*
+* @summary Returns a matrix to be used for subsequent computations.
+*
+* @description This internal function centralizes the allocation of a n by m matrix to be used for
+* subsequent computations.
+*
+* @param {number} n the number of rows of the matrix to allocate, natural integer greater than or equal to 1.
+* @param {number} m the number of columns of the matrix to allocate, natural integer greater than or equal to 1.
+* @param {Matrix_} out an optional n by m matrix.
+* @return {Matrix_} either a newly allocated matrix if out is not provided or out if out is provided, a n by m matrix.
+*
+* @example
+* allocateMatrix_(2, 3);
+*/
+function allocateMatrix_(n, m, out) {
+	// The logic of the matrix allocation is the following:
+	// - If no output matrix is provided, a new n by m matrix is created
+	// - If an output is provided, it is checked to be a matrix with proper dimensions, and if, it is re-used
+	var obj;
+	if (out === undefined) {
+    	obj = Object.create(Matrix_.prototype);
+    	obj.nbRows = n;
+    	obj.nbColumns = m;
+    	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	}
+	else if (!(out instanceof Matrix_)){
+		throw new Error('provided output must be a matrix');
+	}
+	else if (out.nbRows !== n || out.nbColumns !== m) {
+		throw new Error('provided output matrix size does not match expected matrix size: ' + '(' + out.nbRows + ',' + out.nbColumns + 
+		') v.s. ' + '(' + n + ',' + m + ')');
+	}
+	else {
+		obj = out;
+	}
+	
+	// Return the allocated matrix
+	return obj;
+}
 
 Matrix_.prototype = {
     constructor: Matrix_,
@@ -685,7 +715,7 @@ Matrix_.prototype = {
 	* @see <a href="https://en.wikipedia.org/wiki/Matrix_norm">Matrix norm</a>
 	*
 	* @memberof Matrix_
-	* @param {string} p the matrix norm to compute as detailled in the description of this method, a string either equals to 'one', to 'infinity' or to 'frobenius'.
+	* @param {string} p the matrix norm to compute as detailled in the description, a string either equals to 'one', to 'infinity' or to 'frobenius'.
 	* @return {number} the computed matrix norm.
 	*
 	* @example
@@ -802,14 +832,10 @@ Matrix_.prototype = {
 		if (p == 'one') {
             // Compute the sum of the absolute values of the elements of the matrix
 			var absSum = 0;
-			var i = idxStartRow;
-			while (i < idxEndRow) {
-				var j = idxStartColumn;
-				while (j < idxEndColumn) {
+			for (var i = idxStartRow; i < idxEndRow; ++i) {
+			    for (var j = idxStartColumn; j < idxEndColumn; ++j) {
 					absSum += Math.abs(this.data[i * this.nbColumns + j]);
-					++j;
 				}
-				++i;
 			}
 			return absSum;
 		}
@@ -818,10 +844,9 @@ Matrix_.prototype = {
 			// C.f. problem 27.5 of the second reference
 			var t = 0;
 			var s = 1;
-			var i = idxStartRow;
-			while (i < idxEndRow) {
-				var j = idxStartColumn;
-				while (j < idxEndColumn) {
+			for (var i = idxStartRow; i < idxEndRow; ++i) {
+			    for (var j = idxStartColumn; j < idxEndColumn; ++j) {
+
 				    var val = this.data[i * this.nbColumns + j];
 					var absVal = Math.abs(val);
 					if (absVal != 0) {
@@ -833,23 +858,17 @@ Matrix_.prototype = {
 							s = s + (val/t) * (val/t);
 						}
 					}
-					++j;
 				}
-				++i;
 			}
 			return t * Math.sqrt(s);
 		}
 		else if (p == 'infinity') {
 			// Compute the largest absolute value of the elements of the matrix
 		    var maxAbsVal = 0;
-			var i = idxStartRow;
-			while (i < idxEndRow) {
-				var j = idxStartColumn;
-				while (j < idxEndColumn) {
+			for (var i = idxStartRow; i < idxEndRow; ++i) {
+    		    for (var j = idxStartColumn; j < idxEndColumn; ++j) {
 					 maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[i * this.nbColumns + j]));
-					++j;
 				}
-				++i;
 			}
 		    return maxAbsVal;
 		}
@@ -949,26 +968,8 @@ Matrix_.axpby = function(a, X, b, Y, out) {
 		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
 	}
 	
-	// Result matrix computation logic:
-	// - If no output matrix is provided, a new matrix is created
-	// - Otherwise, the output matrix elements will be overwritten
-	var obj;
-	if (!out) {
-		obj = Object.create(Matrix_.prototype);
-		obj.nbRows = X.nbRows;
-		obj.nbColumns = X.nbColumns;
-		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-	}
-	else if (!(out instanceof Matrix_)){
-		throw new Error('fifth input must be a matrix');
-	}
-	else if (out.nbRows !== X.nbRows || out.nbColumns !== X.nbColumns) {
-		throw new Error('fifth input matrix size does not match first input matrix size: ' + '(' + out.nbRows + ',' + out.nbColumns + 
-		') - ' + '(' + X.nbRows + ',' + X.nbColumns + ')');
-	}
-	else {
-		obj = out;
-	}
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbRows, X.nbColumns, out);
 	
 	// Computation of aX + bY
 	for (var i = 0; i < obj.nbRows; ++i) {
@@ -977,7 +978,7 @@ Matrix_.axpby = function(a, X, b, Y, out) {
 		}
 	}
 	
-	// Return
+	// Return the computed matrix
     return obj;
 };
 
@@ -1004,29 +1005,20 @@ Matrix_.copy = function(A, out) {
 		throw new Error('first input must be a matrix');
 	}
 
-	// Result matrix computation logic:
-	// - If no output matrix is provided, a new matrix is created
-	// - Otherwise, the output matrix elements will be overwritten
-	if (!out) {
-		return new Matrix_(A);
-	}
-	else if (!(out instanceof Matrix_)){
-		throw new Error('second input must be a matrix');
-	}
-	else if (out.nbRows !== A.nbRows || out.nbColumns !== A.nbColumns) {
-		throw new Error('second input matrix size does not match first input matrix size: ' + '(' + out.nbRows + ',' + out.nbColumns + 
-		') - ' + '(' + A.nbRows + ',' + A.nbColumns + ')');
-	}
-	else {
-		// Copy of A into the provided out matrix
-		for (var i = 0; i < out.nbRows; ++i) {
-			for (var j = 0; j < out.nbColumns; ++j) {
-				out.data[i * out.nbColumns + j] = A.data[i * A.nbColumns + j];
-			}
+	// Result matrix allocation
+	var obj = allocateMatrix_(A.nbRows, A.nbColumns, out);
+
+	// Copy of A into the provided out matrix
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = A.data[i * A.nbColumns + j];
 		}
-		return out;
 	}
+	
+	// Return the computed matrix
+	return obj;
 };
+
 
 
 /**
@@ -1041,13 +1033,14 @@ Matrix_.copy = function(A, out) {
 * 
 * @param {Matrix_} A a n by m matrix.
 * @param {Matrix_} B a m by p matrix.
-* @return {Matrix_} the matrix product A*B, a m by p matrix.
+* @param {Matrix_} out an optional n by m matrix.
+* @return {Matrix_} the matrix product A*B, either stored in the matrix out or in a new matrix, a m by p matrix.
 *
 * @example
 * product(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,1], [2,2], [3,3]]));
 * // Matrix_([[14,14], [32,32]])
 */
-Matrix_.product = function(a, b) {
+Matrix_.product = function(a, b, out) {
 	// Ensure a,b are matrices
 	if (!(a instanceof Matrix_)) {
 		throw new Error('a must be a matrix');
@@ -1062,12 +1055,9 @@ Matrix_.product = function(a, b) {
 		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
 	}
 	
-	// Result matrix instantiation
-	var obj = Object.create(Matrix_.prototype);
-	obj.nbRows = a.nbRows;
-	obj.nbColumns = b.nbColumns;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-	
+	// Result matrix allocation
+	var obj = allocateMatrix_(a.nbRows, b.nbColumns, out);
+
 	// Computation of A*B product in IKJ format, cache aware
 	for (var i = 0; i < a.nbRows; ++i) {
 		for (var j = 0; j < b.nbColumns; ++j) {
@@ -1075,15 +1065,15 @@ Matrix_.product = function(a, b) {
 		}
 	
 		for (var k = 0; k < a.nbColumns; ++k) {
-			var aik = a.data[i * a.nbColumns + k];
+			var a_ik = a.data[i * a.nbColumns + k];
 			
 			for (var j = 0; j < b.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] += aik * b.data[k * b.nbColumns + j];
+				obj.data[i * obj.nbColumns + j] += a_ik * b.data[k * b.nbColumns + j];
 			}
 		}
 	}
 	
-	// Return
+	// Return the computed matrix
     return obj;
 };
 
@@ -1198,11 +1188,8 @@ Matrix_.fillSymetric = function(n, fct) {
 		throw new Error('input number of rows and columns out of bounds: ' + n);
 	}
 	
-	// Result matrix instantiation
-	var obj = Object.create(Matrix_.prototype);
-	obj.nbRows = n;
-	obj.nbColumns = n;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	// Result matrix allocation
+	var obj = allocateMatrix_(n, n);
 	
 	// Computation of the elements of the matrix
 	for (var i = 0; i < obj.nbRows; ++i) {
@@ -1247,11 +1234,8 @@ Matrix_.fill = function(n, m, fct) {
 		throw new Error('input number of columns out of bounds: ' + m);
 	}
 	
-	// Result matrix instantiation
-	var obj = Object.create(Matrix_.prototype);
-	obj.nbRows = n;
-	obj.nbColumns = m;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	// Result matrix allocation
+	var obj = allocateMatrix_(n, m);
 	
 	// Computation of the elements of the matrix
 	for (var i = 0; i < obj.nbRows; ++i) {
@@ -1356,11 +1340,8 @@ Matrix_.vectorHadamardProduct = function(x, y) {
 		throw new Error('Vectors sizes do not match: ' + '(' + x.nbRows + ') - ' + '(' + y.nbRows + ')');
 	}
 	
-	// Result vector instantiation
-	var obj = Object.create(Matrix_.prototype);
-	obj.nbRows = x.nbRows;
-	obj.nbColumns = 1;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	// Result matrix allocation
+	var obj = allocateMatrix_(x.nbRows, 1);
 	
 	// Computation of x*y product
 	for (var i = 0; i < x.nbRows; ++i) {
@@ -1423,7 +1404,7 @@ Matrix_.vectorDotProduct = function(x, y) {
 * @description This function computes a QR decomposition of a matrix A, using Givens rotations 
 * as described in the algorithm 5.2.4 (and above discussion therein) of the first reference.
 * 
-* To be noted that the 'givens' internal function used in this method is not the same
+* To be noted that the 'givens' internal function used in this function is not the same
 * as the one described in the first reference, but is the continuous one described
 * in the algorithm 4 of the second reference.
 * 
@@ -2287,12 +2268,13 @@ function rank_(x, order) {
 *
 * @see <a href="https://cssanalytics.wordpress.com/2013/11/26/fast-threshold-clustering-algorithm-ftca/">Fast Threshold Clustering Algorithm (FTCA)</a>
 * 
-* @param {Matrix_} correlationMatrix the correlation matrix (rho_ij),i,j=1..n of n elements, square n by n Matrix where n is a strictly positive natural integer.
+* @param {Array.<Array.<number>>} correlationMatrix the correlation matrix (rho_ij),i,j=1..n, an array arr of n arrays of n real numbers 
+* satisfying arr[i-1][j-1] = rho_ij, i,j=1..n, where n is a strictly positive natural integer.
 * @param {number} threshold the correlation threshold to use in the FTCA algorithm, a real number typically belonging to interval [-1, 1].
 * @return {Array.<Array.<number>>} the list of clusters as computed by the FTCA algorithm, array of m arrays of strictly positive integers representing the indexes of the elements in the considered universe, where m is the number of clusters, with the m arrays forming a partition of the set [1..n].
 *
 * @example
-* ftca_(new Matrix_([[1, 0], [0,1]]), 0.5);
+* ftca_([[1, 0], [0,1]]), 0.5);
 *  // [[2],[1]]
 */
 function ftca_(correlationMatrix, threshold) {
@@ -2301,6 +2283,9 @@ function ftca_(correlationMatrix, threshold) {
 	if (threshold === undefined) {
 		threshold = 0.5;
 	}
+	
+	// Convert the correlation matrix to matrix format
+	var correlationMatrix = new Matrix_(correlationMatrix);
 	
 	// The list of output clusters, to be populated
 	var clusters = [];
@@ -2409,7 +2394,7 @@ function ftca_(correlationMatrix, threshold) {
 				// Add a Cluster made of LC and set this element as not unassigned anymore
 				// (Unless HC == LC, which can happen, for instance when there are only two elements remaining)
 				if (hc !== lc) {
-					// Note: At this stage, to be noted that the LC element cannot have been assigned to the Hc cluster above if LC <> HC, since
+					// Note: At this stage, the LC element cannot have been assigned to the Hc cluster above if LC <> HC, since
 					// otherwise, it would mean corr(lc, hc) > threshold, which is incompatible with the "else" branch in which
 					// the code currently is; Lc cluster is thus always non empty.
 					var newClusterLc = [lc];
@@ -2991,8 +2976,8 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 	}
 	// Otherwise, compute the clusters using the Fast Threshold Clustering Algorithm from David Varadi
 	else if (clusteringMode === 'ftca') {
-		// Extract the correlation matrix from the covariance matrix
-		var corrMat = sigma.getCorrelationMatrix();
+		// Extract the correlation matrix from the covariance matrix, as a double array
+		var corrMat = sigma.getCorrelationMatrix().toRowArray();
 		
 		// Compute the clusters using the FTCA algorithm
 		clusters = ftca_(corrMat, opt.ftcaThreshold);
@@ -3115,7 +3100,7 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 	// Proceed to an exhaustive enumeration of all the subsets of the set {1,...,nbAssets},
 	// in order to find the x^ERB as detailled in section 3.3.1, formula 22, of the reference.
 	//
-	// Skip the empty set, for obvious reasons.
+	// The empty set is skipped.
 	var nextSubsetIterator = new subsetsIterator_(nbAssets);
 	var nextSubset = nextSubsetIterator.next();
 	do {
@@ -3370,6 +3355,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	
 	// Preparational computations
 	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
+	var sigma_x_2 = Matrix_.product(sigma, x); // SIGMA*x
 	var var_x = Matrix_.vectorDotProduct(sigma_x, x); // sigma(x), the portfolio variance
 	var obj = 0.5 * var_x - x.sum();
 	
@@ -3405,7 +3391,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 			x.setValueAt(i, 1, xi_star_1);
 
     	      // Case #1 updated SIGMA*x and x'*SIGMA*x products
-    	    sigma_x = Matrix_.product(sigma, x)
+    	    sigma_x = Matrix_.product(sigma, x, sigma_x);
     	    var_x = Matrix_.vectorDotProduct(sigma_x, x);
 			
 			  // Case #1 objective function computation
@@ -3419,7 +3405,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 				x.setValueAt(i, 1, xi_star_2);
 				
 				// Case #2 updated SIGMA*x and x'*SIGMA*x products
-				var sigma_x_2 = Matrix_.product(sigma, x)
+				sigma_x_2 = Matrix_.product(sigma, x, sigma_x_2);
 				var var_x_2 = Matrix_.vectorDotProduct(sigma_x_2, x);
 				
 				// Case #2 objective function computation
@@ -3431,7 +3417,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 					// Case #2 weights update is already done
 					
 					// Update the products for convergence condition evaluation + next loop evaluation
-					sigma_x = sigma_x_2;
+					sigma_x = Matrix_.copy(sigma_x_2, sigma_x);
 					var_x = var_x_2;
 					obj_star = obj_star_2;
 				}
@@ -3705,6 +3691,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 	
 	// Preparational computations
 	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
+	var sigma_x_2 = Matrix_.product(sigma, x); // SIGMA*x
 	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
 	var dr = Matrix_.vectorDotProduct(stddevs, x) / s_x; // diversification ratio DR
 	
@@ -3740,7 +3727,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 			x.setValueAt(i, 1, xi_star_1);
 
     	      // Case #1 updated SIGMA*x and x'*SIGMA*x products
-    	    sigma_x = Matrix_.product(sigma, x)
+    	    sigma_x = Matrix_.product(sigma, x, sigma_x)
     	    s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x));
 			
 			  // Case #1 diversification ratio computation
@@ -3754,7 +3741,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 				x.setValueAt(i, 1, xi_star_2);
 				
 				// Case #2 updated SIGMA*x and x'*SIGMA*x products
-				var sigma_x_2 = Matrix_.product(sigma, x)
+				sigma_x_2 = Matrix_.product(sigma, x, sigma_x_2);
 				var s_x_2 = Math.sqrt(Matrix_.vectorDotProduct(sigma_x_2, x));
 				
 				// Case #2 diversification ratio computation
@@ -3766,7 +3753,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 					// Case #2 weights update is already done
 					
 					// Update the products for convergence condition evaluation + next loop evaluation
-					sigma_x = sigma_x_2;
+					sigma_x = Matrix_.copy(sigma_x_2, sigma_x);
 					s_x = s_x_2;
 					dr_star = dr_star_2;
 				}
@@ -3967,7 +3954,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
     	    x.setValueAt(i,1,xi_star);
     	    
     	    // Compute the updated SIGMA*x and x'*SIGMA*x products for convergence condition evaluation + next loop evaluation
-    	    sigma_x = Matrix_.product(sigma, x)
+    	    sigma_x = Matrix_.product(sigma, x, sigma_x)
     	    s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x));
     	    
     	    // Update the convergence condition: |RC_i* - b_i| <= eps, i = 1..nbAssets

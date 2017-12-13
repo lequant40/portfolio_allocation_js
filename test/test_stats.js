@@ -52,7 +52,7 @@ QUnit.test('Rank computation', function(assert) {
 QUnit.test('FTCA computation', function(assert) {    
   // FTCA test, using static data
   {
-	  var corrMat = new PortfolioAllocation.Matrix([[1.0000000,  0.2378848,  0.2483431,  0.3163914,  0.1796639], [0.2378848,  1.0000000,  0.2487009, -0.1986677, -0.2165444], [0.2483431,  0.2487009,  1.0000000, -0.3179188,  0.3713964], [0.3163914, -0.1986677, -0.3179188, 1.0000000,  0.4131639],[0.1796639, -0.2165444,  0.3713964,  0.4131639,  1.0000000]]);
+	  var corrMat = [[1.0000000,  0.2378848,  0.2483431,  0.3163914,  0.1796639], [0.2378848,  1.0000000,  0.2487009, -0.1986677, -0.2165444], [0.2483431,  0.2487009,  1.0000000, -0.3179188,  0.3713964], [0.3163914, -0.1986677, -0.3179188, 1.0000000,  0.4131639],[0.1796639, -0.2165444,  0.3713964,  0.4131639,  1.0000000]];
 	
       // Compute FTCA with varying thresholds
 	  // A threshold of 1 will always output as many clusters as initial elements
@@ -66,7 +66,7 @@ QUnit.test('FTCA computation', function(assert) {
   
   // FTCA test, limit case with static data
   {
-	var corrMat = new PortfolioAllocation.Matrix([[0.01, 0.016, 0, 0], [0.016, 0.04, 0, 0], [0, 0, 0.09, -0.06], [0, 0, -0.06, 0.16]]);
+	var corrMat = [[0.01, 0.016, 0, 0], [0.016, 0.04, 0, 0], [0, 0, 0.09, -0.06], [0, 0, -0.06, 0.16]];
 	var clusters = PortfolioAllocation.ftca_(corrMat, 1);
 	var expectedClusters = [[2],[4],[3],[1]];
 	assert.deepEqual(clusters, expectedClusters, "FTCA - Test 2");
