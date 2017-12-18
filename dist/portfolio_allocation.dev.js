@@ -1974,7 +1974,7 @@ function compositionsIterator_(n, k) {
 			this.t = this.r[this.h - 1];
 			this.r[this.h - 1] = 0;
 			this.r[0] = this.t - 1;
-			this.r[this.h]++;
+			++this.r[this.h];
 		}
 		else  { 
 		    // No more composition to generate, so, (re) generation of the first composition, equals to n00...0
@@ -1994,9 +1994,182 @@ function compositionsIterator_(n, k) {
 
 
 /**
+* @function randomKSubsetIterator_
+*
+* @summary Returns an infinite iterator to compute random k-subsets of a n-set.
+*
+* @description This function constructs an iterator to compute random k-subsets of the n-set {1,...,n}, 
+* using both the algorithms RANKSB and RKS2 described in section 4 of the reference.
+*
+* From the discussion following the examples in the reference, the random k-subsets are probably generated
+* uniformly, but this is not written in the reference.
+*
+* The algorithm used to compute the random k-subsets is either RANKSB when k < n/2,
+* or RKS2 when k >= n/2, so that linear performances in O(k) are guaranteed.
+*
+* @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
+*
+* @param {number} n the number of elements of the n-set {1,...,n} whose k-subsets are desired, a non-negative integer.
+* @param {number} k a non-negative integer, with 0 <= k <= n.
+* @return {function} a function to be used as an iterator through its .next() method, computing random 
+* k-subsets of the n-set {1,...,n}.
+*
+* @example
+* var myIterator = new randomKSubsetIterator_(6, 3);
+* myIterator.next();
+* // [1, 2, 5];
+*/
+function randomKSubsetIterator_(n, k) {
+	// Initialize n and k
+	this.n = n;
+	this.k = k;
+	
+	// Initialize the array to hold the k-subsets
+	this.a = new Array(k);
+
+	/**
+	* @function next_ranksb
+	*
+	* @summary Returns a random k-subset of a n-set.
+	*
+	* @description This function computes a random k-subset of a n-set using the algorithm RANKSB of the reference.
+	*
+	* @memberof randomKSubsetIterator_
+	* @return {Array.<number>} a random k-subset of the n-set {1,...,n}, a sorted array of k increasing strictly positive integers.
+	*
+	*/
+	this.next_ranksb = function() {
+		// Step A - Initialization of a
+		for (var i = 1; i <= this.k; ++i) {
+			this.a[i-1] = Math.floor((i - 1) * this.n / this.k);
+		}
+		
+		// Step B
+		// Note: in the reference, the c variable is initialized to k and is decremented until 0
+		// each time a generated x is accepted: this is a reverse for loop in disguise.
+		var x;
+		var l;
+		for (var c = this.k; c > 0; --c) {
+			do {
+				var u = Math.random();
+				x = 1 + Math.floor(u * this.n);
+				l = 1 + Math.floor((x * this.k - 1) / this.n);
+			} while (x <= this.a[l-1]);
+			this.a[l-1] = this.a[l-1] + 1;
+		}
+		var p = 0;
+		var s = this.k;
+		
+		// Step C
+		// Note: in the reference, the i variable is initialized to 0 and is incremented
+		// until k each time: this is a for loop in disguise.
+		for (var i = 1; i <= this.k; ++i) {
+			if (this.a[i-1] == Math.floor((i - 1) * this.n / this.k)) {
+				this.a[i-1] = 0;
+			}
+			else {
+				p = p + 1;
+				var m = this.a[i-1];
+				this.a[i-1] = 0;
+				this.a[p-1] = m;
+			}
+		}
+		
+		// Step D
+		// Note: in the reference, the p variable is initialized to whatever value it has, and is decremented
+		// until 0 each time: this is a reverse for loop in disguise.
+		for (; p > 0; --p) {
+			l = 1 + Math.floor((this.a[p-1] * this.k - 1) / this.n);
+			var delta_s = this.a[p-1] - Math.floor((l - 1) * this.n / this.k);
+			this.a[p-1] = 0;
+			this.a[s-1] = l;
+			s = s - delta_s;			
+		}
+		l = k;
+		
+		// Steps E to H
+		// Note: in the reference, the l variable is initialized at this step to k, and is decremented
+		// until 0 each time: this is a reverse for loop in disguise.
+		var r;
+		for (; l > 0; --l) {
+			// Step E
+			var m_0;
+			if (this.a[l-1] != 0) {
+				r = l;
+				m_0 = 1 + Math.floor((this.a[l-1] - 1) * this.n / this.k);
+				m = Math.floor(this.a[l-1] * this.n / this.k) - m_0 + 1;
+			}
+
+			// Step F
+			var u = Math.random();
+			x = m_0 + Math.floor(u * m);
+			i = l;
+			
+			// Step G
+			++i;
+			while (i <= r && x >= this.a[i-1]) {
+				this.a[i-2] = this.a[i-1];
+				x = x + 1;
+				++i;
+			}
+			
+			// Step H
+			this.a[i-2] = x;
+			m = m - 1;
+		}
+		
+		// Return a copy of the computed array
+		return this.a.slice();
+	}
+	
+	/**
+	* @function next_rks2
+	*
+	* @summary Returns a random k-subset of a n-set.
+	*
+	* @description This function computes a random k-subset of a n-set using the algorithm RKS2 of the reference.
+	*
+	* @memberof randomKSubsetIterator_
+	* @return {Array.<number>} a random k-subset of the n-set {1,...,n}, a sorted array of k increasing strictly positive integers.
+	*
+	*/
+	this.next_rks2 = function() {
+		// Initializations
+		var c_1 = this.k;
+		var c_2 = this.n;
+		var k_0 = 0;
+		var i = 0;
+
+		// Main loop of the RKS2 algorithm
+		while (c_1 > 0) {
+			++i;
+			var u = Math.random();
+			if (u <= c_1/c_2) {
+				c_1 = c_1 - 1;
+				this.a[k_0] = i;
+				k_0 = k_0 + 1; // this line is inversed compared to the reference because of JavaScript arrays starting at index 0
+			}
+			c_2 = c_2 - 1;
+		}
+		
+		// Return a copy of the computed array
+		return this.a.slice();
+	}
+	
+	// Initialize the appropriate iterator to keep the required labor to O(k) uniformly for 1 <= k <= n
+	if (k < n/2) {
+		this.next = this.next_ranksb;
+	}
+	else {
+		this.next = this.next_rks2;
+	}
+}
+
+
+/**
 * @function subsetsIterator_
 *
-* @summary Returns an iterator to compute all the subsets of a set.
+* @summary Returns an iterator to compute all the subsets of a n-set.
 *
 * @description This function constructs an iterator to compute all the subsets of the n-set {1,...,n}, 
 * using the algorithm NEXSUB described in section 1 of the first reference.
@@ -2004,7 +2177,7 @@ function compositionsIterator_(n, k) {
 * @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
 * @see <a href="*https://en.wikipedia.org/wiki/Power_set">Power set</a>
 *
-* @param {number} n the number of elements of the n-set {1,...,n} whose subsets are desired.
+* @param {number} n the number of elements of the n-set {1,...,n} whose subsets are desired, a non-negative integer.
 * @return {function} a function to be used as an iterator through its .next() method, sequentially computing all 
 * the subsets of the n-set {1,...,n}.
 *
@@ -2050,9 +2223,9 @@ function subsetsIterator_(n) {
 		if (this.mtc) { // There is still a subset to generate
 			var j = 0;
 			if (this.ncard % 2 != 0) {
-				j++;
+				++j;
 				while (this.iin[j - 1] == 0) {
-					j++;
+					++j;
 				}
 			}
 			this.iin[j] = 1 - this.iin[j];
@@ -2145,7 +2318,7 @@ self.rank_ = function(x, order) { return rank_(x, order); }
 self.ftca_ = function(correlationMatrix, threshold) { return ftca_(correlationMatrix, threshold); }
 /* End Wrapper private methods - Unit tests usage only */
  
- 
+
 /**
 * @function hypot_
 *
@@ -2752,19 +2925,10 @@ function simplexRationalGirdSearch_(fct, n, k) {
 	var minValue = Number.MAX_VALUE;
 	var minValueGridPoints = [];
 
-	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference,
-	// using all the k-compositions of the integer n.
-	var nextCompositionIterator = new compositionsIterator_(k, n);
-	do {
-		// Generate a new composition	
-		var nextComposition = nextCompositionIterator.next();
-		
-		// Compute the current rational grid point by normalizing the generated k-composition
-		var weights = nextComposition[1];
-		for (var i = 0; i < weights.length; ++i) {
-			weights[i] = weights[i] / k;
-		}
-	  
+	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference.
+	var sampler = new simplexRationalSampler_(n, k);
+	var weights = sampler.nextDeterministicSample();
+	while (weights !== null) {  
 		// Evaluate the function fct at the current grid point
 		var fctValue = fct(weights);
 	  
@@ -2779,9 +2943,11 @@ function simplexRationalGirdSearch_(fct, n, k) {
 		else if (fctValue == minValue) {
 			minValueGridPoints.push(weights);
 		}
-		// Otherwise, nothing needs to be done	  
+		// Otherwise, nothing needs to be done
+		
+		// Generate a new grid point
+		weights = sampler.nextDeterministicSample();
 	}
-	while (nextComposition[0]);
 	
 	// Return the list of grid points associated to the minimum value of fct
 	return minValueGridPoints;
@@ -2796,8 +2962,135 @@ function simplexRationalGirdSearch_(fct, n, k) {
 
 /* Start Wrapper private methods - Unit tests usage only */
 self.simplexRationalRounding_ = function(x, r) { return simplexRationalRounding_(x, r); }
+self.simplexSampler = simplexSampler_;
+self.simplexRationalSampler = simplexRationalSampler_;
 /* End Wrapper private methods - Unit tests usage only */
 
+//* @description This function returns the list of points x = (x_1,...,x_n) belonging to the unit simplex of R^n which 
+//* minimize an arbitrary real-valued function fct of n real variables defined on the unit simplex of R^n, 
+//* using an exhaustive search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the reference.
+// * @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
+	
+// The algorithm used to generated the rational points is to use all the k-compositions of the integer n
+// * @see <a href="*https://en.wikipedia.org/wiki/Composition_(combinatorics)">Composition (combinatorics)</a>
+	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference,
+	// using all the k-compositions of the integer n.
+//	* @param {number} n the number of variables of the function fct, natural integer superior or equal to 1.
+//* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function fct, a natural integer superior or equal to 1.
+/*
+* @param {number} n a non-negative integer whose composition are desired.
+* @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
+* @return {function} a function to be used as a generator through its .nextDeterministicSample() method, until it returns null.
+*
+* @example
+* var mySampler = new simplexRationalSampler_(3, 6);
+* mySampler.nextDeterministicSample(); mySampler.nextDeterministicSample();
+* // [1,0,0]; ~[0.833,0.167,0];
+*/
+function simplexRationalSampler_(n, k) {
+	// Initialize n and x, the coordinates of the point being sampled.
+	this.n = n;
+	this.k = k;
+	this.compositionIterator = new compositionsIterator_(k, n);
+	this.compositionIteratorStatus = true;
+	
+	/**
+	* @function sample
+	*
+	* @summary Returns .
+	*
+	* @description This function computes the next k-composition of n.
+	*
+	* The initial k-composition computed by the first call to this function is n00...0, and each subsequent call to 
+	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
+	*
+	* A subsequent call to this function when the final k-composition has been reached will result in
+	* the recomputation of all the k-compositions of n, starting from the initial k-composition.
+	*
+	* @memberof simplexUniformSampler_
+	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
+	* and arr[1] an array of k elements containing the computed k-composition of n.
+	*
+	*/
+	this.nextDeterministicSample = function() {
+		// Return null in case there is no more samples to draw
+		if (!this.compositionIteratorStatus) {
+			return null;
+		}
+		
+		// Generate a new k-composition
+		var nextComposition = this.compositionIterator.next();
+		
+		// Compute the current rational grid point by normalizing the generated k-composition
+		var x = nextComposition[1];
+		for (var i = 0; i < x.length; ++i) {
+			x[i] = x[i] / k;
+		}
+
+		// Update the iterator status
+		this.compositionIteratorStatus = nextComposition[0];	
+		
+		// Return the point being sampled
+		return x;
+	}
+}
+ 
+// R.Y. Rubinstein, Generating random vectors uniformly distributed inside and on the surface of different regions, In European Journal of Operational Research, Volume 10, Issue 2, 1982, Pages 205-209
+// https://doi.org/10.1016/0377-2217(82)90161-8
+// Algorithm 2 of the reference
+//  k returns a random variable being uniformly distributed over a standard simplex of dimension k.
+function simplexSampler_(n) {
+	// Initialize n and x, the coordinates of the point being sampled.
+	this.n = n;
+	this.x = new Array(n);
+	
+	/**
+	* @function sample
+	*
+	* @summary Returns .
+	*
+	* @description This function computes the next k-composition of n.
+	*
+	* The initial k-composition computed by the first call to this function is n00...0, and each subsequent call to 
+	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
+	*
+	* A subsequent call to this function when the final k-composition has been reached will result in
+	* the recomputation of all the k-compositions of n, starting from the initial k-composition.
+	*
+	* @memberof simplexUniformSampler_
+	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
+	* and arr[1] an array of k elements containing the computed k-composition of n.
+	*
+	*/
+	this.nextRandomSample = function() {
+		// Computation of n random variables from EXP(1), which will form the basis
+		// of the coordinates of the point being sampled	
+		var sum = 0;
+		for (var i = 0; i < this.n; ++i) {
+			// Generate a random variable from EXP(1) using the inverse method, with no need for the minus sign
+			// as the negative sign would cancel out at the subsequent normalization step
+			var u = 1 - Math.random(); // belongs to ]0,1], so that the logarithm below is properly defined
+			var e = Math.log(u);
+
+			// Set the i-th coordinate of the point being sampled
+			this.x[i] = e;
+			
+			// Compute the running sum of the exponential variables, for the subsequant normalization step
+			sum = sum + e;	
+		}
+
+		// Normalization of the computed coordinates of the point being sampled, so that
+		// they all belong to [0,1] and sum to 1
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = this.x[i]/sum;
+		}
+		
+		// Return a copy of the point being sampled, so that callers can alter it
+		return this.x.slice();
+	}
+}
+ 
+ 
 
 /**
 * @function simplexRationalRounding_
@@ -2807,9 +3100,10 @@ self.simplexRationalRounding_ = function(x, r) { return simplexRationalRounding_
 * @description Given a point x = (x_1,...,x_n) on the standard simplex of R^n, this function computes a proximal point xr = (xr_1,...,xr_n) on 
 * the r-th rational grid of the unit simplex of R^n, 1/r * I_n(r), with I_n(r) the set of N^n containing the points m = (m_1,...,m_n) 
 * statisfying sum m_i = r with r a strictly positive natural integer, so that the computed proximal point xr is one of the closest points to x 
-* on this grid with respect to any norm in a large class, c.f. the reference.
+* on this grid with respect to any norm in a large class, c.f. the first reference.
 *
-* @see <a href="https://link.springer.com/article/10.1007/s10898-013-0126-2">.M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258.</a>
+* @see <a href="https://link.springer.com/article/10.1007/s10898-013-0126-2">M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258</a>
+* @see <a href="https://arxiv.org/abs/1501.00014">Rama Cont, Massoud Heidari, Optimal rounding under integer constraints</a>
 * 
 * @param {Array.<number>} x a point belonging to the standard simplex of R^n, array of n real numbers.
 * @param {number} r the indice of the rational grid of the unit simplex of R^n, 1/r * I_n(r), on which to compute the closest point to x, natural integer greater than or equal to 1.
@@ -2822,8 +3116,9 @@ self.simplexRationalRounding_ = function(x, r) { return simplexRationalRounding_
 function simplexRationalRounding_(x, r) {
 	// TODO: Checks, if enabled
 
-	// Compute the integer and fractional parts of the coordinates of the input point multiplied by r, as described in paragraph 2 of the reference.
-	// In parallel, compute k as also defined in paragraph 2 of the reference. 
+	// Compute the integer and fractional parts of the coordinates of the input point multiplied by r, 
+	// as described in paragraph 2 of the first reference.
+	// In parallel, compute k as also defined in paragraph 2 of the first reference. 
 	var k = r;
 	var xPartsWithIndexes = new Array(x.length);
 	for (var i = 0; i < x.length; ++i) {
@@ -2839,13 +3134,23 @@ function simplexRationalRounding_(x, r) {
 		xPartsWithIndexes[i] = [integerPart, fractionalPart, i];
 	}
 
-	// Re-order the fractional parts in non-increasing order, c.f. theorem 1 of the reference.
+	// Re-order the coordinates according to decreasing values of the fractional parts, c.f. theorem 1 of the first reference.
+	// In case the fractional parts are equal, re-order the coordinates according to decreasing values of the integer parts,
+	// c.f. paragraph 3 of the second reference.
 	xPartsWithIndexes.sort(function(a, b) {
-		return b[1] - a[1];
+		if (b[1] < a[1]) {
+			return -1;
+		}
+		else if (b[1] > a[1]) {
+			return 1;
+		}
+		else { // coordinates have equal fractional parts
+			return b[0] - a[0];
+		}
 	}); 
 
 	// Rounding rule: round the k largest fractional parts up to one and all other fractional parts down to zero,
-	// as described in paragraph 2 of the reference.
+	// as described in paragraph 2 of the first reference.
 	var xr = new Array(x.length);
 	for (var i = 0; i < k; ++i) {
 		var index = xPartsWithIndexes[i][2];
@@ -3851,6 +4156,97 @@ self.minVarWeights = function (sigma, opt) {
 	var invVariancesWeights = sigma.diagonal().elemMap(function(i,j,val) { return 1/val; }).normalize();
 	weights = Matrix_.vectorHadamardProduct(weights, invVariancesWeights).normalize();
 	
+	// Return the computed weights
+	return weights.toArray();
+}
+
+
+/**
+ * @file Functions related to random weights portfolio.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function randomWeights
+*
+* @summary Compute the weights of a random weighted portfolio.
+*
+* @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only 
+* random portfolio of n assets, XXX w_i = 1/n, i=1..n.
+*
+* The algorithms used internally by this function should allow the random portfolios to be generated uniformly
+* among all the feasible portfolios.
+*
+* @see <a href="https://academic.oup.com/rfs/article-abstract/22/5/1915/1592901/Optimal-Versus-Naive-Diversification-How">Victor DeMiguel, Lorenzo Garlappi, Raman Uppal; Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?. Rev Financ Stud 2009; 22 (5): 1915-1953. doi: 10.1093/rfs/hhm075</a>
+* 
+* @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.contraints.minAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
+* @param {number} opt.contraints.maxAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets.
+* @return {Array.<number>} the weights corresponding to a random weighted portfolio, array of real numbers of length nbAssets.
+*
+* @example
+* randomWeights(5);
+* // ~[0, 0 0.33, 0.33, 0.33]
+*/
+self.randomWeights = function (nbAssets, opt) {
+	// TODO: Checks, if enabled
+	// Check that nbAssets is a strictly positive natural integer
+
+	// Decode options
+	if (opt === undefined) {
+		opt = { contraints: {} };
+	}
+	var nbMinAssets = opt.contraints.minAssets || 1;
+	var nbMaxAssets = opt.contraints.maxAssets || nbAssets;
+	
+	// 1 - Generate the number of assets to include in the portfolio (uniform generation)
+	var nbSelectedAssets = Math.floor(Math.random() * (nbMaxAssets - nbMinAssets +1)) + nbMinAssets;
+	
+	// 2 - Generate the indices of the assets to include in the portfolio (uniform generation)
+	var selectedAssetsIdx = new randomKSubsetIterator_(nbAssets, nbSelectedAssets).next();
+	
+	// 3 - Generate the weights of the assets to include in the portfolio (uniform generation)
+	//
+	// Extra caution needs to be taken in case one of the weights is zero,
+	// as exactly nbSelectedAssets must be included in the portfolio.
+	var selectedAssetsWeights;
+	var sampler = new simplexSampler_(nbSelectedAssets);
+	while (true) {
+		// Generate a new sample of assets weights
+		selectedAssetsWeights = sampler.nextRandomSample();
+		
+		// Reject the sample if there is one asset with a zero weight
+		var rejectSample = false;
+		for (var i = 0; i < nbSelectedAssets; ++i) {
+			if (selectedAssetsWeights[i] == 0) {
+				rejectSample = true;
+				break;
+			}
+		}
+		if (!rejectSample) {
+			break;
+		}
+	}
+	
+	// Compute the final weights vector:
+	// - The weights associated to assets not included in the portfolio at step 2 are set to zero
+	// - The weights associated to assets included in the portfolio at step 2 are set to their values generated at step 3
+	var weights = Matrix_.zeros(nbAssets, 1);
+	for (var i = 0; i < nbSelectedAssets; ++i) {
+		// Extract included assets information
+		var assetIdx = selectedAssetsIdx[i];
+		var assetWeight = selectedAssetsWeights[i];
+		
+		// Update the weights vector
+		weights.setValueAt(assetIdx, 1, assetWeight);
+	}
+
 	// Return the computed weights
 	return weights.toArray();
 }

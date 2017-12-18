@@ -698,6 +698,15 @@ QUnit.test('Equal risk bounding portfolio', function(assert) {
   */
 });
 
+/*
+QUnit.test('Random weights portfolio', function(assert) {    
+  // Example with static data
+  {
+	  console.log(PortfolioAllocation.randomWeights(5, { contraints: { minAssets: 1, maxAssets: 1 } }));	  
+  }  
+
+});
+*/
 
 
 QUnit.test('Rounded weights portfolio', function(assert) {    
