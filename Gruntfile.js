@@ -62,8 +62,8 @@ module.exports = function(grunt) {
 		  preserveOrder: true,
           patterns: [
             {
-              match: /FLOAT64_ARRAY\((.+?)\);/g,
-              replacement: "typeof Float64Array === 'function' ? new Float64Array($1) : new Array($1);"
+              match: /NONE\((.+?)\);/g,
+              replacement: "NONE($1);"
             }		
           ]
         },
@@ -72,7 +72,7 @@ module.exports = function(grunt) {
         ]
 	  }
     },
-	
+
 	concat: {
 	  portfolio_allocation: {
 	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/vector.js', 'lib/matrix/covmatrix.js', 'lib/stats/*.js', 'lib/allocation/*.js', 'lib/footer.js'],

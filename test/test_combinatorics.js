@@ -38,6 +38,57 @@ QUnit.test('Next subset computation', function(assert) {
 });
 
 
+QUnit.test('Next random k-subset computation', function(assert) {    
+  // Test with random data
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var nbSubTests = 10;
+	  var minN = 1;
+	  var maxN = 50;
+
+	  // Aim of these tests is to check that for any generated k-subset of a n-set, 
+	  // an array of k strictly increasing integers belonging to the n-set is returned
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random n-set, and an associated k-subset iterator
+		 var n = Math.floor(Math.random()*(maxN - minN + 1) + minN);
+		 var k  = Math.floor(Math.random()*(n - 1 + 1) + 1);
+		 var nextRandomKSubsetIterator = new PortfolioAllocation.randomKSubsetIterator_(n, k);
+		 
+		 for (var j = 0; j < nbSubTests; ++j) {
+			 // Generate a random k-subset
+			 var generatedSubset = nextRandomKSubsetIterator.next();
+			 
+			 // Compute the length of the generatedSubset
+			 var generatedSubsetLength = generatedSubset.length;
+			 assert.equal(generatedSubsetLength, k, "Next random k-subset computation, k-subset length - Test " + i + "," + j);
+			 
+			 // Check that the subset elements belong to the n-set
+			 var generatedSubsetElementsBelongToNSet = true;
+			 for (var k = 0; k < generatedSubset.length; ++k) {
+				if (generatedSubset[k] > n || generatedSubset[k] < 0) {
+					generatedSubsetElementsBelongToNSet = false;
+					break;
+				}
+			 }
+			 assert.equal(generatedSubsetElementsBelongToNSet, true, "Next random k-subset computation, elements in n-set - Test " + i + "," + j);
+
+			 // Check that the subset elements are in strictly increasing order
+			 var generatedSubsetElementsInOrder = true;
+			 for (var k = 1; k < generatedSubset.length; ++k) {
+				if (generatedSubset[k] <= generatedSubset[k-1]) {
+					generatedSubsetElementsInOrder = false;
+					break;
+				}
+			 }
+			assert.equal(generatedSubsetElementsInOrder, true, "Next random k-subset computation, elements in strictly increasing order - Test " + i + "," + j);
+		  }
+	  }
+  }
+
+});
+
+
 QUnit.test('Binomial coefficient computation', function(assert) {    
 	// Test with the static data examples
 	{

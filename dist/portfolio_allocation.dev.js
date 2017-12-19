@@ -432,19 +432,17 @@ Matrix_.prototype = {
 	* with n the number of rows of the original matrix and m the number of columns of the original matrix.
 	* 
 	* @memberof Matrix_
-	* @return {Matrix_} the normalized matrix.
+	* @param {Matrix_} out an optional n by m matrix.
+	* @return {Matrix_} the normalized n by m matrix matrix, either stored in the matrix out or in a new matrix.
 	*
 	* @example
 	* Matrix_([[1,2,3]]).normalize();
 	* // Matrix_([[1/6,1/3,1/2]])
 	*/
-	normalize: function() {
-		// Result matrix instantiation
-		var obj = Object.create(Matrix_.prototype);
-		obj.nbRows = this.nbRows;
-		obj.nbColumns = this.nbColumns;
-		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-
+	normalize: function(out) {
+		// Result matrix allocation
+		var obj = allocateMatrix_(this.nbRows, this.nbColumns, out);
+		
 		// Computation of the sum of the matrix elements
 		var sum = this.sum();
 		if (sum === 0.0) {
@@ -471,23 +469,22 @@ Matrix_.prototype = {
 	* the diagonal elements (a_ii), i=1..n from the original square matrix (a_ij),i=1..n,j=1..n.
 	*
 	* @memberof Matrix_
-	* @return {Matrix_} a column matrix (i.e., vector) containing the diagonal elements of the original matrix.
+	* @param {Matrix_} out an optional n by 1 matrix.
+	* @return {Matrix_} a n by 1 matrix (i.e., vector) containing the diagonal elements of the original matrix, 
+	* either stored in the matrix out or in a new matrix.
 	*
 	* @example
 	* Matrix_([[1,2], [4,5]]).diagonal();
 	* // Matrix_([1,5])
 	*/
-    diagonal: function () {
+    diagonal: function (out) {
     	// Checks
     	if (!this.isSquare()) {
     		throw new Error('matrix is not square: ' + '(' + this.nbRows + ',' + this.nbColumns + ')');
     	}
     	
-    	// Result vector instantiation
-    	var obj = Object.create(Matrix_.prototype);
-    	obj.nbRows = this.nbRows;
-    	obj.nbColumns = 1;
-    	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+		// Result matrix allocation
+		var obj = allocateMatrix_(this.nbRows, 1, out);
     	
     	// Extraction of diagonal elements of A
     	for (var i = 0; i < this.nbRows; ++i) {
@@ -508,13 +505,15 @@ Matrix_.prototype = {
 	*
 	* @memberof Matrix_
 	* @param {number} i the row index of the matrix for wich to return the elements, a natural integer belonging to 1..number of matrix rows.
-	* @return {Matrix_} a column matrix (i.e., vector) containing the elements of the i-th row of the original matrix.
+	* @param {Matrix_} out an optional n by 1 matrix.
+	* @return {Matrix_} a n by 1 matrix (i.e., vector) containing the elements of the i-th row of the original matrix, 
+	* either stored in the matrix out or in a new matrix.
 	*
 	* @example
 	* Matrix_([[1,2], [4,5]]).row(1);
 	* // Matrix_([1,2])
 	*/
-    row: function (i) {
+    row: function (i, out) {
 		// Bounds check
 		if (i < 1 || i > this.nbRows) {
 			throw new Error(
@@ -522,12 +521,9 @@ Matrix_.prototype = {
 			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
 		}
     	
-    	// Result vector instantiation
-    	var obj = Object.create(Matrix_.prototype);
-    	obj.nbRows = this.nbColumns;
-    	obj.nbColumns = 1;
-    	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-    	
+    	// Result matrix allocation
+		var obj = allocateMatrix_(this.nbColumns, 1, out);
+		
     	// Extraction of the elements of the i-th row of A
     	for (var j = 0; j < this.nbColumns; ++j) {
     		obj.data[j] = this.data[(i-1) * this.nbColumns + j] ;
@@ -549,18 +545,17 @@ Matrix_.prototype = {
 	* @param {function(number, number, number): number} fct the function to call on each element of the original matrix,
 	* which should take 3 arguments: row index i=1..n, column index j=1..m, original matrix element a_ij and which
 	* should return a number, which will be inserted into the new matrix.
-	* @return {Matrix_} a matrix with the original matrix coefficients transformed by the function fct.
+	* @param {Matrix_} out an optional n by m matrix.
+	* @return {Matrix_} a n by m matrix with the original matrix coefficients transformed by the function fct,
+	* either stored in the matrix out or in a new matrix.
 	*
 	* @example
 	* Matrix_([[1,2,3], [4,5,6]]).elemMap(function(i,j,val) { return i+j;});
 	* // Matrix_([[2,3,4], [3,4,5]])
 	*/
-	elemMap: function (fct) {
-		// Result matrix instantiation
-		var obj = Object.create(Matrix_.prototype);
-		obj.nbRows = this.nbRows;
-		obj.nbColumns = this.nbColumns;
-		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	elemMap: function (fct, out) {
+		// Result matrix allocation
+		var obj = allocateMatrix_(this.nbRows, this.nbColumns, out);
 		
 		// Computation of the fonction fct applied to the coefficients of A
 		for (var i = 0; i < obj.nbRows; ++i) {
@@ -582,15 +577,17 @@ Matrix_.prototype = {
 	* rindexes/cindexes, where p is equal to the length of rindexes and q is equal to the length of cindexes, with coefficients satisfying c_ij = a_rindexes[i]cindexes[j].
 	*
 	* @memberof Matrix_
-	* @param {Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..number of matrix rows
-    * @param {Array.<number>} cindexes the column indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..number of matrix columns
-	* @return {Matrix_} a matrix whose elements correspond to the elements of the original matrix whose row/column indexes belong to the input lists of row/column indexes to keep.
+	* @param {Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..n.
+    * @param {Array.<number>} cindexes the column indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..m.
+	* @param {Matrix_} out an optional rindexes by cindexes matrix.
+	* @return {Matrix_} a rindexes by cindexes matrix whose elements correspond to the elements of the original matrix
+	* whose row/column indexes belong to the input lists of row/column indexes to keep, either stored in the matrix out or in a new matrix.
 	*
 	* @example
 	* Matrix_([[1,2,3], [4,5,6]]).submatrix([1], [2, 3];
 	* // Matrix_([[2,3]])
 	*/
-    submatrix : function(rindexes, cindexes) {
+    submatrix : function(rindexes, cindexes, out) {
     	// Check that indexes are arrays
     	if (!(rindexes instanceof Array) || rindexes.length == 0) {
     		throw new Error('first parameter must be a non empty array');
@@ -613,11 +610,8 @@ Matrix_.prototype = {
     	    
     	}
     	
-    	// Result matrix instantiation
-    	var obj = Object.create(this);
-    	obj.nbRows = rindexes.length;
-    	obj.nbColumns = cindexes.length;
-    	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+		// Result matrix allocation
+		var obj = allocateMatrix_(rindexes.length, cindexes.length, out);
     	
     	// Computation of the elements of A
     	for (var i = 0; i < obj.nbRows; ++i) {
@@ -642,18 +636,16 @@ Matrix_.prototype = {
 	* with coefficients satisfying c_ij = a_ji.
 	*
 	* @memberof Matrix_
-	* @return {Matrix_} the transpose of the original matrix.
+	* @param {Matrix_} out an optional m by n matrix.
+	* @return {Matrix_} a m by n matrix, transposed of the original matrix, either stored in the matrix out or in a new matrix.
 	*
 	* @example
 	* Matrix_([[1,2,3], [4,5,6]]).transpose();
 	* // Matrix_([[1,4], [2,5], [3,6]])
 	*/
-	transpose: function () {
-		// Result matrix instantiation
-		var obj = Object.create(this);
-		obj.nbRows = this.nbColumns;
-		obj.nbColumns = this.nbRows;
-		obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	transpose: function (out) {
+		// Result matrix allocation
+		var obj = allocateMatrix_(this.nbColumns, this.nbRows, out);
 		
 		// Computation of the transpose of A
 		for (var i = 0; i < obj.nbRows; ++i) {
@@ -1680,11 +1672,8 @@ self.covarianceMatrix = function(varg_args) {
 	// Construct the covariance matrix
 	var arrs = arguments;
 	
-	// Result matrix instantiation
-	var obj = Object.create(Matrix_.prototype);
-	obj.nbRows = arrs.length;
-	obj.nbColumns =  arrs.length;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	// Result matrix allocation
+	var obj = allocateMatrix_(arrs.length, arrs.length);
 
 	// Computation of the correlation matrix
 	for (var i = 0; i < obj.nbRows; ++i) {
@@ -1725,11 +1714,8 @@ self.sampleCovarianceMatrix = function(varg_args) {
 	// Construct the covariance matrix
 	var arrs = arguments;
 	
-	// Result matrix instantiation
-	var obj = Object.create(Matrix_.prototype);
-	obj.nbRows = arrs.length;
-	obj.nbColumns =  arrs.length;
-	obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
+	// Result matrix allocation
+	var obj = allocateMatrix_(arrs.length, arrs.length);
 
 	// Computation of the correlation matrix
 	for (var i = 0; i < obj.nbRows; ++i) {
@@ -1804,19 +1790,18 @@ function addCovarianceMatrixMethods_(matrix) {
     	* matrix (a_ij),i=1..n,j=1..n, with coefficients satisfying c_ij = a_ij/(a_ii * a_jj).
     	*
     	* @memberof Matrix_
-    	* @return {Matrix_} the correlation matrix associated to the covariance matrix.
+		* @param {Matrix_} out an optional n by n matrix.
+    	* @return {Matrix_} a n by n matrix containing the correlation matrix associated to the covariance matrix,
+		* either stored in the matrix out or in a new matrix.
     	*
     	* @example
     	* fromDoubleArray([[1,0.1], [0.1,1]]).getCorrelationMatrix();
     	* // Matrix_([[1,0.1], [0.1,1]])
     	*/
-		'getCorrelationMatrix': function() { 
-			// Result matrix instantiation
-			var obj = Object.create(Matrix_.prototype);
-			obj.nbRows = this.nbRows;
-			obj.nbColumns =  this.nbColumns;
-			obj.data = typeof Float64Array === 'function' ? new Float64Array(obj.nbRows * obj.nbColumns) : new Array(obj.nbRows * obj.nbColumns);
-
+		'getCorrelationMatrix': function(out) { 
+			// Result matrix allocation
+			var obj = allocateMatrix_(this.nbRows, this.nbColumns, out);
+			
 			// Computation of the correlation matrix
 			for (var i = 0; i < obj.nbRows; ++i) {
 				// Standard devation of a_ii
@@ -1845,18 +1830,20 @@ function addCovarianceMatrixMethods_(matrix) {
     	*
     	* @summary Returns the variances associated to a covariance matrix.
     	*
-    	* @description This function returns, as a matrix of n rows, the diagonal elements (a_ii), i=1..n from the original
+    	* @description This function returns, as a n by 1 matrix, the diagonal elements (a_ii), i=1..n from the original
     	* square matrix (a_ij),i=1..n,j=1..n.
     	*
     	* @memberof Matrix_
-    	* @return {Matrix_} the variances vector associated to the covariance matrix.
+		* @param {Matrix_} out an optional n by 1 matrix.
+    	* @return {Matrix_} a n by 1 column matrix containing the variances vector associated to the covariance matrix,
+		* either stored in the matrix out or in a new matrix.
     	*
     	* @example
     	* fromDoubleArray([[1,0.1], [0.1,1]]).getVariancesVector();
     	* // Vector_([1,1])
     	*/
-		'getVariancesVector': function() { 
-			return this.diagonal();
+		'getVariancesVector': function(out) { 
+			return this.diagonal(out);
 		},
 		
     	/**
@@ -1909,7 +1896,8 @@ function addCovarianceMatrixMethods_(matrix) {
 /* Start Wrapper private methods - Unit tests usage only */
 self.compositionsIterator_ = compositionsIterator_;
 self.subsetsIterator_ = subsetsIterator_;
-self.binomial_ = function(n, k) { return binomial_(n, k); }
+self.randomKSubsetIterator_ = randomKSubsetIterator_;
+self.binomial_ = binomial_;
 /* End Wrapper private methods - Unit tests usage only */
  
  
@@ -1926,7 +1914,7 @@ self.binomial_ = function(n, k) { return binomial_(n, k); }
 *
 * @param {number} n a non-negative integer whose composition are desired.
 * @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
-* @return {function} a function to be used as an iterator through its .next() method, sequentially computing all 
+* @return {function} a function to be used as an iterator through its .next() method, computing all 
 * the k-compositions of n.
 *
 * @example
@@ -1952,7 +1940,7 @@ function compositionsIterator_(n, k) {
 	*
 	* @summary Returns the next composition of a non negative integer.
 	*
-	* @description This function computes the next k-composition of n.
+	* @description This function computes the next k-composition of a non negative integer n.
 	*
 	* The initial k-composition computed by the first call to this function is n00...0, and each subsequent call to 
 	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
@@ -2005,7 +1993,7 @@ function compositionsIterator_(n, k) {
 * uniformly, but this is not written in the reference.
 *
 * The algorithm used to compute the random k-subsets is either RANKSB when k < n/2,
-* or RKS2 when k >= n/2, so that linear performances in O(k) are guaranteed.
+* or RKS2 when k >= n/2, so that performances are in O(k).
 *
 * @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
 *
@@ -2178,7 +2166,7 @@ function randomKSubsetIterator_(n, k) {
 * @see <a href="*https://en.wikipedia.org/wiki/Power_set">Power set</a>
 *
 * @param {number} n the number of elements of the n-set {1,...,n} whose subsets are desired, a non-negative integer.
-* @return {function} a function to be used as an iterator through its .next() method, sequentially computing all 
+* @return {function} a function to be used as an iterator through its .next() method, computing all 
 * the subsets of the n-set {1,...,n}.
 *
 * @example
@@ -2926,8 +2914,8 @@ function simplexRationalGirdSearch_(fct, n, k) {
 	var minValueGridPoints = [];
 
 	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference.
-	var sampler = new simplexRationalSampler_(n, k);
-	var weights = sampler.nextDeterministicSample();
+	var sampler = new simplexDeterministicRationalSampler_(n, k);
+	var weights = sampler.sample();
 	while (weights !== null) {  
 		// Evaluate the function fct at the current grid point
 		var fctValue = fct(weights);
@@ -2946,7 +2934,7 @@ function simplexRationalGirdSearch_(fct, n, k) {
 		// Otherwise, nothing needs to be done
 		
 		// Generate a new grid point
-		weights = sampler.nextDeterministicSample();
+		weights = sampler.sample();
 	}
 	
 	// Return the list of grid points associated to the minimum value of fct
@@ -2961,34 +2949,39 @@ function simplexRationalGirdSearch_(fct, n, k) {
 
 
 /* Start Wrapper private methods - Unit tests usage only */
-self.simplexRationalRounding_ = function(x, r) { return simplexRationalRounding_(x, r); }
-self.simplexSampler = simplexSampler_;
-self.simplexRationalSampler = simplexRationalSampler_;
+self.simplexRationalRounding_ = simplexRationalRounding_;
+self.simplexRandomSampler_ = simplexRandomSampler_;
+self.simplexDeterministicRationalSampler_ = simplexDeterministicRationalSampler_;
 /* End Wrapper private methods - Unit tests usage only */
 
-//* @description This function returns the list of points x = (x_1,...,x_n) belonging to the unit simplex of R^n which 
-//* minimize an arbitrary real-valued function fct of n real variables defined on the unit simplex of R^n, 
-//* using an exhaustive search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the reference.
-// * @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
-	
-// The algorithm used to generated the rational points is to use all the k-compositions of the integer n
-// * @see <a href="*https://en.wikipedia.org/wiki/Composition_(combinatorics)">Composition (combinatorics)</a>
-	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference,
-	// using all the k-compositions of the integer n.
-//	* @param {number} n the number of variables of the function fct, natural integer superior or equal to 1.
-//* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function fct, a natural integer superior or equal to 1.
-/*
-* @param {number} n a non-negative integer whose composition are desired.
-* @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
-* @return {function} a function to be used as a generator through its .nextDeterministicSample() method, until it returns null.
+
+/**
+* @function simplexDeterministicRationalSampler_
+*
+* @summary Returns a function to compute all the points on a rational grid of the unit simplex of R^n.
+*
+* @description This function constructs a function to compute all the points on the k-th rational grid
+* of the unit simplex of R^n, 1/k * I_n(k), c.f. the first reference.
+* 
+* The algorithm used is based on the enumeration of all the k-compositions of the integer n, c.f. the second reference.
+*
+* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic
+*  optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
+* @see <a href="*https://en.wikipedia.org/wiki/Composition_(combinatorics)">Composition (combinatorics)</a>
+*
+* @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
+* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to compute points, 
+* a natural integer superior or equal to 1.
+* @return {function} a function to be used through its .sample() method, computing all 
+* the points on the k-th rational grid of the unit simplex of R^n.
 *
 * @example
-* var mySampler = new simplexRationalSampler_(3, 6);
-* mySampler.nextDeterministicSample(); mySampler.nextDeterministicSample();
-* // [1,0,0]; ~[0.833,0.167,0];
+* var mySampler = new simplexDeterministicRationalSampler_(3, 10);
+* mySampler.sample(); mySampler.sample(); ...; mySampler.sample();
+* // [1, 0, 0]; [0.9, 0.1, 0]; ...; null
 */
-function simplexRationalSampler_(n, k) {
-	// Initialize n and x, the coordinates of the point being sampled.
+function simplexDeterministicRationalSampler_(n, k) {
+	// Initializations
 	this.n = n;
 	this.k = k;
 	this.compositionIterator = new compositionsIterator_(k, n);
@@ -2997,28 +2990,25 @@ function simplexRationalSampler_(n, k) {
 	/**
 	* @function sample
 	*
-	* @summary Returns .
+	* @summary Returns a point on the k-th rational grid of the unit simplex of R^n.
 	*
-	* @description This function computes the next k-composition of n.
+	* @description This function computes a point on the k-th rational grid of the unit simplex of R^n.
 	*
-	* The initial k-composition computed by the first call to this function is n00...0, and each subsequent call to 
-	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
+	* Each call to this function results in the computation of a new point on the k-th rational grid
+	* of the unit simplex of R^n, until exhaustion of all such points.
 	*
-	* A subsequent call to this function when the final k-composition has been reached will result in
-	* the recomputation of all the k-compositions of n, starting from the initial k-composition.
-	*
-	* @memberof simplexUniformSampler_
-	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
-	* and arr[1] an array of k elements containing the computed k-composition of n.
+	* @memberof simplexDeterministicRationalSampler_
+	* @return {Array.<number>|null} an array of n real numbers corresponding to the coordinates of the computated point in R^n,
+	* or null in case all such points have been generated.
 	*
 	*/
-	this.nextDeterministicSample = function() {
+	this.sample = function() {
 		// Return null in case there is no more samples to draw
 		if (!this.compositionIteratorStatus) {
 			return null;
 		}
 		
-		// Generate a new k-composition
+		// Generate a new k-composition of n
 		var nextComposition = this.compositionIterator.next();
 		
 		// Compute the current rational grid point by normalizing the generated k-composition
@@ -3027,7 +3017,7 @@ function simplexRationalSampler_(n, k) {
 			x[i] = x[i] / k;
 		}
 
-		// Update the iterator status
+		// Update the internal iterator status
 		this.compositionIteratorStatus = nextComposition[0];	
 		
 		// Return the point being sampled
@@ -3035,57 +3025,68 @@ function simplexRationalSampler_(n, k) {
 	}
 }
  
-// R.Y. Rubinstein, Generating random vectors uniformly distributed inside and on the surface of different regions, In European Journal of Operational Research, Volume 10, Issue 2, 1982, Pages 205-209
-// https://doi.org/10.1016/0377-2217(82)90161-8
-// Algorithm 2 of the reference
-//  k returns a random variable being uniformly distributed over a standard simplex of dimension k.
-function simplexSampler_(n) {
-	// Initialize n and x, the coordinates of the point being sampled.
+ 
+/**
+* @function simplexRandomSampler_
+*
+* @summary Returns a function to compute random points on the unit simplex of R^n.
+*
+* @description This function constructs a function to compute random points uniformly distributed on
+* the unit simplex of R^n, using the algorithm 2 of the reference.
+* 
+* @see <a href="https://doi.org/10.1016/0377-2217(82)90161-8">R.Y. Rubinstein, Generating random vectors uniformly distributed inside and on 
+* the surface of different regions, In European Journal of Operational Research, Volume 10, Issue 2, 1982, Pages 205-209</a>
+*
+* @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
+* @return {function} a function to be used through its .sample() method, computing random  
+* points on the unit simplex of R^n.
+*
+* @example
+* var mySampler = new simplexRandomSampler_(3);
+* mySampler.sample();
+* // [0.25, 0, 0.75]
+*/
+function simplexRandomSampler_(n) {
+	// Initializations
 	this.n = n;
-	this.x = new Array(n);
+	this.x = new Array(n); // the coordinates of a point being sampled
 	
 	/**
 	* @function sample
 	*
-	* @summary Returns .
+	* @summary Returns a random point on the unit simplex of R^n.
 	*
-	* @description This function computes the next k-composition of n.
+	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
+	* using the algorithm 2 of the reference, which is linear with n (i.e., which has a time complexity of O(n)).
 	*
-	* The initial k-composition computed by the first call to this function is n00...0, and each subsequent call to 
-	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
-	*
-	* A subsequent call to this function when the final k-composition has been reached will result in
-	* the recomputation of all the k-compositions of n, starting from the initial k-composition.
-	*
-	* @memberof simplexUniformSampler_
-	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
-	* and arr[1] an array of k elements containing the computed k-composition of n.
+	* @memberof simplexRandomSampler_
+	* @return {Array.<number>} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
 	*
 	*/
-	this.nextRandomSample = function() {
+	this.sample = function() {
 		// Computation of n random variables from EXP(1), which will form the basis
 		// of the coordinates of the point being sampled	
 		var sum = 0;
 		for (var i = 0; i < this.n; ++i) {
 			// Generate a random variable from EXP(1) using the inverse method, with no need for the minus sign
-			// as the negative sign would cancel out at the subsequent normalization step
+			// as the negative sign would cancel out at the subsequent normalization step.
 			var u = 1 - Math.random(); // belongs to ]0,1], so that the logarithm below is properly defined
 			var e = Math.log(u);
 
-			// Set the i-th coordinate of the point being sampled
+			// Set the i-th coordinate of the point being sampled.
 			this.x[i] = e;
 			
-			// Compute the running sum of the exponential variables, for the subsequant normalization step
-			sum = sum + e;	
+			// Compute the running sum of the exponential variables, for the subsequant normalization step.
+			sum = sum + e;
 		}
 
 		// Normalization of the computed coordinates of the point being sampled, so that
-		// they all belong to [0,1] and sum to 1
+		// they all belong to [0,1] and sum to 1.
 		for (var i = 0; i < this.n; ++i) {
 			this.x[i] = this.x[i]/sum;
 		}
 		
-		// Return a copy of the point being sampled, so that callers can alter it
+		// Return a copy of the point being sampled, so that callers can alter it.
 		return this.x.slice();
 	}
 }
@@ -3221,8 +3222,8 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 	// Clustering options
 	var clusteringMode = opt.clusteringMode || 'ftca';
 	
-	// Convert sigma to matrix format
-	var sigma = new Matrix_(sigma).toCovarianceMatrix();
+	// Convert sigma to matrix format and convert it to acovariance matrix
+	var sigma = new Matrix_(sigma).toCovarianceMatrix(sigma);
 	var nbAssets = sigma.nbRows;
 
 	
@@ -3322,14 +3323,17 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 		}
 	}
 	
+	// 2(tmp) - Compute the transpose of the matrix mapping the initial assets to the clusters space
+	var assetsToClustersWeightsT = assetsToClustersWeights.transpose()
+	
 	// 3a - Compute the the covariance matrix associated to the weighted clusters space, using formula Var(A*X) = A * Var(X) * A'.
-	var clustersSigma = Matrix_.product(assetsToClustersWeights, Matrix_.product(sigma, assetsToClustersWeights.transpose()));
+	var clustersSigma = Matrix_.product(assetsToClustersWeights, Matrix_.product(sigma, assetsToClustersWeightsT));
 	
 	// 3b - Compute ERC weights in the clusters space
 	var clustersWeights = self.equalRiskContributionWeights(clustersSigma, opt);
 	
 	// 3c - Compute original assets weights, using formula A' * Y
-	var weights = Matrix_.product(assetsToClustersWeights.transpose(), new Matrix_(clustersWeights));
+	var weights = Matrix_.product(assetsToClustersWeightsT, new Matrix_(clustersWeights));
 	
 	// Return them (already normalized)
 	return weights.toArray();
@@ -3489,7 +3493,8 @@ self.equalRiskBudgetWeights = function (sigma, opt) {
 	// ------
 	
 	// The output weights are defined as the normalized inverses of the assets standard deviations.
-	var weights = new Matrix_(sigma).elemMap(function(i,j,val) { return 1/Math.sqrt(val); }).normalize();
+	var weights = new Matrix_(sigma).elemMap(function(i,j,val) { return 1/Math.sqrt(val); })
+	weights = weights.normalize(weights);
 	
 	// Return the computed weights
 	return weights.toArray();
@@ -3591,7 +3596,8 @@ self.equalWeights = function (nbAssets, opt) {
 	// Check that nbAssets is a strictly positive natural integer
 
 	// Allocate the weights vector: all the weights are equal to 1/nbAssets
-	var weights = Matrix_.ones(nbAssets, 1).normalize();
+	var weights = Matrix_.ones(nbAssets, 1);
+	weights = weights.normalize(weights);
 
 	// Return the computed weights
 	return weights.toArray();
@@ -3656,7 +3662,8 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	var nbAssets = sigma.nbRows;
 	
 	// Initial point for the algorithm is an equal weight vector
-	var x = Matrix_.ones(nbAssets, 1).normalize();
+	var x = Matrix_.ones(nbAssets, 1);
+	x = x.normalize(x);
 	
 	// Preparational computations
 	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
@@ -3751,7 +3758,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	}
 	
 	// Return the computed weights, after normalization
-	x = x.normalize();
+	x = x.normalize(x);
 	return x.toArray();
 }
 
@@ -3992,7 +3999,8 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 	var nbAssets = sigma.nbRows;
 	
 	// Initial point for the algorithm is an equal weight vector
-	var x = Matrix_.ones(nbAssets, 1).normalize();
+	var x = Matrix_.ones(nbAssets, 1);
+	x = x.normalize(x);
 	
 	// Preparational computations
 	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
@@ -4087,7 +4095,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 	}
 	
 	// Return the computed weights, after normalization
-	x = x.normalize();
+	x = x.normalize(x);
 	return x.toArray();
 }
 
@@ -4150,7 +4158,8 @@ self.minVarWeights = function (sigma, opt) {
 	// Step 2: Gaussian convertion, and proportional average covar weigth
 	var weights = new Matrix_(rowsAverages, 1).elemMap(function(i, j, val) { 
 		return 1 - normcdf_((val - elementsMean)/elementsStddev);
-	}).normalize();
+	});
+	weights = weights.normalize(weights);
 	
 	// Step 3: Scale portfolio weights by assets variances
 	var invVariancesWeights = sigma.diagonal().elemMap(function(i,j,val) { return 1/val; }).normalize();
@@ -4177,13 +4186,18 @@ self.minVarWeights = function (sigma, opt) {
 * @summary Compute the weights of a random weighted portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only 
-* random portfolio of n assets, XXX w_i = 1/n, i=1..n.
+* random portfolio of n assets, optionally satisfying:
+* - Cardinality constraints on the number of assets hold
+*
+* This kind of portfolio has several applications in asset allocation, c.f. the first reference, as
+* well as in trading strategies evaluation, c.f. the second reference.
 *
 * The algorithms used internally by this function should allow the random portfolios to be generated uniformly
 * among all the feasible portfolios.
 *
-* @see <a href="https://academic.oup.com/rfs/article-abstract/22/5/1915/1592901/Optimal-Versus-Naive-Diversification-How">Victor DeMiguel, Lorenzo Garlappi, Raman Uppal; Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?. Rev Financ Stud 2009; 22 (5): 1915-1953. doi: 10.1093/rfs/hhm075</a>
-* 
+* @see <a href="https://arxiv.org/abs/1008.3718">William T. Shaw, Monte Carlo Portfolio Optimization for General Investor Risk-Return Objectives and Arbitrary Return Distributions: a Solution for Long-only Portfolios</a>
+* @see <a href="https://ssrn.com/abstract=881735"> Burns, Patrick, Random Portfolios for Evaluating Trading Strategies (January 13, 2006)</a>
+*
 * @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.contraints.minAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
@@ -4196,7 +4210,6 @@ self.minVarWeights = function (sigma, opt) {
 */
 self.randomWeights = function (nbAssets, opt) {
 	// TODO: Checks, if enabled
-	// Check that nbAssets is a strictly positive natural integer
 
 	// Decode options
 	if (opt === undefined) {
@@ -4216,10 +4229,10 @@ self.randomWeights = function (nbAssets, opt) {
 	// Extra caution needs to be taken in case one of the weights is zero,
 	// as exactly nbSelectedAssets must be included in the portfolio.
 	var selectedAssetsWeights;
-	var sampler = new simplexSampler_(nbSelectedAssets);
+	var simplexSampler = new simplexSampler_(nbSelectedAssets);
 	while (true) {
-		// Generate a new sample of assets weights
-		selectedAssetsWeights = sampler.nextRandomSample();
+		// Generate a sample of assets weights
+		selectedAssetsWeights = simplexSampler.nextRandomSample();
 		
 		// Reject the sample if there is one asset with a zero weight
 		var rejectSample = false;
@@ -4315,7 +4328,8 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 	var nbAssets = sigma.nbRows;
 	
 	// Initial point for the algorithm is an equal weight vector
-	var x = Matrix_.ones(nbAssets, 1).normalize();
+	var x = Matrix_.ones(nbAssets, 1);
+	x = x.normalize(x);
 	
 	// Preparational computations
 	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
@@ -4370,7 +4384,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 	}
 	
 	// Return the computed weights, after normalization
-	x = x.normalize();
+	x = x.normalize(x);
 	return x.toArray();
 }
 

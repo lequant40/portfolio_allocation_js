@@ -20,19 +20,66 @@ QUnit.test('Simplex rational rounding point computation', function(assert) {
 });
 
 
-
-QUnit.test('Simplex rational sampler point computation', function(assert) {    
+QUnit.test('Simplex deterministic rational sampler point computation', function(assert) {    
   // Reference: Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
   // Test with the static data examples of section 5, divided by 6
   {
 	  var expectedValues = [[6/6,0,0], [5/6,1/6,0], [4/6,2/6,0], [3/6,3/6,0], [2/6,4/6,0], [1/6,5/6,0], [0,6/6,0], [5/6,0,1/6], [4/6,1/6,1/6], [3/6,2/6,1/6], [2/6,3/6,1/6], [1/6,4/6,1/6], [0,5/6,1/6], [4/6,0,2/6], [3/6,1/6,2/6], [2/6,2/6,2/6], [1/6,3/6,2/6], [0,4/6,2/6], [3/6,0,3/6], [2/6,1/6,3/6], [1/6,2/6,3/6], [0,3/6,3/6], [2/6,0,4/6], [1/6,1/6,4/6], [0,2/6,4/6], [1/6,0,5/6], [0,1/6,5/6], [0,0,6/6]];
 	  
-	  var sampler = new PortfolioAllocation.simplexRationalSampler(3, 6);
+	  var sampler = new PortfolioAllocation.simplexDeterministicRationalSampler_(3, 6);
 	  for (var i = 0; i < expectedValues.length; ++i) {
-		var sample = sampler.nextDeterministicSample();
-		assert.deepEqual(sample, expectedValues[i], 'Simplex rational sampler - Test 1 #' + i);
+		var sample = sampler.sample();
+		assert.deepEqual(sample, expectedValues[i], 'Simplex deterministic rational sampler - Test 1 #' + i);
 	  }
 	  
-	  assert.equal(sampler.nextDeterministicSample(), null, "Simplex rational sampler - Test 1 #end");
+	  assert.equal(sampler.sample(), null, "Simplex deterministic rational sampler - Test 1 #end");
+  }
+});
+
+
+QUnit.test('Simplex random sampler point computation', function(assert) {    
+  // Test with random data
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var nbSubTests = 10;
+	  var minDimension = 1;
+	  var maxDimension = 50;
+
+	  // Aim of these tests is to check that for a sample of size n:
+	  // - An array of coordinates of size n is returned
+	  // - The coordinates belong to the interval [0, 1]
+	  // - The coordinates sum to 1	  
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random dimension size and the associated sampler
+		 var dimension = Math.floor(Math.random()*(maxDimension - minDimension + 1) + minDimension);
+		 var sampler = new PortfolioAllocation.simplexRandomSampler_(dimension);
+		 
+		 for (var j = 0; j < nbSubTests; ++j) {
+			// Generate a random sample point
+			var sampledPoint = sampler.sample();
+		 
+			// Compute the number of coordinates of the sampled point 
+			var sampledPointDimension = sampledPoint.length;
+			assert.equal(sampledPointDimension, dimension, "Simplex random sampler point computation, coordinates length - Test " + i + "," + j);
+		 
+			 // Check that the coordinates of the sampled point belong to the unit interval
+			 var sampledPointBelongToUnitInterval = true;
+			 for (var k = 0; k < sampledPoint.length; ++k) {
+				if (sampledPoint[k] > 1 || sampledPoint[k] < 0) {
+					sampledPointBelongToUnitInterval = false;
+					break;
+				}
+			 }
+			 assert.equal(sampledPointBelongToUnitInterval, true, "Simplex random sampler point computation, coordinates in unit interval - Test " + i + "," + j);
+
+			 // Check that the sum of the coordinates of the sampled point is 1, near to machine precision
+			 var sampledPointSumCoordinates = 0;
+			 for (var k = 0; k < sampledPoint.length; ++k) {
+				sampledPointSumCoordinates += sampledPoint[k];
+			}
+			assert.equal(Math.abs(sampledPointSumCoordinates - 1) <= 1e-15, true, "Simplex random sampler point computation, coordinates sum to one - Test " + i + "," + j);
+		}
+	  }
   }
 });
