@@ -698,15 +698,82 @@ QUnit.test('Equal risk bounding portfolio', function(assert) {
   */
 });
 
-/*
-QUnit.test('Random weights portfolio', function(assert) {    
-  // Example with static data
-  {
-	  console.log(PortfolioAllocation.randomWeights(5, { contraints: { minAssets: 1, maxAssets: 1 } }));	  
-  }  
 
+QUnit.test('Random weights portfolio', function(assert) {    
+  // Test with random data, no constraints
+  {
+  	  // Setup static parameters of the random test
+	  var nbTests = 50;
+	  var nbAssetsMin = 1;
+	  var nbAssetsMax = 50;
+
+	  // Aim of these tests is to check that for a portfolio of n assets:
+	  // - The number of weights computed is n
+	  // - The weights belong to the interval [0, 1]
+	  // - The weights sum to 1	  
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random number of assets
+		 var nbAssets = Math.floor(Math.random()*(nbAssetsMax - nbAssetsMin + 1) + nbAssetsMin);
+		 
+		 // Generate a random portfolio for this number of assets
+		 var randomWeights = PortfolioAllocation.randomWeights(nbAssets);
+		 	 
+		 // Check that the number of weights corresponds to the number of assets
+		 var nbWeights = randomWeights.length;
+		 assert.equal(nbWeights, nbAssets, "Random weights portfolio, number of weights - Test " + i);
+		 
+		 // Check that the weights belong to the unit interval
+		 var weightsBelongToUnitInterval = true;
+		 for (var k = 0; k < randomWeights.length; ++k) {
+			if (randomWeights[k] > 1 || randomWeights[k] < 0) {
+				weightsBelongToUnitInterval = false;
+				break;
+			}
+		 }
+		 assert.equal(weightsBelongToUnitInterval, true, "Random weights portfolio, weights in unit interval - Test " + i);
+
+		 // Check that the sum of the weights is 1, near to machine precision
+		 var weightsSum = 0;
+		 for (var k = 0; k < randomWeights.length; ++k) {
+			weightsSum += randomWeights[k];
+		}
+		assert.equal(Math.abs(weightsSum - 1) <= 1e-15, true, "Random weights portfolio, weights sum to one - Test " + i);
+	  }
+  }
+  
+  // Test with random data, cardinality constraints
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 50;
+	  var nbAssetsMin = 1;
+	  var nbAssetsMax = 50;
+
+	  // Aim of these tests is to check that for a portfolio of n assets constrained to hold betwen i and j assets:
+	  // - The number of non-zero weights is between i and j
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random number of assets
+		 var nbAssets = Math.floor(Math.random()*(nbAssetsMax - nbAssetsMin + 1) + nbAssetsMin);
+		 
+		 // Generate random cardinality constraints
+		 var maxAssets = Math.floor(Math.random()*(nbAssets - 1 + 1) + 1);
+		 var minAssets = Math.floor(Math.random()*(maxAssets - 1 + 1) + 1);
+		 
+		 // Generate a random portfolio for this number of assets and these cardinality constraints
+		 var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { contraints: { minAssets: minAssets, maxAssets: maxAssets } });
+		 	 
+		 // Check that the number of non-zero weights is between minAssets and maxAssets
+		 var nbNonZeroAssets = 0;
+		 for (var k = 0; k < randomWeights.length; ++k) {
+			if (randomWeights[k] != 0) {
+				nbNonZeroAssets = nbNonZeroAssets + 1;
+			}
+		 }
+		 assert.equal(maxAssets >= nbNonZeroAssets, true, "Random weights portfolio with cardinality constraints, number of non-zero weights - Test " + i + "/1");
+		 assert.equal(minAssets <= nbNonZeroAssets, true, "Random weights portfolio with cardinality constraints, number of non-zero weights - Test " + i + "/2");
+	 }
+  }
 });
-*/
+
 
 
 QUnit.test('Rounded weights portfolio', function(assert) {    

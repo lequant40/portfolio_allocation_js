@@ -59,7 +59,7 @@ QUnit.test('Simplex random sampler point computation', function(assert) {
 			// Generate a random sample point
 			var sampledPoint = sampler.sample();
 		 
-			// Compute the number of coordinates of the sampled point 
+			// Check that the number of coordinates of the sampled point corresponds to the requested dimension
 			var sampledPointDimension = sampledPoint.length;
 			assert.equal(sampledPointDimension, dimension, "Simplex random sampler point computation, coordinates length - Test " + i + "," + j);
 		 
@@ -74,12 +74,13 @@ QUnit.test('Simplex random sampler point computation', function(assert) {
 			 assert.equal(sampledPointBelongToUnitInterval, true, "Simplex random sampler point computation, coordinates in unit interval - Test " + i + "," + j);
 
 			 // Check that the sum of the coordinates of the sampled point is 1, near to machine precision
-			 var sampledPointSumCoordinates = 0;
+			 var sampledPointCoordinatesSum = 0;
 			 for (var k = 0; k < sampledPoint.length; ++k) {
-				sampledPointSumCoordinates += sampledPoint[k];
+				sampledPointCoordinatesSum += sampledPoint[k];
 			}
-			assert.equal(Math.abs(sampledPointSumCoordinates - 1) <= 1e-15, true, "Simplex random sampler point computation, coordinates sum to one - Test " + i + "," + j);
+			assert.equal(Math.abs(sampledPointCoordinatesSum - 1) <= 1e-15, true, "Simplex random sampler point computation, coordinates sum to one - Test " + i + "," + j);
 		}
 	  }
   }
+
 });

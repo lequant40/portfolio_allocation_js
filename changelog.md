@@ -1,8 +1,13 @@
+### 0.0.5 - XX/YY/2018
+- Misc. Matrix/Vector operations additions/refactor
+- Added a linear system solver: Kaczmarz method
+- New portfolio allocation method: Random Portfolio
+- Updated portfolio allocation helper method to round portfolio weights 
+
 ### 0.0.4 - 01/12/2017
 - Misc. Matrix/Vector operations additions/refactor
 - New portfolio allocation methods: Equal Risk Bounding, Global Minimum Variance, Grid Search
 - New portfolio allocation helper method: "optimal" floating-point portfolio weights transformation to rational portfolio weights
-
 
 ### 0.0.3 - 10/09/2017
 - Misc. Matrix/Vector operations additions/refactor
