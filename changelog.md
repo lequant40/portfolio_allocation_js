@@ -1,6 +1,7 @@
 ### 0.0.5 - XX/YY/2018
 - Misc. Matrix/Vector operations additions/refactor
-- Added a linear system solver: Kaczmarz method
+- Added a linear system solver: Kaczmarz (extended) method
+- Working on a linear programming solver: primal affine scaling method
 - New portfolio allocation method: Random Portfolio
 - Updated portfolio allocation helper method to round portfolio weights 
 

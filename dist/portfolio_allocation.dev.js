@@ -357,7 +357,8 @@ Matrix_.prototype = {
 	*
 	* @summary Determines if the matrix is square.
 	*
-	* @description This function determines if the number of rows of the matrix is equal to the number of columns of the matrix.
+	* @description This function determines if the number of rows of the matrix
+	* is equal to the number of columns of the matrix.
 	* 
 	* @memberof Matrix_
 	* @return {boolean} true if the matrix is square, false otherwise.
@@ -377,12 +378,12 @@ Matrix_.prototype = {
 	/**
 	* @function isVector
 	*
-	* @summary Determines if the matrix is a (column) vector.
+	* @summary Determines if the matrix is a vector.
 	*
 	* @description This function determines if the number of columns of the matrix is equal to 1.
 	* 
 	* @memberof Matrix_
-	* @return {boolean} true if the matrix is a column vector, false otherwise.
+	* @return {boolean} true if the matrix is a vector, false otherwise.
 	*
 	* @example
 	* Matrix_([[1,2,3], [4,5,10]]).isVector();
@@ -395,7 +396,147 @@ Matrix_.prototype = {
 	isVector: function() {
 	    return this.nbColumns === 1;
 	},
+	
+	/**
+	* @function isNonNegative
+	*
+	* @summary Determines if the matrix is a nonnegative matrix.
+	*
+	* @description This function determines if the matrix is a nonnegative matrix,
+    * i.e. if all its elements are equal to or greater than zero.
+	* 
+	* @see <a href="https://en.wikipedia.org/wiki/Nonnegative_matrix">Nonnegative matrix</a>
+	*
+	* @memberof Matrix_
+	* @return {boolean} true if the matrix is a nonnegative matrix, false otherwise.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,10]]).isNonNegative();
+	* // true
+	*
+	* @example
+	* Matrix_([[-1], [4]]).isNonNegative();
+	* // false
+	*/
+	isNonNegative: function() {
+		// Check the nonnegativity condition element by element
+		for (var i = 0; i < this.nbRows; ++i) {
+			for (var j = 0; j < this.nbColumns; ++j) {
+				if (this.data[i * this.nbColumns + j] < 0) {
+					return false;
+				}
+			}
+		}
+		
+		// At this stage, the matrix is nonnegative.
+		return true;
+	},
+	
+	/**
+	* @function isPositive
+	*
+	* @summary Determines if the matrix is a positive matrix.
+	*
+	* @description This function determines if the matrix is a positive matrix,
+    * i.e. if all its elements are strictly greater than zero.
+	* 
+	* @see <a href="https://en.wikipedia.org/wiki/Nonnegative_matrix">Nonnegative matrix</a>
+	*
+	* @memberof Matrix_
+	* @return {boolean} true if the matrix is a positive matrix, false otherwise.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,10]]).isPositive();
+	* // true
+	*
+	* @example
+	* Matrix_([[0], [4]]).isPositive();
+	* // false
+	*/
+	isPositive: function() {
+		// Check the positivity condition element by element
+		for (var i = 0; i < this.nbRows; ++i) {
+			for (var j = 0; j < this.nbColumns; ++j) {
+				if (this.data[i * this.nbColumns + j] <= 0) {
+					return false;
+				}
+			}
+		}
+		
+		// At this stage, the matrix is positive.
+		return true;
+	},
 
+	/**
+	* @function isNonPositive
+	*
+	* @summary Determines if the matrix is a nonpositive matrix.
+	*
+	* @description This function determines if the matrix is a nonpositive matrix,
+    * i.e. if all its elements are equal to or lower than zero.
+	* 
+	* @see <a href="http://mathworld.wolfram.com/NonpositiveMatrix.html"> Weisstein, Eric W. "Nonpositive Matrix." From MathWorld--A Wolfram Web Resource. http://mathworld.wolfram.com/NonpositiveMatrix.html </a>
+	*
+	* @memberof Matrix_
+	* @return {boolean} true if the matrix is a nonpositive matrix, false otherwise.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,10]]).isNonPositive();
+	* // false
+	*
+	* @example
+	* Matrix_([[-1], [0]]).isNonPositive();
+	* // true
+	*/
+	isNonPositive: function() {
+		// Check the nonpositivity condition element by element
+		for (var i = 0; i < this.nbRows; ++i) {
+			for (var j = 0; j < this.nbColumns; ++j) {
+				if (this.data[i * this.nbColumns + j] > 0) {
+					return false;
+				}
+			}
+		}
+		
+		// At this stage, the matrix is nonpositive.
+		return true;
+	},
+	
+	/**
+	* @function isNegative
+	*
+	* @summary Determines if the matrix is a negative matrix.
+	*
+	* @description This function determines if the matrix is a negative matrix,
+    * i.e. if all its elements are strictly lower than zero.
+	* 
+	* @see <a href="http://mathworld.wolfram.com/NegativeMatrix.html">Weisstein, Eric W. "Negative Matrix." From MathWorld--A Wolfram Web Resource. http://mathworld.wolfram.com/NegativeMatrix.html </a>
+	*
+	* @memberof Matrix_
+	* @return {boolean} true if the matrix is a negative matrix, false otherwise.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,10]]).isNegative();
+	* // false
+	*
+	* @example
+	* Matrix_([[-1], [-2]]).isNegative();
+	* // true
+	*/
+	isNegative: function() {
+		// Check the negativity condition element by element
+		for (var i = 0; i < this.nbRows; ++i) {
+			for (var j = 0; j < this.nbColumns; ++j) {
+				if (this.data[i * this.nbColumns + j] >= 0) {
+					return false;
+				}
+			}
+		}
+		
+		// At this stage, the matrix is negative.
+		return true;
+	},
+	
 	/**
 	* @function sum
 	*
@@ -413,14 +554,66 @@ Matrix_.prototype = {
 	sum: function() {
 		// Computation of sum a_ij, i=1..nbRows, j=1..nbColumns
 		var sum = 0;
-		for (var i = 0; i < this.nbRows; ++i) {
-			for (var j = 0; j < this.nbColumns; ++j) {
-				sum += this.data[i * this.nbColumns + j];
-			}
+		for (var k = 0; k < this.data.length; ++k) {
+			sum += this.data[k];
 		}
 		
-		// Return the computed sum
+		// Return the computed value
 		return sum;
+	},
+	
+	/**
+	* @function min
+	*
+	* @summary Returns the minimum element of the matrix.
+	*
+	* @description This function computes the minimum element of the matrix.
+	* 
+	* @memberof Matrix_
+	* @return {number} the minimum element of the matrix.
+	*
+	* @example
+	* Matrix_([[1,2,3]]).min();
+	* // 1
+	*/
+	min: function() {
+		// Computation of the minimum of a_ij, i=1..nbRows, j=1..nbColumns
+		var minVal = Number.POSITIVE_INFINITY;
+		for (var k = 0; k < this.data.length; ++k) {
+		  if (this.data[k] < minVal) {
+			minVal = this.data[k];
+		  }
+		}
+
+		// Return the computed value
+		return minVal;
+	},
+	
+	/**
+	* @function max
+	*
+	* @summary Returns the maximum element of the matrix.
+	*
+	* @description This function computes the maximum element of the matrix.
+	* 
+	* @memberof Matrix_
+	* @return {number} the maximum element of the matrix.
+	*
+	* @example
+	* Matrix_([[1,2,3]]).max();
+	* // 3
+	*/
+	max: function() {
+		// Computation of the maximum of a_ij, i=1..nbRows, j=1..nbColumns
+		var maxVal = Number.NEGATIVE_INFINITY;
+		for (var k = 0; k < this.data.length; ++k) {
+		  if (this.data[k] > maxVal) {
+			maxVal = this.data[k];
+		  }
+		}
+
+		// Return the computed value
+		return maxVal;
 	},
 	
 	/**
@@ -763,17 +956,18 @@ Matrix_.prototype = {
 	* The value of the optional parameter subset determines the subset of the matrix to consider:
 	* - 'matrix', in order to compute a vector norm for the whole matrix.
 	* - 'row', in order to compute a vector norm for a specific row of the matrix.
+	* - 'column', in order to compute a vector norm for a specific column of the matrix.
 	*
-	* If the parameter subset is provided and is equal to 'row', the parameter idx correspond to the row index of the matrix
-	* for which to compute the vector norm.
+	* If the parameter subset is provided and is equal to 'row'/'column', the parameter idx corresponds
+	* to the row/column index for which to compute the vector norm.
 	*
 	* @see <a href="https://en.wikipedia.org/wiki/Norm_(mathematics)">Norm (mathematics)</a>
 	* @see Nicholas J. Higham. 2002. Accuracy and Stability of Numerical Algorithms (2nd ed.). Soc. for Industrial and Applied Math., Philadelphia, PA, USA. 
 	*
 	* @memberof Matrix_
 	* @param {string} p the vector norm to compute, a string either equals to 'one', to 'two' or to 'infinity'.
-	* @param {string} subset the subset of the matrix for which to compute the vector norm, an optional string either equals to 'matrix' or to 'row'; defaults to 'matrix'.
-	* @param {number} idx if subset is equal to 'row', the row index of the matrix for which to compute the vector norm, a natural integer belonging to 1..nbRows.
+	* @param {string} subset the subset of the matrix for which to compute the vector norm, an optional string either equals to 'matrix', 'row' or 'column'; defaults to 'matrix'.
+	* @param {number} idx if subset is equal to 'row'/'column', the row/column index for which to compute the vector norm, a natural integer belonging to 1..nbRows/nbColumns.
 	* @return {number} the computed vector norm.
 	*
 	* @example
@@ -791,7 +985,7 @@ Matrix_.prototype = {
 		var idxStartColumn;
 		var idxEndColumn;
 		
-		// Supported subsets are 'matrix' and 'row'
+		// Supported subsets are 'matrix', 'row', 'column'
 		if (subset === undefined || subset == 'matrix') {
 			// Indexes assignement
 			idxStartRow = 0;
@@ -811,6 +1005,23 @@ Matrix_.prototype = {
 				idxEndRow = idx;
 				idxStartColumn = 0;
 				idxEndColumn = this.nbColumns;
+			}
+			else {
+				throw new Error('undefined row index');
+			}
+		}
+		else if (subset == 'column') {
+			if (idx !== undefined) {
+				// Checks
+				if (idx < 1 || idx > this.nbColumns) { 
+					throw new Error('column index out of bounds: ' + idx);
+				}
+
+				// Indexes assignement
+				idxStartRow = 0;
+				idxEndRow = this.nbRows;
+				idxStartColumn = idx-1;
+				idxEndColumn = idx;
 			}
 			else {
 				throw new Error('undefined row index');
@@ -916,7 +1127,7 @@ Matrix_.areEqual = function (a, b, eps) {
 	var tol = eps || 0;
 	for (var i = 0; i < nbRows; ++i) {
 		for (var j = 0; j < nbColumns; ++j) {
-			if (Math.abs(a.data[i * nbRows + j] - b.data[i * nbRows + j]) > tol) {
+			if (Math.abs(a.data[i * nbColumns + j] - b.data[i * nbColumns + j]) > tol) {
 				return false;
 			}
 		}
@@ -1021,46 +1232,142 @@ Matrix_.copy = function(A, out) {
 * @description This function computes the product A*B of a matrix A with another matrix B,
 * where A is a n by m matrix and B is a m by p matrix.
 *
-* The algorithm implemented uses an IKJ form, cache aware.
-* 
 * @param {Matrix_} A a n by m matrix.
 * @param {Matrix_} B a m by p matrix.
-* @param {Matrix_} out an optional n by m matrix.
-* @return {Matrix_} the matrix product A*B, either stored in the matrix out or in a new matrix, a m by p matrix.
+* @param {Matrix_} out an optional n by p matrix.
+* @return {Matrix_} the matrix product A*B, either stored in the matrix out or in a new matrix, a n by p matrix.
 *
 * @example
 * product(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,1], [2,2], [3,3]]));
 * // Matrix_([[14,14], [32,32]])
 */
 Matrix_.product = function(a, b, out) {
-	// Ensure a,b are matrices
-	if (!(a instanceof Matrix_)) {
-		throw new Error('a must be a matrix');
+	// Delegate the computations to the internal function.
+	return Matrix_.axy(1, a, b);
+};
+
+
+/**
+* @function elementwiseProduct
+*
+* @summary Returns the elementwise product of a matrix with another matrix.
+*
+* @description This function computes the elementwise product Z = X.*Y of a matrix X with another matrix Y,
+* where A is a n by m matrix and B is either a n by m matrix (full matrix elementwise product), or
+* a n by 1 matrix (row matrix elementwise product) or a 1 by m matrix (column matrix elementwise product).
+*
+* When used with a n by 1 matrix, this function mimics the behavior of a left multiplication of X with
+* a diagonal matrix made of the n by 1 matrix elements: Z = Diag(Y) * X.
+*
+* When used with a 1 by m matrix, this function mimics the behavior of a right multiplication of X with
+* a diagonal matrix made of the 1 by m matrix elements: Z = X * Diag(Y).
+*
+* @param {Matrix_} X a n by m matrix.
+* @param {Matrix_} Y a m by p matrix, a n by 1 matrix or a 1 by m matrix.
+* @param {Matrix_} out an optional n by m matrix.
+* @return {Matrix_} the matrix elementwise product A.*B, either stored in the matrix out or in a new matrix, a n by m matrix.
+*
+* @example
+* elementwiseProduct(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,2,3]]));
+* // Matrix_([[1,4,9], [4,10,18]])
+*/
+Matrix_.elementwiseProduct = function(X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('first input must be a matrix');
 	}
-	if (!(b instanceof Matrix_)) {
-		throw new Error('b must be a matrix');
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
 	}
 	
-	// Checks
-	if (a.nbColumns !== b.nbRows) {
-		throw new Error('Matrices sizes do not match: ' + '(' + a.nbRows + ',' + a.nbColumns + 
-		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	// Ensure X,Y are compatible
+	if (!(X.nbRows === Y.nbRows && X.nbColumns === Y.nbColumns || 
+		  Y.nbRows === X.nbRows && Y.nbColumns === 1 ||
+		  Y.nbRows === 1 && Y.nbColumns === X.nbColumns)) {
+		throw new Error('input matrices sizes do not match: ' + '(' + X.nbRows + ',' + X.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
 	}
 	
 	// Result matrix allocation
-	var obj = allocateMatrix_(a.nbRows, b.nbColumns, out);
+	var obj = allocateMatrix_(X.nbRows, X.nbColumns, out);
+	
+	// Computation of X.*Y
+	if (X.nbRows === Y.nbRows && X.nbColumns === Y.nbColumns) { // full matrix elementwise product
+		for (var i = 0; i < obj.nbRows; ++i) {
+			for (var j = 0; j < obj.nbColumns; ++j) {
+				obj.data[i * obj.nbColumns + j] = X.data[i * X.nbColumns + j] * Y.data[i * Y.nbColumns + j];
+			}
+		}
+	}
+	else if (Y.nbRows === X.nbRows && Y.nbColumns === 1) { // row matrix elementwise product
+		for (var i = 0; i < obj.nbRows; ++i) {
+			var y_i = Y.data[i];
+			
+			for (var j = 0; j < obj.nbColumns; ++j) {
+				obj.data[i * obj.nbColumns + j] = X.data[i * X.nbColumns + j] * y_i;
+			}
+		}
+	}
+	else if (Y.nbRows === 1 && Y.nbColumns === X.nbColumns) { // column matrix elementwise product
+		for (var i = 0; i < obj.nbRows; ++i) {
+			for (var j = 0; j < obj.nbColumns; ++j) {
+				obj.data[i * obj.nbColumns + j] = X.data[i * X.nbColumns + j] * Y.data[j];
+			}
+		}
+	}
+	
+	// Return the computed matrix
+    return obj;
+};
 
-	// Computation of A*B product in IKJ format, cache aware
-	for (var i = 0; i < a.nbRows; ++i) {
-		for (var j = 0; j < b.nbColumns; ++j) {
+
+/**
+* @function axy
+*
+* @summary Returns the product of a matrix with a real number and with another matrix.
+*
+* @description This function computes a*X*Y, the product of a n by m matrix X with a real number a
+* and with another m by p matrix Y.
+*
+* @param {number} a a real number.
+* @param {Matrix_} X a n by m matrix.
+* @param {Matrix_} Y a m by p matrix.
+* @param {Matrix_} out an optional n by p matrix.
+* @return {Matrix_} the matrix a*X*Y, either stored in the matrix out or in a new matrix, a n by p matrix.
+*
+* @example
+* axy(Matrix_(1, [[1,2,3], [4,5,6]]), Matrix_([[1,1], [2,2], [3,3]]));
+* // Matrix_([[14,14], [32,32]])
+*/
+Matrix_.axy = function(a, X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('third input must be a matrix');
+	}
+	
+	// Checks
+	if (X.nbColumns !== Y.nbRows) {
+		throw new Error('matrices sizes do not match: ' + '(' + X.nbRows + ',' + Y.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
+	}
+	
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbRows, Y.nbColumns, out);
+
+	// Computation of a*X*Y product in IKJ format, cache aware
+	for (var i = 0; i < X.nbRows; ++i) {
+		for (var j = 0; j < Y.nbColumns; ++j) {
 			obj.data[i * obj.nbColumns + j] = 0;
 		}
 	
-		for (var k = 0; k < a.nbColumns; ++k) {
-			var a_ik = a.data[i * a.nbColumns + k];
+		for (var k = 0; k < X.nbColumns; ++k) {
+			var a_ik = a * X.data[i * X.nbColumns + k];
 			
-			for (var j = 0; j < b.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] += a_ik * b.data[k * b.nbColumns + j];
+			for (var j = 0; j < Y.nbColumns; ++j) {
+				obj.data[i * obj.nbColumns + j] += a_ik * Y.data[k * Y.nbColumns + j];
 			}
 		}
 	}
@@ -1070,87 +1377,164 @@ Matrix_.product = function(a, b, out) {
 };
 
 /**
-* @function rowColumnProduct
+* @function axty
 *
-* @summary Returns the product of a matrix row and a matrix column.
+* @summary Returns the product of a matrix with a real number and with the
+* transpose of another matrix.
 *
-* @description This function computes the product A(i,:) * B(:,j) of the i-th row
-* of the matrix A with the j-th column of the matrix B, where A is a n by m matrix
-* and B is a m by p matrix.
+* @description This function computes a*X*Y^t, the product of a n by m matrix X
+* with a real number a and with the transpose of another p by m matrix Y.
 *
-* @param {Matrix_} A a n by m matrix.
-* @param {number} i the row index of the matrix A, a natural integer belonging to 1..n.
-* @param {Matrix_} B a m by p matrix.
-* @param {number} j the column index of the matrix B, a natural integer belonging to 1..m.
-* @return {number} the product A(i,:) * B(:,j), a real number.
+* @param {number} a a real number.
+* @param {Matrix_} X a n by m matrix.
+* @param {Matrix_} Y a p by m matrix.
+* @param {Matrix_} out an optional n by p matrix.
+* @return {Matrix_} the matrix a*X*Y^t, either stored in the matrix out or in a new matrix, a n by p matrix.
 *
 * @example
-* rowColumnProduct(Matrix_([[1,2,3], [4,5,6]]), 1, Matrix_([[1,1], [2,2], [3,3]]), 1);
-* // 14
+* axty(Matrix_(1, [[1,2,3], [4,5,6]]), Matrix_([[1,2,3], [1,2,3]]));
+* // Matrix_([[14,14], [32,32]])
 */
-Matrix_.rowColumnProduct = function(a, i, b, j) {
-	// Ensure a,b are matrices
-	if (!(a instanceof Matrix_)) {
-		throw new Error('a must be a matrix');
+Matrix_.axty = function(a, X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
 	}
-	if (!(b instanceof Matrix_)) {
-		throw new Error('b must be a matrix');
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('third input must be a matrix');
 	}
 	
 	// Checks
-	if (a.nbColumns !== b.nbRows) {
-		throw new Error('Matrices sizes do not match: ' + '(' + a.nbRows + ',' + a.nbColumns + 
-		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	if (X.nbColumns !== Y.nbColumns) {
+		throw new Error('matrices sizes do not match: ' + '(' + X.nbRows + ',' + Y.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
 	}
 	
-	// Bounds check for a
-	if (i < 1 || i > a.nbRows) {
-		throw new Error(
-		'index out of bounds when getting matrix row, (' + i + 
-		') in size (' + a.nbRows + ',' + a.nbColumns + ')');
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbRows, Y.nbRows, out);
+
+	// Computation of a*X*Y product in IJK format due to Y being used in
+	// transposed form
+    for (var i = 0; i < X.nbRows; ++i) {
+        for (var j = 0; j < Y.nbRows; ++j) {
+            obj.data[i * obj.nbColumns + j] = 0;
+            
+            for (var k = 0; k < X.nbColumns; ++k) {
+                obj.data[i * obj.nbColumns + j] += X.data[i * X.nbColumns + k] * Y.data[j * Y.nbColumns + k];
+            }
+            
+            obj.data[i * obj.nbColumns + j] = a * obj.data[i * obj.nbColumns + j];
+        }
+    }
+	
+	// Return the computed matrix
+    return obj;
+};
+
+
+/**
+* @function atxy
+*
+* @summary Returns the product of the transpose of a matrix with a real number 
+* and with another matrix.
+*
+* @description This function computes a*X^t*Y, the product of the transpose of 
+* a m by n matrix X with a real number a and with another m by p matrix Y.
+*
+* @param {number} a a real number.
+* @param {Matrix_} X a m by n matrix.
+* @param {Matrix_} Y a m by p matrix.
+* @param {Matrix_} out an optional n by p matrix.
+* @return {Matrix_} the matrix a*X^t*Y, either stored in the matrix out or in a new matrix, a n by p matrix.
+*
+* @example
+* atxy(Matrix_(1, [[1,4], [2,5], [3,6]]), Matrix_([[1,1], [2,2], [3,3]]));
+* // Matrix_([[14,14], [32,32]])
+*/
+Matrix_.atxy = function(a, X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('third input must be a matrix');
 	}
 	
-	// Bounds check for b
-	if (j < 1 || j > b.nbRows) {
-		throw new Error(
-		'index out of bounds when getting matrix column, (' + j + 
-		') in size (' + b.nbRows + ',' + b.nbColumns + ')');
+	// Checks
+	if (X.nbRows !== Y.nbRows) {
+		throw new Error('matrices sizes do not match: ' + '(' + X.nbRows + ',' + Y.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
 	}
-	
-	// Computation of <A(i,:))/B(:,j)>
-	var rowColProd = 0;
-	for (var k = 0; k < a.nbColumns; ++k) {
-		rowColProd += a.data[(i-1) * a.nbColumns + k] * b.data[k * b.nbColumns + (j-1)]; 
+
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbColumns, Y.nbColumns, out);
+
+	// Computation of a*X*Y product in KIJ format due to X being used in
+	// transposed form
+    // First k loop unrolled to initialize the matrix with zeros
+	var k = 0;
+	for (var i = 0; i < X.nbColumns; ++i) {
+		var a_ik = a * X.data[k * X.nbColumns + i];
+		
+		for (var j = 0; j < Y.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 0;
+		}
+
+		for (var j = 0; j < Y.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] += a_ik * Y.data[k * Y.nbColumns + j];
+		} 
 	}
-	
-	// Return the computed value
-	return rowColProd;
+    for (var k = 1; k < X.nbRows; ++k) {
+        for (var i = 0; i < X.nbColumns; ++i) {
+            var a_ik = a * X.data[k * X.nbColumns + i];
+			
+            for (var j = 0; j < Y.nbColumns; ++j) {
+                obj.data[i * obj.nbColumns + j] += a_ik * Y.data[k * Y.nbColumns + j];
+            } 
+        }
+    }
+
+	// Return the computed matrix
+    return obj;
 };
 
 
 /**
 * @function diagonal
 *
-* @summary Returns a diagonal matrix constructed from an array of numbers.
+* @summary Returns a diagonal matrix constructed from a vector.
 *
-* @description This function computes a diagonal square matrix (a_ij),i=1..n,j=1..n from an array arr of n real numbers, 
-* with coefficients a_ij satisfying a_ij = 0, i <> j and a_ij = arr[i-1], i==j.
+* @description This function computes a diagonal square matrix (a_ij),i=1..n,j=1..n from 
+* a vector vec of n elements, with coefficients a_ij satisfying a_ij = 0, i <> j and a_ij = vec_i1, i==j.
 *
-* @param {Array<number>} x an array of real numbers of size n.
-* @return {Matrix_} a n by n diagonal matrix with its diagonal elements corresponding to the elements of x.
+* @param {Matrix_} x a n by 1 matrix.
+* @param {Matrix_} out an optional n by n matrix.
+* @return {Matrix_} a n by n diagonal matrix with its diagonal elements corresponding to the elements of x,
+* either stored in the matrix out or in a new matrix.
 *
 * @example
-* diagonal([1,2,3]);
+* diagonal(Matrix_([1,2,3]));
 * // == Matrix_([[1,0,0], [0,2,0], [0,0,3]])
 */
-Matrix_.diagonal = function(arr) {
+Matrix_.diagonal = function(x, out) {
 	// Checks
-	if (!(arr instanceof Array)) {
-		throw new Error('arr must be an array');
+	if (!(x instanceof Matrix_) || !x.isVector()) {
+		throw new Error('first input must be a vector');
 	}
 
+	// Result matrix allocation
+	var obj = allocateMatrix_(x.nbRows, x.nbRows, out);
+	
 	// Result matrix computation
-	return Matrix_.fillSymetric(arr.length, function(i,j) { if (i == j) { return arr[i-1]; } else { return 0; } });
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 0;
+		}
+		obj.data[i * obj.nbColumns + i] = x.data[i * x.nbColumns];
+	}
+	
+	// Return the computed matrix
+    return obj;
 };
 
 
@@ -1168,20 +1552,22 @@ Matrix_.diagonal = function(arr) {
 * @param {function(number, number): number} fct the function to call on each (i,j) pair of indexes with j >= i,
 * which should take 2 arguments: row index i=1..n, column index j=i..n and which
 * should return a number, which will be inserted into the matrix as its a_ij coefficient.
-* @return {Matrix_} a n by n symetric matrix with its elements computed by the fonction fct.
+* @param {Matrix_} out an optional n by n matrix.
+* @return {Matrix_} a n by n symetric matrix with its elements computed by the fonction fct,
+* either stored in the matrix out or in a new matrix..
 *
 * @example
 * fillSymetric(2, function(i,j) { return 0; });
 * // == Matrix_([[0,0], [0,0]])
 */
-Matrix_.fillSymetric = function(n, fct) {
+Matrix_.fillSymetric = function(n, fct, out) {
 	// Checks
 	if (n < 1) {
 		throw new Error('input number of rows and columns out of bounds: ' + n);
 	}
 	
 	// Result matrix allocation
-	var obj = allocateMatrix_(n, n);
+	var obj = allocateMatrix_(n, n, out);
 	
 	// Computation of the elements of the matrix
 	for (var i = 0; i < obj.nbRows; ++i) {
@@ -1211,13 +1597,15 @@ Matrix_.fillSymetric = function(n, fct) {
 * @param {function(number, number): number} fct the function to call on each (i,j) pair of indexes,
 * which should take 2 arguments: row index i=1..n, column index j=i..n and which
 * should return a number, which will be inserted into the matrix as its a_ij coefficient.
-* @return {Matrix_} a n by m matrix with its elements computed by the fonction fct.
+* @param {Matrix_} out an optional n by m matrix.
+* @return {Matrix_} a n by m matrix with its elements computed by the fonction fct,
+* either stored in the matrix out or in a new matrix..
 *
 * @example
 * fill(2, 2, function(i,j) { return 0; });
 * // == Matrix_([[0,0], [0,0]])
 */
-Matrix_.fill = function(n, m, fct) {
+Matrix_.fill = function(n, m, fct, out) {
 	// Checks
 	if (n < 1) {
 		throw new Error('input number of rows out of bounds: ' + n);
@@ -1227,7 +1615,7 @@ Matrix_.fill = function(n, m, fct) {
 	}
 	
 	// Result matrix allocation
-	var obj = allocateMatrix_(n, m);
+	var obj = allocateMatrix_(n, m, out);
 	
 	// Computation of the elements of the matrix
 	for (var i = 0; i < obj.nbRows; ++i) {
@@ -1258,7 +1646,18 @@ Matrix_.fill = function(n, m, fct) {
 * // Matrix_([[0,0], [0,0], [0,0]])
 */
 Matrix_.zeros = function(n, m) {
-	return Matrix_.fill(n, m, function(i,j) { return 0; });	
+	// Result matrix allocation
+	var obj = allocateMatrix_(n, m);
+	
+	// Result matrix computation
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 0;
+		}
+	}
+	
+	// Return the computed matrix
+    return obj;	
 
 }
 
@@ -1279,7 +1678,18 @@ Matrix_.zeros = function(n, m) {
 * // Matrix_([[1,1], [1,1], [1,1]])
 */
 Matrix_.ones = function(n, m) {
-	return Matrix_.fill(n, m, function(i,j) { return 1; });	
+	// Result matrix allocation
+	var obj = allocateMatrix_(n, m);
+	
+	// Result matrix computation
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 1;
+		}
+	}
+	
+	// Return the computed matrix
+    return obj;
 }
 
 
@@ -1299,7 +1709,19 @@ Matrix_.ones = function(n, m) {
 * // Matrix_([[1,0,0], [0,1,0], [0,0,1]])
 */
 Matrix_.identity = function(n) {
-	return Matrix_.fillSymetric(n, function(i,j) { if (i == j) { return 1; } else { return 0; } });
+	// Result matrix allocation
+	var obj = allocateMatrix_(n, n);
+	
+	// Result matrix computation
+	for (var i = 0; i < obj.nbRows; ++i) {
+		for (var j = 0; j < obj.nbColumns; ++j) {
+			obj.data[i * obj.nbColumns + j] = 0;
+		}
+		obj.data[i * obj.nbColumns + i] = 1;
+	}
+	
+	// Return the computed matrix
+    return obj;
 }
 
 
@@ -1319,31 +1741,8 @@ Matrix_.identity = function(n) {
 * // Matrix_([[1],[4],[9]])
 */
 Matrix_.vectorHadamardProduct = function(x, y) {
-	// Ensure x,y are vectors
-	if (!x.isVector()) {
-		throw new Error('first argument must be a vector');
-	}
-	if (!y.isVector()) {
-		throw new Error('second argument must be a vector');
-	}
-
-	// Checks
-	if (x.nbRows !== y.nbRows) {
-		throw new Error('Vectors sizes do not match: ' + '(' + x.nbRows + ') - ' + '(' + y.nbRows + ')');
-	}
-	
-	// Result matrix allocation
-	var obj = allocateMatrix_(x.nbRows, 1);
-	
-	// Computation of x*y product
-	for (var i = 0; i < x.nbRows; ++i) {
-		for (var j = 0; j < y.nbRows; ++j) {
-			obj.data[i] = x.data[i] * y.data[i];
-		}
-	}
-	
-	// Return the vector
-    return obj;
+	// Delegate the computations to the internal function.
+	return Matrix_.elementwiseProduct(x, y);
 }
 
 
@@ -1409,7 +1808,7 @@ Matrix_.vectorDotProduct = function(x, y) {
 * - R is an m by n matrix
 * - A = QR
 * - Q is an orthogonal matrix, with a determinant equals to 1 (i.e., a rotation)
-* - R is an upper triangular matrix
+* - R is an upper triangular matrix, that is, its bottom (m−n) rows consist entirely of zeroes
 *
 * @example
 * qrDecomposition(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
@@ -1466,20 +1865,20 @@ Matrix_.qrDecomposition = function(a) {
 	}
 
 
+	// Checks
+	if (a.nbRows < a.nbColumns) {
+		throw new Error('matrix has more columns than rows: ' + '(' + a.nbRows + ') v.s. ' + '(' + a.nbColumns + ')');
+	}
+
 	// Initializations
 	var m = a.nbRows;
 	var n = a.nbColumns;
 
-	// Checks
-	if (m < n) {
-		throw new Error('matrix has more columns than rows: ' + '(' + m + ') v.s. ' + '(' + n + ')');
-	}
-	
 	// Create a copy of A so that it is not overwritten
-	var rr = new Matrix_(a); // Represents R
+	var rr = new Matrix_(a); // represents R
 	
 	// Create the matrix that will hold Q
-	var qq = Matrix_.identity(m); // Represents Q
+	var qq = Matrix_.identity(m); // represents Q
 	
 	// Core of the algorithm
 	for (var j = 1; j <= n; ++j) {
@@ -1530,112 +1929,162 @@ Matrix_.qrDecomposition = function(a) {
 *
 * @description TODO
 * 
-* @see <a href="https://www.sciencedirect.com/science/article/pii/002437959090207S">Hanke, M. and Niethammer, W. [1990], On the acceleration of Kaczmarz’smethod for inconsistent linear systems, Linear Algebra and its Applications 130, 83–98.</a>
+* @see <a href="https://doi.org/10.1016/j.matcom.2004.01.021">Constantin Popa and Rafal Zdunek. 2004. Kaczmarz extended algorithm for tomographic image reconstruction from limited-data. Math. Comput. Simul. 65, 6 (May 2004), 579-598.</a>
 *
 * @param {Matrix_} A an m by n matrix, with m >= n.
-* @param {Matrix_} b an m by 1 column matrix (e.g., a vector).
+* @param {Matrix_} b an m by 1 matrix (e.g., a vector).
 * @param {object} opt the optional parameters for the algorithm.
-* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-16.
-* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
-* @return {<Matrix_} an n by 1 column matrix x^* (e.g., a vector) satisfying the following properties:
+* @param {number} opt.epsAbs the tolerance parameter for the convergence of the algorithm on the absolute error between two iterates, a strictly positive real number; defaults to 1e-14.
+* @param {number} opt.epsRel the tolerance parameter for the convergence of the algorithm on the relative error between two iterates, a strictly positive real number; defaults to 1e-12.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 10000.
+* @return {<Matrix_} an n by 1 matrix x^* (e.g., a vector) satisfying the following properties:
 * - If the linear system of equations Ax = b is square with A invertible, then x^* is the unique solution of this system
-* - If the linear system of equations Ax = b is overdetermined and consistent (i.e., b belongs to Range(A)), then x^* is the minimum euclidian norm solution of the least square problem min ||Ax - b||
-* - If the linear system of equations Ax = b is overdetermined and inconsistent (i.e., b does not belong to Range(A)), then x^* is a solution of the least square problem min ||Ax - b||
+* - If the linear system of equations Ax = b is overdetermined and consistent (i.e., b belongs to Range(A)), then x^* is the minimum euclidian norm solution of the least square problem min ||Ax - b||_2
+* - If the linear system of equations Ax = b is overdetermined and inconsistent (i.e., b does not belong to Range(A)), then x^* is the minimum euclidian norm solution of the least square problem min ||Ax - b||_2
 *
 * @example
 * linsolveKaczmarz(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
 * // XX
 */
+
+// Kaczmarz Extended Algorithm for Tomographic Image Reconstruction from Limited-Data, algorithm KE, formulas 58-60 
 Matrix_.linsolveKaczmarz = function(A, b, opt) {
 	// Decode options
 	if (opt === undefined) {
 		opt = {};
 	}
-	var eps = opt.eps || 1e-16;
+	var epsAbs = opt.epsAbs || 1e-14;
+	var epsRel = opt.epsRel || 1e-12;
 	var maxIterations = opt.maxIter || 10000;
 	
 	// ------
 	
-	// Ensure a,b are matrices
+	// Misc. checks
 	if (!(A instanceof Matrix_)) {
-		throw new Error('a must be a matrix');
+		throw new Error('first input must be a matrix');
 	}
 	if (!(b instanceof Matrix_)) {
-		throw new Error('b must be a matrix');
+		throw new Error('second input must be a matrix');
 	}
 	
-	// Checks
-	if (A.nbColumns !== b.nbRows) {
-		throw new Error('Matrices sizes do not match: ' + '(' + A.nbRows + ',' + A.nbColumns + 
+	if (A.nbRows !== b.nbRows) {
+		throw new Error('matrix and second member sizes do not match: ' + '(' + A.nbRows + ',' + A.nbColumns + 
 		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
 	}
 	if (b.nbColumns !== 1) {
 		throw new Error('b is not a vector: ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
 	}
+	if (A.nbRows < A.nbColumns) {
+		throw new Error('matrix has more columns than rows: ' + '(' + A.nbRows + ') v.s. ' + '(' + A.nbColumns + ')');
+	}	
+
+	// ------
 	
 	// Initializations
 	var m = A.nbRows;
 	var n = A.nbColumns;
-	var x_km = new Matrix_.zeros(n, 1); // the previous iteration solution vector; x in the algorithm 2.1 of the reference
-	var x_k = new Matrix_.zeros(n, 1); // the current iteration solution vector; u in the algorithm 2.1 of the reference
+	var x_km = new Matrix_.zeros(n, 1); // the previous solution vector
+	var x_k = new Matrix_.zeros(n, 1); // the current solution vector
+	var y_k = Matrix_.copy(b); // the current projection of b on the hyperplanes generated by the columns of A	
+	var b_k = Matrix_.copy(b); // the current difference betwen b abd y_k
 	
-	// Checks
-	if (m < n) {
-		throw new Error('matrix has more columns than rows: ' + '(' + m + ') v.s. ' + '(' + n + ')');
-	}
+	// ------
 	
 	// Preliminary computation of the squares of the 2-norms of the rows of A
 	var a_rows_two_norm_sq = new Array(m);
 	for (var i = 1; i <= m; ++i) {
 		var a_i_two_norm = A.vectorNorm('two', 'row', i);
-		a_rows_two_norm_sq[i-1] = a_i_two_norm * a_i_two_norm;
+		if (a_i_two_norm <= Number.EPSILON) {
+			a_rows_two_norm_sq[i-1] = 0; // for all practical purposes, this row of A is null
+		}
+		else {
+			a_rows_two_norm_sq[i-1] = a_i_two_norm * a_i_two_norm;
+		}
 	}
 	
-	// Main loop until convergence, guaranteed as per theorem 3.1 of the reference
+	// Preliminary computation of the squares of the 2-norms of the columns of A
+	var a_columns_two_norm_sq = new Array(n);
+	for (var j = 1; j <= n; ++j) {
+		var alpha_j_two_norm = A.vectorNorm('two', 'column', j);
+		if (alpha_j_two_norm <= Number.EPSILON) {
+			a_columns_two_norm_sq[j-1] = 0; // for all practical purposes, this column of A is null
+		}
+		else {
+			a_columns_two_norm_sq[j-1] = alpha_j_two_norm * alpha_j_two_norm;
+		}
+	}
+	
+	// ------
+	// Main loop until convergence, guaranteed as per formula 64 of the reference.	
 	var iter = 0;
-	var converged = false;
 	var delta_x = new Matrix_.zeros(n, 1); // the delta vector (current iteration solution vector minus previous iteration solution vector)
-	while (!converged) {
+	while (true) {
+		// Update the number of iterations
+		++iter;
+
+		// Check the number of iterations
+		if (maxIterations !== -1 && iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+		
+		// Cycle through the n columns of A and orthogonally project the current iterate y_k onto
+		// the hyperplanes generated by the columns A(:,j), j=1..n, c.f. formula 58 of the reference.
+		for (var j = 1; j <= n; ++j) {
+			// Limit case: skip the projection in case the current column of A is null
+			if (a_columns_two_norm_sq[j-1] == 0) {
+			    continue;
+			}
+			
+			// Compute <A(:,j)/y_k>
+			var a_j_y_k = 0;
+			for (var i = 1; i <= m; ++i) {
+				a_j_y_k += A.data[(i-1) * A.nbColumns + (j-1)] * y_k.data[(i-1) * y_k.nbColumns];
+			}
+			
+			// Update y_k: y_k = y_k - <A(:,j)/y_k>/||A(:,j)||_2^2 * A(:,j)
+			for (var i = 1; i <= m; ++i) {
+				y_k.data[(i-1) * y_k.nbColumns] -= a_j_y_k / a_columns_two_norm_sq[j-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+			}
+		}
+		
+		// Update b, c.f. formula 59 of the reference.
+		b_k = Matrix_.axpby(1, b, -1, y_k, b_k);
+		
 		// Cycle through the m rows of A and orthogonally project the current iterate x_k onto
-		// the solution hyperplane of <A(i,:)/x_k> = b_i, i=1..m.
+		// the solution hyperplane of <A(i,:)/x_k> = b_i, i=1..m, c.f. formula 60 of the reference.
 		for (var i = 1; i <= m; ++i) {
 			// Limit case: skip the projection in case the current row of A is null
 			if (a_rows_two_norm_sq[i-1] == 0) {
 			    continue;
 			}
 			
-			// Compute r, c.f. algorithm 2.1 of the reference: r = b(i) - <A(i,:)/x_k>
-			var r = b.data[(i-1) * b.nbColumns] - Matrix_.rowColumnProduct(A, i, x_k, 1);
-			
-			// Update x_k, c.f. algorithm 2.1 of the reference: x_k = x_k + r/||A(i,:)||_2^2 * A(i,:)
+			// Compute r_k = <A(i,:)/x_k> - b_k(i)
+			var a_i_x_k = 0;
 			for (var j = 1; j <= n; ++j) {
-				x_k.data[(j-1) * x_k.nbColumns] += r / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+				a_i_x_k += A.data[(i-1) * A.nbColumns + (j-1)] * x_k.data[(j-1) * x_k.nbColumns];
+			}
+			var r_k = a_i_x_k - b_k.data[(i-1) * b.nbColumns];
+			
+			// Update x_k: x_k = x_k - r_k/||A(i,:)||_2^2 * A(i,:)
+			for (var j = 1; j <= n; ++j) {
+				x_k.data[(j-1) * x_k.nbColumns] -= r_k / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
 			}
 		}
 		
-		// Check the convergence conditions: 
-		// - Absoute error: ||x_k - x_km||_abs <= eps 
-		// - Relative error ||x_k - x_km||_abs / ||x_k||_abs <= eps
-		delta_x = Matrix_.axpby(1, x_k, -1, x_km, delta_x);
-		
-		var delta_x_inf_norm = delta_x.vectorNorm('infinity');
-		var x_k_inf_norm = x_k.vectorNorm('infinity');
-		if (delta_x_inf_norm <= eps && delta_x_inf_norm <= eps * x_k_inf_norm) {
-			converged = true;
+		// Convergence conditions (not in the references, but usual condition for convergent sequences): 
+		// - Absolute error: ||x_k - x_km||_inf <= epsAbs
+		// - Relative error: ||x_k - x_km||_inf <= epsRel * ( 1 + ||x_k||_inf)
+		var delta_x_inf_norm = Matrix_.axpby(1, x_k, -1, x_km, delta_x).vectorNorm('infinity');
+		if (delta_x_inf_norm <= epsAbs && delta_x_inf_norm <= epsRel * (1 + x_k.vectorNorm('infinity'))) {
+			break;
 		}
 		
 		// Prepare the next iteration
 		// Update the previous iteration solution vector to the current iteration solution vector: x_km = x_k
 		x_km = Matrix_.copy(x_k, x_km);
-		
-		// Update the number of iterations
-		++iter;
-		
-		// Check the number of iterations
-		if (iter > maxIterations) {
-			throw new Error('maximum number of iterations reached: ' + maxIterations);
-		}
 	}
+	
+	// ------
 	
 	// Return the computed solution
 	return x_k;
@@ -2877,69 +3326,440 @@ function sampleCovariance_(x, y) {
  */
 
 /* Start Wrapper private methods - Unit tests usage only */
-self.simplexRationalGirdSearch_ = function(fct, n, k) { return simplexRationalGirdSearch_(fct, n, k); }
+self.lpsolveAffineScaling_ = lpsolveAffineScaling_;
 /* End Wrapper private methods - Unit tests usage only */
  
  
-/**
-* @function simplexRationalGirdSearch_
-*
-* @summary Compute the point(s) minimizing a real-valued arbitrary function of several real variables
-* defined on the unit simplex, using an exhaustive search algorithm on a grid made of rational points belonging to the unit simplex.
-*
-* @description This function returns the list of points x = (x_1,...,x_n) belonging to the unit simplex of R^n which 
-* minimize an arbitrary real-valued function fct of n real variables defined on the unit simplex of R^n, 
-* using an exhaustive search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the reference.
-
-* To be noted that per lemma 1 of the reference, the number of points on such a rational grid is equal to
-* factorial(n + k - 1) / (factorial(k - 1) * factorial(n)), i.e., binomial(n+k-1, n-1), 
-* so that this method can be of limited use, even for small n.
-*
-* For instance, n=5 and k=100 already result in 4598126 points on which to evaluate fct.
-*
-* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
-*
-* @param {function} fct a real-valued function of n real variables defined on the unit simplex of R^n, 
-* which must take as first input argument an array of n real numbers corresponding to a point on the unit simplex of R^n 
-* and which must return as output a real number.
-* @param {number} n the number of variables of the function fct, natural integer superior or equal to 1.
-* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function fct, a natural integer superior or equal to 1.
-* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to a point of R^n 
-* minimizing the function fct on the k-th rational grid of the unit simplex of R^n.
-*
-*/
-function simplexRationalGirdSearch_(fct, n, k) {
-	// Initialize the current minimum value and the current list of associated grid points
-	var minValue = Number.MAX_VALUE;
-	var minValueGridPoints = [];
-
-	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference.
-	var sampler = new simplexDeterministicRationalSampler_(n, k);
-	var weights = sampler.sample();
-	while (weights !== null) {  
-		// Evaluate the function fct at the current grid point
-		var fctValue = fct(weights);
-	  
-		// If the function value at the current grid point is lower than the current minimum value, this value
-		// becomes the new minimum value and the current grid point becomes the new (unique for now) associated grid point.
-		if (fctValue < minValue) {
-			minValue = fctValue;
-			minValueGridPoints = [weights];
-		}
-		// In case of equality of the function value at the current grid point with the current minimum value, 
-		// the current grid point is added to the list of grid points associated to the current minimum value.
-		else if (fctValue == minValue) {
-			minValueGridPoints.push(weights);
-		}
-		// Otherwise, nothing needs to be done
-		
-		// Generate a new grid point
-		weights = sampler.sample();
+ // c,x n cost vector; x vector unknows
+// b m; RHS of constraints
+// A m n, m constraints matrix;  m constraints, n variables  
+// Because the optimal solutions to linear programs reside on the boundary of the feasible region, interior point algorithms cannot move to the exact optimal solution
+// * @see <a href="https://link.springer.com/article/10.1007/BF01840454">Robert J. Vanderbei; Meketon, Marc; Freedman, Barry (1986). "A Modification of Karmarkar's Linear Programming Algorithm" (PDF). Algorithmica. 1: 395–407.</a>
+// * @see <a href="https://link.springer.com/article/10.1007/BF02592024">Barnes, E.R. A variation on Karmarkar’s algorithm for solving linear programming problems. Mathematical Programming (1986) 36: 174.</a>
+// * @see <a href="https://link.springer.com/article/10.1007/BF01582276">Vanderbei, R.J. Affine-scaling for linear programs with free variables. Mathematical Programming (1989) 43: 31.</a>
+// * @see <a href="https://link.springer.com/article/10.1007%2FBF02592206">Monteiro, R.D.C.; Tsuchiya, T.; Wang, Y.; A simplified global convergence proof of the affine scaling algorithm. Mathematical Programming (1996) 75: 77.</a>
+function lpsolveAffineScaling_(A, b, c, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var epsRelOptimality = opt.eps || 1e-12;
+	var epsAbsInfeasibility = 1e-14; // Note: must be agressive with this one, to avoid false positives
+	var epsAbsFeasibility = 1e-10; // Note: beware with these, as problem can easily be marked as infeasible if too agressive
+	var epsRelFeasibility = 1e-08; 
+	var t = opt.t || 0.666666666666;
+	var maxIterations = opt.maxIter || 10000;
+	
+	// ------
+	
+	// Misc. checks
+	if (!(A instanceof Matrix_)) {
+		throw new Error('first input must be a matrix');
+	}
+	if (!(b instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	if (!(c instanceof Matrix_)) {
+		throw new Error('third input must be a matrix');
+	}
+	if (A.nbRows > A.nbColumns) {
+		throw new Error('first input matrix has more rows than columns: ' + '(' + A.nbColumns + ') v.s. ' + '(' + A.nbRows + ')');
+	}
+	if (A.nbRows !== b.nbRows) {
+		throw new Error('first and second inputs number of rows do not match: ' + A.nbRows + '-' + b.nbRows);
+	}
+	if (A.nbColumns !== c.nbRows) {
+		throw new Error('first input number of columns and third input number of rows do not match: ' + A.nbColumns + '-' + c.nbRows);
 	}
 	
-	// Return the list of grid points associated to the minimum value of fct
-	return minValueGridPoints;
+	// ------
+
+	// Initializations
+	var m = A.nbRows;
+	var n = A.nbColumns;
+	var fctVal = Number.MAX_VALUE;
+	var b_inf_norm = b.vectorNorm('infinity');
+	var x_k = Matrix_.ones(A.nbColumns, 1); // the solution vector; initial value such that x_0 > 0
+	var tx_k = x_k.transpose(); // the transpose of the solution vector
+	var ad_k = Matrix_.zeros(m, n); // the rescaled matrix
+	var p_k = Matrix_.zeros(m, 1); // the degree of primal feasibility
+	var r_k = Matrix_.zeros(n, 1); // the reduced costs vector
+	var d_k_r_k = Matrix_.zeros(n, 1); // ??
+	var z_k = Matrix_.zeros(n, 1); // the affine scaling direction/step direction
+	
+	// ------
+		
+	// Main loop of the algorithm.
+	//
+	// This algorithm is proved to converge under the following assumptions for 0 < t <= 2/3, 
+	// c.f. the fourth reference assumptions 1-4 and theorem 3.3:
+	// - Rank A = m (if A is rank-deficient, either there are redundant constraints or the problem is infeasible)
+	// - The linear function <x/c> is not constant on the feasible region (TODO: isn't this catched by the algorithm ?)
+	// - The feasible region has a non-empty interior
+	// - The problem has an optimal solution
+	var iter = 0;
+	while (true) {
+		// Update the number of iterations
+		++iter;
+
+		// Check the number of iterations
+		if (iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+
+		// Compute the objective function value (not in the references)
+		fctVal = Matrix_.vectorDotProduct(c, x_k);
+
+		// The scaling matrix D_k will never be computed, and
+		// operations using it will be transformed into element wise
+		// matrix products.
+
+		// Preliminary computation of the rescaled matrix A*D_k
+		tx_k = x_k.transpose(tx_k);
+		ad_k = Matrix_.elementwiseProduct(A, tx_k, ad_k);
+		
+		// ------
+		
+		// Phase 1 - Primal interior feasibility checks/repair on x_k, c.f. the algorithm
+		// of the section 3 of the third reference:
+		// - Primal feasibility of x_k: A*x_k == b <=> ||A*x_k - b||_inf == 0
+		// - Interiority of x_k: x_k > 0
+		//
+		// To be noted that the primal affine scaling algorithm theoretically 
+		// guarantees that the sequence (x_k)_k=1.. is always primal feasible if x_0 is,
+		// c.f. for instance proposition 2.3 of the fourth reference.
+		//
+		// Unfortunately, due to round off errors, this might not be the case
+		// in practice, so that this condition must be tested on each iteration
+		// for the proper convergence of the algorithm.
+		//
+		// To also be noted that there should not be such an issue with the interiority,
+		// thanks to the update formula for x_k.
+		//
+		// The algorithm below is described in the section 3 of the third reference,
+		// with sign differences due to the sign of p_k above, which is the opposite of 
+		// the sign of rho_k.
+		p_k = Matrix_.axpby(1, Matrix_.product(A, x_k), -1, b, p_k); // degree of primal feasibility
+		if (p_k.vectorNorm('infinity') > epsAbsFeasibility || p_k.vectorNorm('infinity') > epsRelFeasibility * (1 + b_inf_norm)) {
+			// Compute w_k = (A*D_k^2*A^t)^-1*p_k
+		    //
+		    // This is equivalent to solving the linear system (A*D_k)*(A*D_k)^t w_k = p_k (1)
+		    // ---
+		    // Compute the lhs of the linear system (1)
+		    var lhs = Matrix_.axty(1, ad_k, ad_k);
+
+		    // Compute the rhs of the linear system (1)
+		    var rhs = p_k;
+		        
+            // Solve the linear system (1)
+            var w_k = Matrix_.linsolveKaczmarz(lhs, rhs, {maxIter: -1});			
+            // ---
+          
+		    // Compute r_k = A^t*w_k
+		    r_k = Matrix_.atxy(1, A, w_k, r_k);
+		    
+		    // Compute ??
+			d_k_r_k = Matrix_.elementwiseProduct(r_k, x_k, d_k_r_k);
+		 	
+			// Compute the affine scaling direction
+			z_k = Matrix_.elementwiseProduct(d_k_r_k, x_k, z_k);
+		 	
+			// Stopping/infeasibility conditions, c.f. section 3 of the third reference.
+			var gamma = d_k_r_k.vectorNorm('infinity'); // degree of complementary slackness
+			var delta = -r_k.min(); // degree of dual feasibility
+			var beta = Matrix_.vectorDotProduct(p_k, w_k);
+			if (gamma + delta * x_k.max() < epsAbsInfeasibility / n) { // the problem is infeasible
+				return [null, null, 1];
+			}
+			else if (gamma < t) { // the problem is feasible, the next iteration will be a phase 2 iteration
+				// The update of the current solution computes a primal feasible and strictly interior point.
+				x_k = Matrix_.axpby(1, x_k, -1, z_k, x_k);
+			}
+			else { // progress is made, the next iteration will be a phase 1 iteration
+				// Prepare the next iteration: update of the current solution x_k+1 = x_k - t/gamma * z_k
+				x_k = Matrix_.axpby(1, x_k, -t/gamma, z_k, x_k);
+			}
+				
+			// In all cases, continue to the next iteration
+			continue;
+		}
+		else if (!x_k.isPositive()) {
+			throw new Error('interiority lost for the sequence of iterates at iteration: ' + iter + ', with value: ' + x_k.toString());
+		}
+		
+
+		// ------
+		
+		// Phase 2 - "Real" affine scaling algorithm
+		//
+		// The algorithm below is described in formula 12 of the fourth reference.
+		
+		// Compute the dual variables vector w_k = (A*D_k^2*A^t)^-1 * A*D_k^2*c
+		//
+		// This is equivalent to solving the linear system (A*D_k*(A*D_k)^t) w_k = A*D_k*D_k*c (2)
+		// ---		
+		// Compute the lhs of the linear system (2)
+		var lhs = Matrix_.axty(1, ad_k, ad_k);
+
+		// Compute the rhs of the linear system (2)
+		var rhs = Matrix_.product(ad_k, Matrix_.elementwiseProduct(c, x_k)); 
+			
+		// Solve the linear system (1)
+		var w_k = Matrix_.linsolveKaczmarz(lhs, rhs, {maxIter: -1});
+		// ---
+		
+		// Compute the reduced costs vector r_k = c - A^t*w_k
+		r_k = Matrix_.axpby(1, c, -1, Matrix_.atxy(1, A, w_k), r_k);
+		
+		// Compute ??
+		d_k_r_k = Matrix_.elementwiseProduct(r_k, x_k, d_k_r_k);
+		
+		// Optimality condition, c.f. proposition 6 of the first reference
+		// and step B.6 of the third reference.
+		var gamma = d_k_r_k.vectorNorm('infinity'); // degree of complementary slackness
+		var delta = -r_k.min(); // degree of dual feasibility
+		if (gamma + delta * x_k.max() < epsRelOptimality / n * (1 + Math.abs(fctVal))) { // an approximate optimal interior point has been found
+			return [x_k, fctVal, 0];
+		}
+
+		// Other conditions, c.f. proposition 1 of the first reference:
+		// - If D_k*r_k == 0, every feasible point is optimal (TODO: constant objective value catch ???)
+		// - If D_k*r_k <= 0 and D_k*r_k <> 0, the problem is unbounded (TODO: test, OR  is it  < 0 ??)
+		if (gamma <= Number.EPSILON) { // every feasible point is optimal
+			return [x_k, fctVal, 2];
+		}
+		if (d_k_r_k.isNonPositive()) { // the problem is unbounded
+			return [null, Number.NEGATIVE_INFINITY, 3];
+		}
+		
+		// Prepare the next iteration:
+		// - Compute the affine scaling direction/step direction
+		// - Update the current solution x_k+1 = x_k - t * D_k^2*r_k / ||D_k * r_k||_inf
+		z_k = Matrix_.elementwiseProduct(d_k_r_k, x_k, z_k);
+		x_k = Matrix_.axpby(1, x_k, -t/gamma, z_k, x_k);
+	}
+
+	
+	
+	
+	
+	
+	
+	
+	// * See Vander book for phase 2
+	function phaseOne(A, b, c, eps, t, maxIterations) {
+		// Initializations
+		var m = A.nbRows;
+		var n = A.nbColumns;
+		var x_k = Matrix_.ones(n, 1); // the solution vector, with initial value such that x_0 > 0
+		var d_k = Matrix_.zeros(n, n); // the (diagonal) scaling matrix
+		var p_k = Matrix_.zeros(m, 1); // the degree of primal feasibility
+		var r_k = Matrix_.zeros(n, 1); // the reduced costs vector
+		var d_k_r_k = Matrix_.zeros(n, 1); // ??
+		var z_k = Matrix_.zeros(n, 1); // the affine scaling direction/step direction
+		
+		// Main loop of the algorithm, implemented following the description of the second reference.
+		//
+		// This algorithm is proved to converge under the following assumptions for 0 < t <= 2/3, 
+		// c.f. the fourth reference assumptions 1-4 and theorem 3.3:
+		// - Rank A = m (if A is rank-deficient, either there are redundant constraints or the problem is infeasible)
+		// - The linear function <x/c> is not constant on the feasible region (TODO: isn't this catched by the algorithm ?)
+		// - The feasible region has a non-empty interior
+		// - The problem has an optimal solution
+		var iter = 0;
+		var converged = false;
+		var convergenceCode = -1;
+		while (!converged) {
+			// Update the number of iterations
+			++iter;
+
+			// Check the number of iterations
+			if (iter > maxIterations) {
+				throw new Error('maximum number of iterations reached: ' + maxIterations);
+			}
+			
+			// Compute the degree of primal feasibility
+			// Note, the sign of p_k is the opposite of the sign of rho_k in the algorithm
+			// of the section 3 of the third reference, which changes the computation of z_k below
+			p_k = Matrix_.axpby(1, Matrix_.product(A, x_k), -1, b, p_k); 
+			
+			// Compute the scaling matrix D_k
+		    d_k = Matrix_.diagonal(x_k, d_k);
+
+		    // Compute w_k = (A*D_k^2*A^t)^-1*p_k
+		    //
+		    // This is equivalent to solving the linear system (A*D_k^2*A^t) w_k = p_k (1)
+		    // ---
+		    // Preliminary computation of the rescaled matrix A*D_k
+		    var ad_k = Matrix_.product(A, d_k);
+		        
+		    // Compute the lhs of the linear system (1)
+		    var lhs = Matrix_.product(ad_k, ad_k.transpose());
+
+		    // Compute the rhs of the linear system (1)
+		    var rhs = p_k;
+		        
+            // Solve the linear system (1)
+            var w_k = Matrix_.linsolveKaczmarz(lhs, rhs);			
+            // ---
+            
+		    // Compute r_k = A^t*w_k
+		    var r_k = Matrix_.product(A.transpose(), w_k, r_k);
+		    
+		    // Compute ??
+			d_k_r_k = Matrix_.product(d_k, r_k, d_k_r_k);
+			
+			// Compute the affine scaling direction
+			z_k = Matrix_.product(d_k, d_k_r_k, z_k);
+			
+			// Stopping/infeasibility conditions, c.f. section 3 of the third reference.
+			var gamma = d_k_r_k.vectorNorm('infinity'); // degree of complementary slackness
+			var delta = -r_k.min(); // degree of dual feasibility
+			var beta = Matrix_.vectorDotProduct(p_k, w_k);
+			if (gamma + delta * x_k.max() < eps / n) {
+				converged = true;
+				convergenceCode = 1;
+				x_k = null;
+		        break;
+			}
+			else if (gamma < t) {
+				converged = true;
+				convergenceCode = 0;
+				x_k = Matrix_.axpby(1, x_k, -1, z_k, x_k);
+				break;
+			}
+
+		    // Prepare the next iteration:
+			// - Update the current solution x_k+1 = x_k - t/gamma * z_k
+			x_k = Matrix_.axpby(1, x_k, -t/gamma, z_k, x_k);
+		}
+
+        // Return the computed feasible vector
+        return [x_k, convergenceCode];
+	}
+	
+
+	// TODO: more epsilons
+	function phaseTwo(A, b, c, x_0, eps, t, maxIterations) {
+		// TODO: Check that x_0 is feasible: A*x_0 = b and x_0 > 0
+
+		// Initializations
+		var m = A.nbRows;
+		var n = A.nbColumns;
+		var x_k = Matrix_.copy(x_0); // the solution vector
+		var fctVal = Number.MAX_VALUE;
+		var d_k = Matrix_.zeros(n, n); // the (diagonal) scaling matrix
+		//var p_k = Matrix_.zeros(m, 1); // the degree of primal feasibility
+		var r_k = Matrix_.zeros(n, 1); // the reduced costs vector
+		var d_k_r_k = Matrix_.zeros(n, 1); // ??
+		var z_k = Matrix_.zeros(n, 1); // the affine scaling direction/step direction
+		
+		// Main loop of the algorithm, implemented following the description of the second reference.
+		//
+		// This algorithm is proved to converge under the following assumptions for 0 < t <= 2/3, 
+		// c.f. the fourth reference assumptions 1-4 and theorem 3.3:
+		// - Rank A = m (if A is rank-deficient, either there are redundant constraints or the problem is infeasible)
+		// - The linear function <x/c> is not constant on the feasible region (TODO: isn't this catched by the algorithm ?)
+		// - The feasible region has a non-empty interior
+		// - The problem has an optimal solution
+		var iter = 0;
+		var converged = false;
+		var convergenceCode = -1;
+		while (!converged) {
+			// Initializations of the loop variables
+			var primalFeasible = false;
+
+			// Update the number of iterations
+			++iter;
+
+			// Check the number of iterations
+			if (iter > maxIterations) {
+				throw new Error('maximum number of iterations reached: ' + maxIterations);
+			}
+			
+		    // Primal feasibility conditions (not in the references):
+			// - A*x_k == b <=> ||A*x_k - b||_inf == 0
+			// - x_k >= 0
+			//
+			// The primal affine scaling algorithm theoretically guarantees that the sequence x_k is primal feasible,
+			// c.f. for instance proposition 2.3 of the fourth reference.
+			//
+			// Nevertheless, due to round off errors, this might not be the case, so that this condition must be tested
+			// for the convergence of the algorithm.
+			// p_k = Matrix_.axpby(1, Matrix_.product(A, x_k), -1, b, p_k);
+			//if (p_k.vectorNorm('infinity') <= eps && x_k.isNonNegative()) {
+				primalFeasible = true;
+			//}
+			
+			// Compute the objective function value (not in the references)
+			fctVal = Matrix_.vectorDotProduct(c, x_k);
+		
+			// Compute the scaling matrix D_k
+		    d_k = Matrix_.diagonal(x_k, d_k);
+
+		    // Compute the dual variables vector w_k = (A*D_k^2*A^t)^-1 * A*D_k^2*c
+		    //
+		    // This is equivalent to solving the linear system (A*D_k^2*A^t) w_k = A*D_k^2*c,
+		    // equivalent to (A*D_k*(A*D_k)^t) w_k = A*D_k*D_k*c (1)
+		    // ---
+		    // Preliminary computation of the rescaled matrix A*D_k
+		    var ad_k = Matrix_.product(A, d_k);
+		        
+		    // Compute the lhs of the linear system (1)
+		    var lhs = Matrix_.product(ad_k, ad_k.transpose());
+
+		    // Compute the rhs of the linear system (1)
+		    var rhs = Matrix_.product(ad_k, Matrix_.product(d_k, c));
+		        
+            // Solve the linear system (1)
+            var w_k = Matrix_.linsolveKaczmarz(lhs, rhs);
+            // ---
+            
+		    // Compute the reduced costs vector r_k = c - A^t*w_k
+		    var r_k = Matrix_.axpby(1, c, -1, Matrix_.product(A.transpose(), w_k), r_k);
+		    
+		    // Compute ??
+			d_k_r_k = Matrix_.product(d_k, r_k, d_k_r_k);
+
+			// Optimality condition, c.f. proposition 6 of the first reference
+			// and step B.6 of the third reference.
+			var gamma = d_k_r_k.vectorNorm('infinity'); // degree of complementary slackness
+			var delta = -r_k.min(); // degree of dual feasibility
+			if (primalFeasible && gamma + delta * x_k.max() < eps / n * (1 + Math.abs(fctVal))) {
+				converged = true;
+				convergenceCode = 0;
+		        break;
+			}
+
+			// Other conditions, c.f. proposition 1 of the first reference:
+			// - If D_k*r_k == 0, every feasible point is optimal (TODO: constant objective value catch ???)
+			// - If D_k*r_k <= 0 and D_k*r_k <> 0, the problem is unbounded (TODO: test, OR  is it  < 0 ??)
+		    if (primalFeasible && gamma <= Number.EPSILON) {
+				converged = true;
+				convergenceCode = 1;
+				break;
+			}
+			else if (primalFeasible && d_k_r_k.isNonPositive()) {
+				converged = true;
+				convergenceCode = 2;
+				fctVal = Number.NEGATIVE_INFINITY;
+				break;
+			}
+		    
+		    // Prepare the next iteration:
+			// - Compute the affine scaling direction/step direction
+			// - Update the current solution x_k+1 = x_k - t * D_k^2*r_k / ||D_k * r_k||_inf
+			z_k = Matrix_.product(d_k, d_k_r_k, z_k);
+			x_k = Matrix_.axpby(1, x_k, -t/gamma, z_k, x_k);
+		}
+
+        // Return the computed variables vector, plus the computed minimal objective function value
+        return [x_k, fctVal, convergenceCode];
+	}
+
+	
 }
+
 
 
 /**
@@ -2952,6 +3772,7 @@ function simplexRationalGirdSearch_(fct, n, k) {
 self.simplexRationalRounding_ = simplexRationalRounding_;
 self.simplexRandomSampler_ = simplexRandomSampler_;
 self.simplexDeterministicRationalSampler_ = simplexDeterministicRationalSampler_;
+self.simplexRationalGirdSearch_ = simplexRationalGirdSearch_;
 /* End Wrapper private methods - Unit tests usage only */
 
 
@@ -3164,6 +3985,66 @@ function simplexRationalRounding_(x, r) {
 
 	// Return the computed point
 	return xr;
+}
+
+/**
+* @function simplexRationalGirdSearch_
+*
+* @summary Compute the point(s) minimizing a real-valued arbitrary function of several real variables
+* defined on the unit simplex, using an exhaustive search algorithm on a grid made of rational points belonging to the unit simplex.
+*
+* @description This function returns the list of points x = (x_1,...,x_n) belonging to the unit simplex of R^n which 
+* minimize an arbitrary real-valued function fct of n real variables defined on the unit simplex of R^n, 
+* using an exhaustive search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the reference.
+
+* To be noted that per lemma 1 of the reference, the number of points on such a rational grid is equal to
+* factorial(n + k - 1) / (factorial(k - 1) * factorial(n)), i.e., binomial(n+k-1, n-1), 
+* so that this method can be of limited use, even for small n.
+*
+* For instance, n=5 and k=100 already result in 4598126 points on which to evaluate fct.
+*
+* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
+*
+* @param {function} fct a real-valued function of n real variables defined on the unit simplex of R^n, 
+* which must take as first input argument an array of n real numbers corresponding to a point on the unit simplex of R^n 
+* and which must return as output a real number.
+* @param {number} n the number of variables of the function fct, natural integer superior or equal to 1.
+* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function fct, a natural integer superior or equal to 1.
+* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to a point of R^n 
+* minimizing the function fct on the k-th rational grid of the unit simplex of R^n.
+*
+*/
+function simplexRationalGirdSearch_(fct, n, k) {
+	// Initialize the current minimum value and the current list of associated grid points
+	var minValue = Number.POSITIVE_INFINITY;
+	var minValueGridPoints = [];
+
+	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference.
+	var sampler = new simplexDeterministicRationalSampler_(n, k);
+	var weights = sampler.sample();
+	while (weights !== null) {  
+		// Evaluate the function fct at the current grid point
+		var fctValue = fct(weights);
+	  
+		// If the function value at the current grid point is lower than the current minimum value, this value
+		// becomes the new minimum value and the current grid point becomes the new (unique for now) associated grid point.
+		if (fctValue < minValue) {
+			minValue = fctValue;
+			minValueGridPoints = [weights];
+		}
+		// In case of equality of the function value at the current grid point with the current minimum value, 
+		// the current grid point is added to the list of grid points associated to the current minimum value.
+		else if (fctValue == minValue) {
+			minValueGridPoints.push(weights);
+		}
+		// Otherwise, nothing needs to be done
+		
+		// Generate a new grid point
+		weights = sampler.sample();
+	}
+	
+	// Return the list of grid points associated to the minimum value of fct
+	return minValueGridPoints;
 }
 
 /**

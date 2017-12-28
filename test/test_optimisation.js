@@ -5,28 +5,20 @@ QUnit.module('Optimisation internal module', {
   }
 });
 
-  
-QUnit.test('Simplex rational grid search computation', function(assert) {    
-	// Test using static data
-	{
-		// f(x,y) = x, min must be at [0,1]
-		assert.deepEqual(PortfolioAllocation.simplexRationalGirdSearch_(function(arr) { return arr[0]; }, 2, 10), [[0,1]], 'Simplex rational grid search Test #1');
-	}
-	
-	// Test using static data
-	{
-		// f(x,y) = y, min must be at [1,0]
-		assert.deepEqual(PortfolioAllocation.simplexRationalGirdSearch_(function(arr) { return arr[1]; }, 2, 10), [[1,0]], 'Simplex rational grid search Test #2');
-	}
-	
-	// Test using static data
-	{
-		// f(x,y) = x + y, min must be at all points in [0,1]
-		assert.deepEqual(PortfolioAllocation.simplexRationalGirdSearch_(function(arr) { return arr[0] + arr[1]; }, 2, 10), 
-		                 [[1,0],[0.9,0.1],[0.8,0.2],[0.7,0.3],[0.6,0.4],[0.5,0.5],[0.4,0.6],[0.3,0.7],[0.2,0.8],[0.1,0.9],[0,1]], 
-						 'Simplex rational grid search Test #3');
-	}
+/*
+QUnit.test('Linear programming solver - Primal Affine Scaling', function(assert) {    
 
-	
+  var A = new PortfolioAllocation.Matrix([[1, -1, 1, 0], [0, 1, 0, 1]]);
+  var b = new PortfolioAllocation.Matrix([[15], [15]]);
+  var c = new PortfolioAllocation.Matrix([[-2], [1], [0], [0]]);
+  console.log(A.toString())
+  console.log(b.toString())
+  console.log(c.toString())
+  
+  var gg = PortfolioAllocation.lpsolveAffineScaling_(A, b, c, {maxIter: 10000});
+  console.log(gg[2]);
+  console.log(gg[1]);
+  console.log(gg[0].toString());
 
 });
+*/

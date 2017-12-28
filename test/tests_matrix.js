@@ -98,26 +98,46 @@ QUnit.test('Matrix-matrix product', function(assert) {
   // Test matrix-matrix product using static data
   var mat1 = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
   var mat2 = new PortfolioAllocation.Matrix([[1,2], [2,4], [3,6]]);
-  var prodMat = PortfolioAllocation.Matrix.product(mat1, mat2);
 
+  var prodMat = PortfolioAllocation.Matrix.product(mat1, mat2);
   var expectedResMat = new PortfolioAllocation.Matrix([[14,28], [32,64]]);
   assert.equal(PortfolioAllocation.Matrix.areEqual(prodMat, expectedResMat), true, 'Matrix-matrix product');
+
+  var axyMat = PortfolioAllocation.Matrix.axy(2, mat1, mat2);
+  var expectedResMat = new PortfolioAllocation.Matrix([[28,56], [64, 128]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(axyMat, expectedResMat), true, 'Matrix-matrix AXY');
+
+  var mat3 = mat1.transpose();
+  var atxyMat = PortfolioAllocation.Matrix.atxy(2, mat3, mat2);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(atxyMat, expectedResMat), true, 'Matrix-matrix ATXY');
+
+  var mat4 = mat2.transpose();
+  var axtyMat = PortfolioAllocation.Matrix.axty(2, mat1, mat4);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(axtyMat, expectedResMat), true, 'Matrix-matrix AXTY');
   
   // TODO: use random data
 });
 
-QUnit.test('Matrix row - column product', function(assert) {    
-  // Test matrix row - column product using static data
+
+QUnit.test('Matrix-matrix elementwise product', function(assert) {    
+  // Test matrix-matrix elementwise product using static data
   var mat1 = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
-  var mat2 = new PortfolioAllocation.Matrix([[1,2], [2,4], [3,6]]);
-  var expectedResMat = new PortfolioAllocation.Matrix([[14,28], [32,64]]);
-  
-  for (var i = 1; i <= mat1.nbRows; ++i) {
-	  for (var j = 1; j <= mat2.nbColumns; ++j) {
-			assert.equal(PortfolioAllocation.Matrix.rowColumnProduct(mat1, i, mat2, j), expectedResMat.getValueAt(i,j), 'Matrix row - column product #(' + i + "," + j + ")");
-	  }
-  }
-  
+  var mat2 = new PortfolioAllocation.Matrix([[1,2,3]]);
+  var mat3 = new PortfolioAllocation.Matrix([[1],[4]]);
+  var mat4 = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
+
+  var prodMat = PortfolioAllocation.Matrix.elementwiseProduct(mat1, mat2);
+  var expectedResMat = new PortfolioAllocation.Matrix([[1,4,9], [4,10,18]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(prodMat, expectedResMat), true, 'Matrix-matrix elementwise product - Row matrix');
+
+  var prodMat = PortfolioAllocation.Matrix.elementwiseProduct(mat1, mat3);
+  var expectedResMat = new PortfolioAllocation.Matrix([[1,2,3], [16,20,24]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(prodMat, expectedResMat), true, 'Matrix-matrix elementwise product - Column matrix');
+
+  var prodMat = PortfolioAllocation.Matrix.elementwiseProduct(mat1, mat4);
+  var expectedResMat = new PortfolioAllocation.Matrix([[1,4,9], [16,25,36]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(prodMat, expectedResMat), true, 'Matrix-matrix elementwise product - Full matrix');
+
   // TODO: use random data
 });
 
@@ -136,6 +156,44 @@ QUnit.test('Matrix to string', function(assert) {
   // Test matrix to string using static data
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,10]]);
   assert.equal(mat.toString(), '[  1  2  3 ]\n[  4  5 10 ]\n', 'Matrix to string');
+});
+
+
+QUnit.test('Marix negativity and positivity functions', function(assert) {    
+  // Test using static data
+  {
+	  var nothingMat = new PortfolioAllocation.Matrix([[-1,2,3], [4,5,10]]);
+	  var posMat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,10]]);
+	  var negMat = new PortfolioAllocation.Matrix([[-1,-2,-3], [-4,-5,-10]]);
+	  var nonNegMat = new PortfolioAllocation.Matrix([[0,2,3], [4,5,10]]);
+	  var nonPosMat = new PortfolioAllocation.Matrix([[0,-2,-3], [-4,-5,-10]]);
+	  
+	  assert.equal(posMat.isNonNegative(), true, 'Marix negativity and positivity - Test #1/1');
+	  assert.equal(posMat.isPositive(), true, 'Marix negativity and positivity - Test #1/2');
+	  assert.equal(posMat.isNonPositive(), false, 'Marix negativity and positivity - Test #1/3');
+	  assert.equal(posMat.isNegative(), false, 'Marix negativity and positivity - Test #1/4');
+	  
+	  assert.equal(nonNegMat.isNonNegative(), true, 'Marix negativity and positivity - Test #2/1');
+	  assert.equal(nonNegMat.isPositive(), false, 'Marix negativity and positivity - Test #2/2');
+	  assert.equal(nonNegMat.isNonPositive(), false, 'Marix negativity and positivity - Test #2/3');
+	  assert.equal(nonNegMat.isNegative(), false, 'Marix negativity and positivity - Test #2/4');  
+	  
+	  assert.equal(nothingMat.isNonNegative(), false, 'Marix negativity and positivity - Test #3/1');
+	  assert.equal(nothingMat.isPositive(), false, 'Marix negativity and positivity - Test #3/2');
+	  assert.equal(nothingMat.isNonPositive(), false, 'Marix negativity and positivity - Test #3/3');
+	  assert.equal(nothingMat.isNegative(), false, 'Marix negativity and positivity - Test #3/4');
+	  
+	  assert.equal(negMat.isNonNegative(), false, 'Marix negativity and positivity - Test #4/1');
+	  assert.equal(negMat.isPositive(), false, 'Marix negativity and positivity - Test #4/2');
+	  assert.equal(negMat.isNonPositive(), true, 'Marix negativity and positivity - Test #4/3');
+	  assert.equal(negMat.isNegative(), true, 'Marix negativity and positivity - Test #4/4');
+
+	  assert.equal(nonPosMat.isNonNegative(), false, 'Marix negativity and positivity - Test #5/1');
+	  assert.equal(nonPosMat.isPositive(), false, 'Marix negativity and positivity - Test #5/2');
+	  assert.equal(nonPosMat.isNonPositive(), true, 'Marix negativity and positivity - Test #5/3');
+	  assert.equal(nonPosMat.isNegative(), false, 'Marix negativity and positivity - Test #5/4');
+  }
+
 });
 
 
@@ -163,7 +221,7 @@ QUnit.test('Matrix to array', function(assert) {
 
 QUnit.test('Diagonal matrix creation', function(assert) {    
   // Test using static data
-  var mat = PortfolioAllocation.Matrix.diagonal([1,2,3]);
+  var mat = PortfolioAllocation.Matrix.diagonal(new PortfolioAllocation.Matrix([1,2,3]));
   var expectedMat = new PortfolioAllocation.Matrix([[1,0,0], [0,2,0], [0,0,3]]);
   assert.deepEqual(mat.toArray(), expectedMat.toArray(), 'Diagonal matrix creation');
 });
@@ -345,6 +403,18 @@ QUnit.test('Matrix norms computation', function(assert) {
   // TODO: Test random data
 });
 
+QUnit.test('Matrix minimum and maximum values computation', function(assert) {    
+  // Test using static data  
+  {
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,2,8]]);
+      var expectedMinVal = -3;
+	  var expectedMaxVal = 8;
+
+      assert.equal(mat.min(), expectedMinVal, 'Matrix minimum computation #1');
+	  assert.equal(mat.max(), expectedMaxVal, 'Matrix maximum computation #1');
+  }
+});
+
 QUnit.test('Matrix vector norms computation', function(assert) {    
   // Unsupported norm
   {
@@ -370,7 +440,7 @@ QUnit.test('Matrix vector norms computation', function(assert) {
 });
 
 
-QUnit.test('Matrix row norms computation', function(assert) {    
+QUnit.test('Matrix row/columns norms computation', function(assert) {    
   // Unsupported norm
   {
       var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4], [0,2,8]]);
@@ -385,11 +455,22 @@ QUnit.test('Matrix row norms computation', function(assert) {
       var expectedRowsNorm1 = [15, 12, 0];
       var expectedRowsNormInf = [7, 6, 0];
       var expectedRowsNorm2 = [Math.sqrt(3*3 + 5*5 + 7*7), Math.sqrt(2*2 + 6*6 +4*4), 0];
-
+	  
 	  for(var i = 0; i < mat.nbRows; ++i) {
 		assert.equal(mat.vectorNorm('one', 'row', i+1), expectedRowsNorm1[i], 'Matrix row 1-norm computation');
 		assert.equal(mat.vectorNorm('infinity', 'row', i+1), expectedRowsNormInf[i], 'Matrix row infinity-norm computation');
-		assert.equal(Math.abs(mat.vectorNorm('two', 'row', i+1) - expectedRowsNorm2[i]) <= 1e-15, true, 'Matrix row 2-norm computation');
+		assert.equal(Math.abs(mat.vectorNorm('two', 'row', i+1) - expectedRowsNorm2[i]) <= 1e-14, true, 'Matrix row 2-norm computation');
+	  }
+	  
+	  
+      var expectedColumnsNorm1 = [5, 11, 11];
+      var expectedColumnsNormInf = [3, 6, 7];
+      var expectedColumnsNorm2 = [Math.sqrt(3*3 + 2*2), Math.sqrt(5*5 + 6*6), Math.sqrt(7*7 + 4*4)];
+	  
+	  for(var j = 0; j < mat.nbColumns; ++j) {
+		assert.equal(mat.vectorNorm('one', 'column', j+1), expectedColumnsNorm1[j], 'Matrix column 1-norm computation');
+		assert.equal(mat.vectorNorm('infinity', 'column', j+1), expectedColumnsNormInf[j], 'Matrix column infinity-norm computation');
+		assert.equal(Math.abs(mat.vectorNorm('two', 'column', j+1) - expectedColumnsNorm2[j]) <= 1e-14, true, 'Matrix column 2-norm computation');
 	  }
   }
   
@@ -397,7 +478,7 @@ QUnit.test('Matrix row norms computation', function(assert) {
 });
 
 
-QUnit.test('Matrix linear system solving via Kaczmarz algorithms', function(assert) {    
+QUnit.test('Linear system solver - Kaczmarz algorithm', function(assert) {    
   // Limit case: null matrix; in this case, the least square solution is null as well
   {
 	  var A = new PortfolioAllocation.Matrix([[0,0,0], [0,0,0], [0, 0, 0]]);
@@ -416,9 +497,43 @@ QUnit.test('Matrix linear system solving via Kaczmarz algorithms', function(asse
       var expectedX = new PortfolioAllocation.Matrix([1, -2, -2]);
 
 	  var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
-	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #2');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #2');
   }
   
+  // Reference: Tanabe, K.: An algorithm for the constrained maximization in nonlinear programming, Research Memorandum No. 31, The Institute of Statistical Mathematics, 1969.
+  // Test using static data
+  {
+	// Problem 1
+	var A = new PortfolioAllocation.Matrix([[-3.2, 2.9, 1.6, 0.1], [0.0, -1.1, 2.3, 1.0], [5.1, 4.8, 0.2, 4.9], [2.0, 1.1, 1.9, -2.9]]);
+	var b = new PortfolioAllocation.Matrix([1.4, 2.2, 15.0, 2.1]);
+	var expectedX = new PortfolioAllocation.Matrix([1, 1, 1, 1]);
+	
+	var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #3');
+	
+	
+	// Problem 4
+	var A = new PortfolioAllocation.Matrix([[1, 3, 2, -1], [1, 2, -1, -2], [1, -1, 	2, 3], [2, 1, 1, 1], [5, 5, 4, 1], [4, -1, 5, 7]]);
+	var b = new PortfolioAllocation.Matrix([5, 0, 5, 5, 15, 15]);
+	// To be noted that the true solution in the reference is [1, 1, 1, 1], with A*x - b == 0 and ||x||_2 == 2
+	// The expected solution below verifies ||A*x - b||_inf ~= 1e-13, but ||x||_2 ~= 1.96, which is less than 2, hence why it is preferred to the true solution.
+	var expectedX = new PortfolioAllocation.Matrix([1.1538461538462281, 0.7692307692307582, 1.153846153846079, 0.7692307692307796]);
+
+	var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #4');
+	
+	
+	// Problem 6
+	var A = PortfolioAllocation.Matrix.fill(84, 84, function(i,j) { if (i == j) { return 6; } else if (j == i+1) { return 1; } else if (i == j+1) { return 8; } else { return 0;} });
+	var b = PortfolioAllocation.Matrix.fill(84, 1, function(i,j) { if (i == 1) { return 7; } else if (i == 84) { return 14; } else { return 15;} });
+	// To be noted that the true solution in the reference is [1, ..., 1], with A*x - b == 0 and ||x||_2 ~> 9.16
+	// The expected solution below verifies ||A*x - b||_inf ~= 1e-13, but ||x||_2 ~> 9.15, which is less than 9.16, hence why it is preferred to the true solution.
+	// To also be noted that the solution in the reference is almost the same as the expected solution below.
+	var expectedX = new PortfolioAllocation.Matrix([1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999996, 1.0000000000000004, 0.9999999999999996, 1.0000000000000004, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999999,                  1,                  1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999998, 1.0000000000000002, 0.9999999999999992,  1.000000000000001, 0.9999999999999987,  1.000000000000002, 0.9999999999999974, 1.0000000000000024, 0.9999999999999983, 0.9999999999999991,  1.000000000000007, 0.9999999999999785, 1.0000000000000522, 0.9999999999998842, 1.0000000000002456, 0.9999999999994922,  1.000000000001035, 0.9999999999979075, 1.0000000000042115,  0.999999999991547, 1.0000000000169387, 0.9999999999660868, 1.0000000000678653, 0.9999999998642277, 1.0000000002715892,  0.999999999456776, 1.0000000010864951, 0.9999999978269619, 1.0000000043461248,  0.999999991307702, 1.0000000173846435,  0.999999965230667, 1.0000000695387083,  0.999999860922549, 1.0000002781549087, 0.9999994436902785, 1.0000011126189468, 0.9999977747641977,  1.000004450463144, 0.9999910991076416, 1.0000178016489207, 0.9999643972454112,  1.000071203336108, 0.9998576020201143, 1.0002847611904067, 0.9994306166966817, 1.0011382102966262, 0.9977258046468135, 1.0045394897460913, 0.9909566243489603, 1.0179443359374987, 0.9646809895833339, 1.0683593749999998, 0.8723958333333336, 1.2187499999999998, 0.7083333333333335]);
+	
+	var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #5');
+  }
   // TODO: Test random data
 });
  
