@@ -5,6 +5,19 @@ QUnit.module('Combinatorics internal module', {
   }
 });
 
+/*
+QUnit.test('Alias method sampler', function(assert) {    
+  // Test with random data
+  {
+	  var aliasSampler = new PortfolioAllocation.aliasMethodSampler_([0, 0.1, 0.4, 0.5]);
+	  console.log(aliasSampler.sample());
+	  console.log(aliasSampler.sample());
+	  console.log(aliasSampler.sample());
+	  console.log(aliasSampler.sample());
+  }
+
+});
+*/
 
 QUnit.test('Next composition computation', function(assert) {    
   // Reference: Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.

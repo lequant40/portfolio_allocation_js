@@ -275,29 +275,179 @@ QUnit.test('Transpose matrix', function(assert) {
 });
 
 
-QUnit.test('Givens QR decomposition', function(assert) {    
+QUnit.test('QR decomposition', function(assert) {    
   // Test using static data  
   {
 	  var mat = new PortfolioAllocation.Matrix([[1,2,0], [1,1,1], [2,1,0]]);
 	  
 	  // Computation of a QR decomposition
-	  var qr = PortfolioAllocation.Matrix.qrDecomposition(mat);
-	  var q = qr[0];
-	  var r = qr[1];
-	  var qqp = PortfolioAllocation.Matrix.product(q, q.transpose());  
-	  var qtimesr = PortfolioAllocation.Matrix.product(q, r);
+	  var fullQR = PortfolioAllocation.Matrix.qrDecomposition(mat);
+	  var Q = fullQR[0];
+	  var R = fullQR[1];
 	  
-	  // Expected matrices were verified with Matlab
-	  var expectedQMat = new PortfolioAllocation.Matrix([[1,4], [2,5], [3,6]]); 
-	  var expectedRMat = new PortfolioAllocation.Matrix([[1,4], [2,5], [3,6]]);
+	  var expectedQ = new PortfolioAllocation.Matrix([[0.408248290463863, 0.8616404368553292, -0.30151134457776363], 
+													  [0.408248290463863, 0.12309149097933275, 0.9045340337332908], 
+													  [0.816496580927726, -0.4923659639173309, -0.30151134457776363]]); 
+	  var expectedR = new PortfolioAllocation.Matrix([[2.449489742783178, 2.041241452319315, 0.408248290463863], 
+													  [0, 1.3540064007726602, 0.12309149097933275], 
+													  [0, 0, 0.9045340337332908]]);
 	  
-	  assert.equal(PortfolioAllocation.Matrix.areEqual(expectedQMat, expectedRMat), true, 'Givens QR decomposition');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(Q, expectedQ), true, 'QR decomposition, full - #1 1/2');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(R, expectedR), true, 'QR decomposition, full - #1 2/2');
+	  
+	  // Computation of the same QR decomposition, without Q
+	  var qLessR = PortfolioAllocation.Matrix.qrDecomposition(mat, {qLess: true});
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(qLessR, R), true, 'QR decomposition, Q less - #2');
   }
   
   // TODO: Test using random data: check Q,R dimensions, check Q*R = A, check R upper triangular, check Q orthogonal: Q*q^t = Identity (m)
   
   // TODO: Test error case
 });
+
+QUnit.test('Singular value decomposition', function(assert) {    
+  // Test using static data, m = n case
+  // Validated with Matlab
+  {
+	  var mat = new PortfolioAllocation.Matrix([[1,2,0], [1,1,1], [2,1,0]]);
+	  
+	  // Computation of a thin SVD decomposition
+	  var svd = PortfolioAllocation.Matrix.svdDecomposition(mat);
+	  var U = svd[0];
+	  var S = svd[1];
+	  var V = svd[2];
+
+	  var expectedU = new PortfolioAllocation.Matrix([[  0.6279630301995544, 0.7071067811865475, -0.3250575836718681 ], 
+													 [   0.459700843380983,                   0,  0.8880738339771154 ], 
+													 [  0.6279630301995544,  -0.7071067811865475, -0.3250575836718681 ]]);
+	  var expectedS = new PortfolioAllocation.Matrix([[  3.346065214951232,                  0,                  0 ],
+													 [                  0,                  1,                  0 ],
+													 [                  0,                  0, 0.8965754721680537 ]]);
+	  var expectedV = new PortfolioAllocation.Matrix([[   0.7004017505420329,   -0.7071067811865475, -0.09714621885413724 ],
+													 [   0.7004017505420329,  0.7071067811865475, -0.09714621885413724 ],
+													 [  0.13738550023678578,                    0,   0.9905176547264003 ]]);
+	 
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(U, expectedU), true, 'SVD decomposition, thin - #1 1/3');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(S, expectedS), true, 'SVD decomposition, thin - #1 2/3');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(V, expectedV), true, 'SVD decomposition, thin - #1 3/3');
+  }
+
+  // Test using static data, m > n case
+  // Validated with Matlab
+ {
+	  var mat = new PortfolioAllocation.Matrix([[1,0,0,2], [0,4,0,0], [0,0,0,0], [0,2,0,0], [1,1,1,1]]);
+	  
+	  // Computation of a SVD decomposition
+	  var svd = PortfolioAllocation.Matrix.svdDecomposition(mat, {svdForm: 'thin'});
+	  var U = svd[0];
+	  var S = svd[1];
+	  var V = svd[2];
+
+		var expectedU = new PortfolioAllocation.Matrix([[  0.04798852953924585,   0.8188713224171728,   -0.571967532606014,  -0.0479881585217683 ],
+														[   0.8628011158778799, -0.16687220119644658,  -0.1665169748336121,  -0.8628011914856866 ],
+														[                    0,                    0,                    0,                    0 ],
+														[  0.43140055793893994, -0.08343610059822329, -0.08325848741680605,  -0.4314005957428433 ],
+														[  0.25916190708226655,   0.5428092140960453,   0.7988699913064179, -0.25916166114085887 ]]);
+		var expectedS = new PortfolioAllocation.Matrix([[       4.60450766417069,                      0,                      0,                      0 ],
+														[                      0,     2.6436006852895395,                      0,                      0 ],
+														[                      0,                      0,      0.899935879565907,                      0 ],
+														[                      0,                      0,                      0, 1.3283077571435252e-19 ]]);
+		var expectedV = new PortfolioAllocation.Matrix([[    0.06670646658090273,     0.5150855589084856,     0.2521318061125118,     -0.816496580927726 ],
+														[     0.9931935876786804,   -0.11028586635967502,   -0.03746365005238518, -2.865163788807784e-20 ],
+														[   0.056284390424387286,    0.20532950271821954,     0.8876965675507464,     0.4082482904638631 ],
+														[    0.07712854273741816,     0.8248416150987519,   -0.38343295532572336,    0.40824829046386296 ]]);
+														
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(U, expectedU), true, 'SVD decomposition, thin - #2 1/3');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(S, expectedS), true, 'SVD decomposition, thin - #2 2/3');
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(V, expectedV), true, 'SVD decomposition, thin - #2 3/3');	  
+  }
+
+
+  // TODO: Test using random data: check dimensions, formula, properties
+  
+  // TODO: Test error case
+  /*
+  Hello all,
+
+I think that there is a bug in gsl_linalg_SV_decomp_jacobi. Given the 
+following matrix: 
+
+1 0 0 0
+0 1 0 0
+0 0 z 0
+0 0 0 1
+
+for z = 0, the singular values computed by SV_decomp_jacobi seem to be wrong:
+SV_decomp:        [ 1, 1, 1, 0]
+SV_decomp_mod:    [ 1, 1, 1, 0]
+SV_decomp_jacobi: [ 1, 1, 0, 0]
+                          ^
+                          WRONG?
+                              
+for z = 0.1 the singular values are correct but not ordered: 
+SV_decomp:        [ 1, 1, 1, 0.1]
+SV_decomp_mod:    [ 1, 1, 1, 0.1]
+SV_decomp_jacobi: [ 1, 1, 0.1, 1]
+*/
+});
+
+
+QUnit.test('Nullspace computation', function(assert) {    
+  // Test using static data, m < n case, nullspace dimension 0
+  {
+  	  var mat = new PortfolioAllocation.Matrix([[1,0,0,0], [0,1,0,0], [0,0,1,0]]);
+	  
+	  // Computation of an orthogonal basis of Ker(A)
+	  var ns = PortfolioAllocation.Matrix.nullSpace(mat);
+	  
+	  var expectedNs = new PortfolioAllocation.Matrix([0,0,0,0]);
+	  
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(ns, expectedNs), true, 'Nullspace computation, m < n - #1');
+  }
+
+  // Test using static data, m < n case, nullspace dimension 2
+  // Validated with Wolfram Alpha
+  {
+  	  var mat = new PortfolioAllocation.Matrix([[1,0,0,0,2], [0,0,3,0,0], [0,0,0,0,0], [0,2,0,0,0]]);
+	  
+	  // Computation of an orthogonal basis of Ker(A)
+	  var ns = PortfolioAllocation.Matrix.nullSpace(mat);
+	  
+	  var expectedNs = new PortfolioAllocation.Matrix([[-0.8944271909999159, 0], 
+													  [0, 0], 
+													  [0, 0],
+													  [0, -1], 
+													  [0.4472135954999579, 0]]);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(ns, expectedNs), true, 'Nullspace computation, m < n - #2');
+  }
+
+  // Test using static data, m > n case, nullspace dimension 0
+  {
+  	  var mat = new PortfolioAllocation.Matrix([[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,1], [1,1,1,1]]);
+	  
+	  // Computation of an orthogonal basis of Ker(A)
+	  var ns = PortfolioAllocation.Matrix.nullSpace(mat);
+	  
+	  var expectedNs = new PortfolioAllocation.Matrix([0,0,0,0]);
+	  
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(ns, expectedNs), true, 'Nullspace computation, m > n - #1');
+  }
+  
+  // Test using static data, m > n case, nullspace dimension 1
+  // Validated with Wolfram Alpha
+  {
+  	  var mat = new PortfolioAllocation.Matrix([[1,0,0,2], [0,4,0,0], [0,0,0,0], [0,2,0,0], [1,1,1,1]]);
+	  
+	  // Computation of an orthogonal basis of Ker(A)
+	  var ns = PortfolioAllocation.Matrix.nullSpace(mat);
+	  
+	  var expectedNs = new PortfolioAllocation.Matrix([-0.816496580927726, -2.865163788807784e-20, 0.4082482904638631, 0.40824829046386296]);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(ns, expectedNs), true, 'Nullspace computation, m > n - #2');
+  }
+  
+   // TODO: Test random data
+});
+
 
 
 QUnit.test('Determinant computation', function(assert) {    
@@ -478,14 +628,14 @@ QUnit.test('Matrix row/columns norms computation', function(assert) {
 });
 
 
-QUnit.test('Linear system solver - Kaczmarz algorithm', function(assert) {    
+QUnit.test('Linear system solver - Randomized Kaczmarz algorithm', function(assert) {    
   // Limit case: null matrix; in this case, the least square solution is null as well
   {
 	  var A = new PortfolioAllocation.Matrix([[0,0,0], [0,0,0], [0, 0, 0]]);
 	  var b = new PortfolioAllocation.Matrix([1,2,3]);
       var expectedX = new PortfolioAllocation.Matrix([0, 0, 0]);
 
-	  var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
+	  var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #1');
   }
   
@@ -496,7 +646,7 @@ QUnit.test('Linear system solver - Kaczmarz algorithm', function(assert) {
 	  var b = new PortfolioAllocation.Matrix([1,-2,0]);
       var expectedX = new PortfolioAllocation.Matrix([1, -2, -2]);
 
-	  var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
+	  var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #2');
   }
   
@@ -508,8 +658,8 @@ QUnit.test('Linear system solver - Kaczmarz algorithm', function(assert) {
 	var b = new PortfolioAllocation.Matrix([1.4, 2.2, 15.0, 2.1]);
 	var expectedX = new PortfolioAllocation.Matrix([1, 1, 1, 1]);
 	
-	var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
-	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #3');
+	var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #3');
 	
 	
 	// Problem 4
@@ -519,8 +669,8 @@ QUnit.test('Linear system solver - Kaczmarz algorithm', function(assert) {
 	// The expected solution below verifies ||A*x - b||_inf ~= 1e-13, but ||x||_2 ~= 1.96, which is less than 2, hence why it is preferred to the true solution.
 	var expectedX = new PortfolioAllocation.Matrix([1.1538461538462281, 0.7692307692307582, 1.153846153846079, 0.7692307692307796]);
 
-	var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
-	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #4');
+	var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #4');
 	
 	
 	// Problem 6
@@ -531,9 +681,19 @@ QUnit.test('Linear system solver - Kaczmarz algorithm', function(assert) {
 	// To also be noted that the solution in the reference is almost the same as the expected solution below.
 	var expectedX = new PortfolioAllocation.Matrix([1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999996, 1.0000000000000004, 0.9999999999999996, 1.0000000000000004, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999999,                  1,                  1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999998, 1.0000000000000002, 0.9999999999999992,  1.000000000000001, 0.9999999999999987,  1.000000000000002, 0.9999999999999974, 1.0000000000000024, 0.9999999999999983, 0.9999999999999991,  1.000000000000007, 0.9999999999999785, 1.0000000000000522, 0.9999999999998842, 1.0000000000002456, 0.9999999999994922,  1.000000000001035, 0.9999999999979075, 1.0000000000042115,  0.999999999991547, 1.0000000000169387, 0.9999999999660868, 1.0000000000678653, 0.9999999998642277, 1.0000000002715892,  0.999999999456776, 1.0000000010864951, 0.9999999978269619, 1.0000000043461248,  0.999999991307702, 1.0000000173846435,  0.999999965230667, 1.0000000695387083,  0.999999860922549, 1.0000002781549087, 0.9999994436902785, 1.0000011126189468, 0.9999977747641977,  1.000004450463144, 0.9999910991076416, 1.0000178016489207, 0.9999643972454112,  1.000071203336108, 0.9998576020201143, 1.0002847611904067, 0.9994306166966817, 1.0011382102966262, 0.9977258046468135, 1.0045394897460913, 0.9909566243489603, 1.0179443359374987, 0.9646809895833339, 1.0683593749999998, 0.8723958333333336, 1.2187499999999998, 0.7083333333333335]);
 	
-	var x = PortfolioAllocation.Matrix.linsolveKaczmarz(A, b);
-	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #5');
+	var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #5');
   }
+  
+  	/*var A = new PortfolioAllocation.Matrix([[    0.632810907566168,  0.07458558260068052,  0.18972932155688532,    0.368496003408602 ],
+											[  0.07458558260068052, 0.014210261176971236,  0.02239443845104238,   0.0379808829726669 ],
+											[  0.18972932155688532,  0.02239443845104238,  0.05694725645543196,    0.110387626650411 ],
+											[    0.368496003408602,   0.0379808829726669,    0.110387626650411,  0.22012749378552407 ]]);
+	var b = new PortfolioAllocation.Matrix([ 0.0034247797381810052, 0.11594559772023327,  0.002703559429703406, -0.11522437741175573 ]);
+	// cond(2-norm) =   14319829869135788.0000
+	 
+	var x = PortfolioAllocation.Matrix.linsolveRandomizedKaczmarz(A, b);
+	*/
   // TODO: Test random data
 });
  
