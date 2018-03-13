@@ -643,10 +643,8 @@ Matrix_.prototype = {
 		}
 		
 		// Normalization of the matrix
-		for (var i = 0; i < obj.nbRows; ++i) {
-			for (var j = 0; j < obj.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] = this.data[i * this.nbColumns + j] / sum; 
-			}
+		for (var k = 0; k < this.data.length; ++k) {
+			obj.data[k] = this.data[k] / sum; 
 		}
 		
 		// Return the computed matrix
@@ -873,13 +871,13 @@ Matrix_.prototype = {
     	}
 		
 		// Compute the (Givens) QR decomposition of the matrix, using only R.
-		var r = Matrix_.qrDecomposition(this, {qLess: true});
+		var R = Matrix_.qrDecomposition(this, {qLess: true});
 		
 		// By property of the Givens QR decomposition, the determinant of the matrix
 		// is then the product of the diagonal elements of the R matrix.
 		var det = 1.0;
-		for (var i = 0; i < r.nbRows; ++i) {
-		        det *= r.data[i * r.nbColumns + i];
+		for (var k = 0; k < R.data.length; k += R.nbColumns + 1) {
+		        det *= R.data[k];
 		}
 
 		// Return the computed determinant
@@ -1034,10 +1032,14 @@ Matrix_.prototype = {
 		if (p == 'one') {
             // Compute the sum of the absolute values of the elements of the matrix
 			var absSum = 0;
+			var i_m = idxStartRow * this.nbColumns; // i * this.nbColumns
 			for (var i = idxStartRow; i < idxEndRow; ++i) {
-			    for (var j = idxStartColumn; j < idxEndColumn; ++j) {
-					absSum += Math.abs(this.data[i * this.nbColumns + j]);
+			    var ij_idx = i_m + idxStartColumn;
+				for (var j = idxStartColumn; j < idxEndColumn; ++j) {
+					absSum += Math.abs(this.data[ij_idx]);
+					ij_idx++;
 				}
+				i_m += this.nbColumns;
 			}
 			return absSum;
 		}
@@ -1046,10 +1048,11 @@ Matrix_.prototype = {
 			// C.f. problem 27.5 of the second reference
 			var t = 0;
 			var s = 1;
+			var i_m = idxStartRow * this.nbColumns; // i * this.nbColumns
 			for (var i = idxStartRow; i < idxEndRow; ++i) {
-			    for (var j = idxStartColumn; j < idxEndColumn; ++j) {
-
-				    var val = this.data[i * this.nbColumns + j];
+			    var ij_idx = i_m + idxStartColumn;
+				for (var j = idxStartColumn; j < idxEndColumn; ++j) {
+				    var val = this.data[ij_idx];
 					var absVal = Math.abs(val);
 					if (absVal != 0) {
 						if (absVal > t) {
@@ -1060,17 +1063,23 @@ Matrix_.prototype = {
 							s = s + (val/t) * (val/t);
 						}
 					}
+					ij_idx++;
 				}
+				i_m += this.nbColumns;
 			}
 			return t * Math.sqrt(s);
 		}
 		else if (p == 'infinity') {
 			// Compute the largest absolute value of the elements of the matrix
 		    var maxAbsVal = 0;
+			var i_m = idxStartRow * this.nbColumns; // i * this.nbColumns
 			for (var i = idxStartRow; i < idxEndRow; ++i) {
-    		    for (var j = idxStartColumn; j < idxEndColumn; ++j) {
-					 maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[i * this.nbColumns + j]));
+    		    var ij_idx = i_m + idxStartColumn;
+				for (var j = idxStartColumn; j < idxEndColumn; ++j) {
+					 maxAbsVal = Math.max(maxAbsVal, Math.abs(this.data[ij_idx]));
+					 ij_idx++;
 				}
+				i_m += this.nbColumns;
 			}
 		    return maxAbsVal;
 		}
@@ -1123,17 +1132,106 @@ Matrix_.areEqual = function (a, b, eps) {
 	// Real checks
 	var nbRows = a.nbRows;
 	var nbColumns = a.nbColumns;
+	var nbElements = nbRows * nbColumns;
 	var tol = eps || 0;
-	for (var i = 0; i < nbRows; ++i) {
-		for (var j = 0; j < nbColumns; ++j) {
-			if (Math.abs(a.data[i * nbColumns + j] - b.data[i * nbColumns + j]) > tol) {
-				return false;
-			}
+	for (var k = 0; k < nbElements; ++k) {
+		if (Math.abs(a.data[k] - b.data[k]) > tol) {
+			return false;
 		}
 	}
-
+	
 	//
 	return true;
+};
+
+/**
+* @function xpy
+*
+* @summary Returns the addition of a matrix with another matrix.
+*
+* @description This function computes X + Y, the addition of a n by m matrix X 
+* with another n by m matrix Y.
+*
+* @param {Matrix_} X a n by m matrix.
+* @param {Matrix_} Y a n by m matrix.
+* @param {Matrix_} out an optional n by m matrix, possibly either the matrix X or the matrix Y.
+* @return {Matrix_} the matrix X + Y, either stored in the matrix out or in a new matrix, an n by m matrix.
+*
+* @example
+* xpy(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[7,8,9], [10,11,12]]));
+* // Matrix_([[8,10,12], [14,16,18]])
+*/
+Matrix_.xpy = function(X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('first input must be a matrix');
+	}
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	
+	// Ensure X,Y are compatible
+	if (X.nbColumns !== Y.nbColumns || X.nbRows !== Y.nbRows) {
+		throw new Error('input matrices sizes do not match: ' + '(' + X.nbRows + ',' + X.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
+	}
+	
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbRows, X.nbColumns, out);
+	
+	// Computation of X + Y
+	var nbElements = X.nbRows * X.nbColumns;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = X.data[k] + Y.data[k];
+	}
+	
+	// Return the computed matrix
+    return obj;
+};
+
+/**
+* @function xmy
+*
+* @summary Returns the difference of a matrix with another matrix.
+*
+* @description This function computes X - Y, the difference of a n by m matrix X 
+* with another n by m matrix Y.
+*
+* @param {Matrix_} X a n by m matrix.
+* @param {Matrix_} Y a n by m matrix.
+* @param {Matrix_} out an optional n by m matrix, possibly either the matrix X or the matrix Y.
+* @return {Matrix_} the matrix X - Y, either stored in the matrix out or in a new matrix, an n by m matrix.
+*
+* @example
+* xmy(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[7,8,9], [10,11,12]]));
+* // Matrix_([[-6,-6,-6], [-6,-6,-6]])
+*/
+Matrix_.xmy = function(X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('first input must be a matrix');
+	}
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	
+	// Ensure X,Y are compatible
+	if (X.nbColumns !== Y.nbColumns || X.nbRows !== Y.nbRows) {
+		throw new Error('input matrices sizes do not match: ' + '(' + X.nbRows + ',' + X.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
+	}
+	
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbRows, X.nbColumns, out);
+	
+	// Computation of X - Y
+	var nbElements = X.nbRows * X.nbColumns;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = X.data[k] - Y.data[k];
+	}
+	
+	// Return the computed matrix
+    return obj;
 };
 
 /**
@@ -1174,16 +1272,14 @@ Matrix_.axpby = function(a, X, b, Y, out) {
 	var obj = allocateMatrix_(X.nbRows, X.nbColumns, out);
 	
 	// Computation of aX + bY
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = a * X.data[i * X.nbColumns + j] + b*Y.data[i * Y.nbColumns + j];
-		}
+	var nbElements = X.nbRows * X.nbColumns;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = a*X.data[k] + b*Y.data[k];
 	}
 	
 	// Return the computed matrix
     return obj;
 };
-
 
 
 /**
@@ -1211,39 +1307,15 @@ Matrix_.copy = function(A, out) {
 	var obj = allocateMatrix_(A.nbRows, A.nbColumns, out);
 
 	// Copy of A into the provided out matrix
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = A.data[i * A.nbColumns + j];
-		}
+	var nbElements = A.nbRows * A.nbColumns;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = A.data[k];
 	}
 	
 	// Return the computed matrix
 	return obj;
 };
 
-
-
-/**
-* @function product
-*
-* @summary Returns the product of a matrix with another matrix.
-*
-* @description This function computes the product A*B of a matrix A with another matrix B,
-* where A is a n by m matrix and B is a m by p matrix.
-*
-* @param {Matrix_} A a n by m matrix.
-* @param {Matrix_} B a m by p matrix.
-* @param {Matrix_} out an optional n by p matrix.
-* @return {Matrix_} the matrix product A*B, either stored in the matrix out or in a new matrix, a n by p matrix.
-*
-* @example
-* product(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,1], [2,2], [3,3]]));
-* // Matrix_([[14,14], [32,32]])
-*/
-Matrix_.product = function(a, b, out) {
-	// Delegate the computations to the internal function.
-	return Matrix_.axy(1, a, b);
-};
 
 
 /**
@@ -1291,26 +1363,30 @@ Matrix_.elementwiseProduct = function(X, Y, out) {
 	var obj = allocateMatrix_(X.nbRows, X.nbColumns, out);
 	
 	// Computation of X.*Y
-	if (X.nbRows === Y.nbRows && X.nbColumns === Y.nbColumns) { // full matrix elementwise product
-		for (var i = 0; i < obj.nbRows; ++i) {
-			for (var j = 0; j < obj.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] = X.data[i * X.nbColumns + j] * Y.data[i * Y.nbColumns + j];
-			}
+	var nbRows = X.nbRows;
+	var nbColumns = X.nbColumns;
+	if (X.nbRows === Y.nbRows && X.nbColumns === Y.nbColumns) { // full matrix elementwise product	
+		var nbElements = nbRows * nbColumns;
+		for (var k = 0; k < nbElements; ++k) {
+			obj.data[k] = X.data[k] * Y.data[k];
 		}
 	}
 	else if (Y.nbRows === X.nbRows && Y.nbColumns === 1) { // row matrix elementwise product
-		for (var i = 0; i < obj.nbRows; ++i) {
+		var x_ij_idx = 0;
+		for (var i = 0; i < nbRows; ++i) {
 			var y_i = Y.data[i];
-			
-			for (var j = 0; j < obj.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] = X.data[i * X.nbColumns + j] * y_i;
+			for (var j = 0; j < nbColumns; ++j) {
+				obj.data[x_ij_idx] = X.data[x_ij_idx] * y_i;
+				x_ij_idx++;
 			}
 		}
 	}
 	else if (Y.nbRows === 1 && Y.nbColumns === X.nbColumns) { // column matrix elementwise product
-		for (var i = 0; i < obj.nbRows; ++i) {
-			for (var j = 0; j < obj.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] = X.data[i * X.nbColumns + j] * Y.data[j];
+		var x_ij_idx = 0;
+		for (var i = 0; i < nbRows; ++i) {
+			for (var j = 0; j < nbColumns; ++j) {
+				obj.data[x_ij_idx] = X.data[x_ij_idx] * Y.data[j];
+				x_ij_idx++
 			}
 		}
 	}
@@ -1319,6 +1395,152 @@ Matrix_.elementwiseProduct = function(X, Y, out) {
     return obj;
 };
 
+
+
+
+/**
+* @function xy
+*
+* @summary Returns the product of a matrix with another matrix.
+*
+* @description This function computes X*Y, the product of a n by m matrix X with another m by p matrix Y.
+*
+* @param {Matrix_} X a n by m matrix.
+* @param {Matrix_} Y a m by p matrix.
+* @param {Matrix_} out an optional n by p matrix.
+* @return {Matrix_} the matrix X*Y, either stored in the matrix out or in a new matrix, a n by p matrix.
+*
+* @example
+* xy(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,1], [2,2], [3,3]]));
+* // Matrix_([[14,14], [32,32]])
+*/
+Matrix_.xy = function(X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('first input must be a matrix');
+	}
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	
+	// Checks
+	if (X.nbColumns !== Y.nbRows) {
+		throw new Error('matrices sizes do not match: ' + '(' + X.nbRows + ',' + Y.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
+	}
+	
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbRows, Y.nbColumns, out);
+
+	// Computation of X*Y product in IKJ format
+	var n = X.nbRows;
+	var m = X.nbColumns;
+	var p = Y.nbColumns;
+	
+	var x_ik_idx = 0;
+	var i_p = 0; // == i*p
+	for (var i = 0; i < n; ++i) {
+		var obj_ij_idx = i_p;
+		for (var j = 0; j < p; ++j) {
+			obj.data[obj_ij_idx] = 0; // obj(i,j) = 0
+			obj_ij_idx++;
+		}
+	
+		var y_kj_idx = 0;
+		for (var k = 0; k < m; ++k) {
+			var x_ik = X.data[x_ik_idx]; // x(i,k)
+			
+			obj_ij_idx = i_p;
+			for (var j = 0; j < p; ++j) {
+				obj.data[obj_ij_idx] += x_ik * Y.data[y_kj_idx]; // obj(i,j) += x(i,k) * y(k,j);
+				y_kj_idx++;
+				obj_ij_idx++;
+			}
+			x_ik_idx++;
+		}
+		i_p += p;
+	}
+	
+	// Return the computed matrix
+    return obj;
+};
+
+
+/**
+* @function txy
+*
+* @summary Returns the product of the transpose of a matrix with another matrix.
+*
+* @description This function computes X^t*Y, the product of the transpose of 
+* a m by n matrix X with another m by p matrix Y.
+*
+* @param {Matrix_} X a m by n matrix.
+* @param {Matrix_} Y a m by p matrix.
+* @param {Matrix_} out an optional n by p matrix.
+* @return {Matrix_} the matrix X^t*Y, either stored in the matrix out or in a new matrix, a n by p matrix.
+*
+* @example
+* txy(Matrix_([[1,4], [2,5], [3,6]]), Matrix_([[1,1], [2,2], [3,3]]));
+* // Matrix_([[14,14], [32,32]])
+*/
+Matrix_.txy = function(X, Y, out) {
+	// Ensure X, Y are matrices
+	if (!(X instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	if (!(Y instanceof Matrix_)) {
+		throw new Error('third input must be a matrix');
+	}
+	
+	// Checks
+	if (X.nbRows !== Y.nbRows) {
+		throw new Error('matrices sizes do not match: ' + '(' + X.nbRows + ',' + Y.nbColumns + 
+		') - ' + '(' + Y.nbRows + ',' + Y.nbColumns + ')');
+	}
+
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbColumns, Y.nbColumns, out);
+
+	// Computation of X*Y product in KIJ format due to X being used in
+	// transposed form
+	var n = X.nbColumns;
+	var m = X.nbRows;
+	var p = Y.nbColumns;
+	
+	var x_ki_idx = 0;
+	var obj_ij_idx = 0;
+	
+	// First k loop unrolled to initialize the matrix with zeros
+	var k = 0;
+	for (var i = 0; i < n; ++i) {
+		var x_ki = X.data[x_ki_idx]; // x(k,i)
+		var y_kj_idx = k_p;
+		for (var j = 0; j < p; ++j) {
+			obj.data[obj_ij_idx] = x_ki * Y.data[j]; // obj(i,j) = x(k,i) *y(k,j)
+			obj_ij_idx++;
+		}
+		x_ki_idx++;
+	}
+	
+	var k_p = p; // == k*p
+    for (var k = 1; k < m; ++k) {
+        obj_ij_idx = 0;
+		for (var i = 0; i < n; ++i) {
+            var x_ki = X.data[x_ki_idx];  // x(k,i)
+			var y_kj_idx = k_p;
+			for (var j = 0; j < p; ++j) {
+                obj.data[obj_ij_idx] += x_ki * Y.data[y_kj_idx]; // obj(i,j) = x(k,i) *y(k,j)
+				obj_ij_idx++;
+				y_kj_idx++;
+            }
+			x_ki_idx++;
+        }
+		k_p += p;
+    }
+
+	// Return the computed matrix
+    return obj;
+};
 
 /**
 * @function axy
@@ -1356,19 +1578,33 @@ Matrix_.axy = function(a, X, Y, out) {
 	// Result matrix allocation
 	var obj = allocateMatrix_(X.nbRows, Y.nbColumns, out);
 
-	// Computation of a*X*Y product in IKJ format, cache aware
-	for (var i = 0; i < X.nbRows; ++i) {
-		for (var j = 0; j < Y.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = 0;
+	// Computation of a*X*Y product in IKJ format
+	var n = X.nbRows;
+	var m = X.nbColumns;
+	var p = Y.nbColumns;
+	
+	var x_ik_idx = 0;
+	var i_p = 0; // == i*p
+	for (var i = 0; i < n; ++i) {
+		var obj_ij_idx = i_p;
+		for (var j = 0; j < p; ++j) {
+			obj.data[obj_ij_idx] = 0; // obj(i,j) = 0
+			obj_ij_idx++;
 		}
 	
-		for (var k = 0; k < X.nbColumns; ++k) {
-			var a_ik = a * X.data[i * X.nbColumns + k];
+		var y_kj_idx = 0;
+		for (var k = 0; k < m; ++k) {
+			var x_ik = a * X.data[x_ik_idx]; // a * x(i,k)
 			
-			for (var j = 0; j < Y.nbColumns; ++j) {
-				obj.data[i * obj.nbColumns + j] += a_ik * Y.data[k * Y.nbColumns + j];
+			obj_ij_idx = i_p;
+			for (var j = 0; j < p; ++j) {
+				obj.data[obj_ij_idx] += x_ik * Y.data[y_kj_idx]; // obj(i,j) += x(i,k) * y(k,j);
+				y_kj_idx++;
+				obj_ij_idx++;
 			}
+			x_ik_idx++;
 		}
+		i_p += p;
 	}
 	
 	// Return the computed matrix
@@ -1447,7 +1683,7 @@ Matrix_.axty = function(a, X, Y, out) {
 * @return {Matrix_} the matrix a*X^t*Y, either stored in the matrix out or in a new matrix, a n by p matrix.
 *
 * @example
-* atxy(Matrix_(1, [[1,4], [2,5], [3,6]]), Matrix_([[1,1], [2,2], [3,3]]));
+* atxy(1, Matrix_([[1,4], [2,5], [3,6]]), Matrix_([[1,1], [2,2], [3,3]]));
 * // Matrix_([[14,14], [32,32]])
 */
 Matrix_.atxy = function(a, X, Y, out) {
@@ -1497,7 +1733,6 @@ Matrix_.atxy = function(a, X, Y, out) {
     return obj;
 };
 
-
 /**
 * @function diagonal
 *
@@ -1522,14 +1757,15 @@ Matrix_.diagonal = function(x, out) {
 	}
 
 	// Result matrix allocation
-	var obj = allocateMatrix_(x.nbRows, x.nbRows, out);
+	var n = x.nbRows;
+	var obj = allocateMatrix_(n, n, out);
 	
 	// Result matrix computation
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = 0;
+	for (var i = 0; i < n; ++i) {
+		for (var j = 0; j < n; ++j) {
+			obj.data[i * n + j] = 0;
 		}
-		obj.data[i * obj.nbColumns + i] = x.data[i * x.nbColumns];
+		obj.data[i * n + i] = x.data[i];
 	}
 	
 	// Return the computed matrix
@@ -1569,12 +1805,12 @@ Matrix_.fillSymetric = function(n, fct, out) {
 	var obj = allocateMatrix_(n, n, out);
 	
 	// Computation of the elements of the matrix
-	for (var i = 0; i < obj.nbRows; ++i) {
+	for (var i = 0; i < n; ++i) {
 		for (var j = 0; j < i; ++j) {
-			obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
+			obj.data[i * n + j] = obj.data[j * n + i];
 		}
 		for (var j = i; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = fct(i+1 ,j+1);
+			obj.data[i * n + j] = fct(i + 1, j + 1);
 		}	
 	}
 	
@@ -1617,9 +1853,9 @@ Matrix_.fill = function(n, m, fct, out) {
 	var obj = allocateMatrix_(n, m, out);
 	
 	// Computation of the elements of the matrix
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = fct(i+1 ,j+1);
+	for (var i = 0; i < n; ++i) {
+		for (var j = 0; j < m; ++j) {
+			obj.data[i * m + j] = fct(i + 1 , j + 1);
 		}
 	}
 	
@@ -1650,10 +1886,9 @@ Matrix_.zeros = function(n, m, out) {
 	var obj = allocateMatrix_(n, m, out);
 	
 	// Result matrix computation
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = 0;
-		}
+	var nbElements = n * m;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = 0;
 	}
 	
 	// Return the computed matrix
@@ -1682,10 +1917,9 @@ Matrix_.ones = function(n, m) {
 	var obj = allocateMatrix_(n, m);
 	
 	// Result matrix computation
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = 1;
-		}
+	var nbElements = n * m;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = 1;
 	}
 	
 	// Return the computed matrix
@@ -1713,11 +1947,12 @@ Matrix_.identity = function(n) {
 	var obj = allocateMatrix_(n, n);
 	
 	// Result matrix computation
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = 0;
+	var nbElements = n * n;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = 0;
+		if (k % (n + 1) == 0) {
+			obj.data[k] = 1;
 		}
-		obj.data[i * obj.nbColumns + i] = 1;
 	}
 	
 	// Return the computed matrix
@@ -1778,7 +2013,8 @@ Matrix_.vectorDotProduct = function(x, y) {
 	
 	// Computation of <x/y>
 	var dotProd = 0;
-	for (var i = 0; i < x.nbRows; ++i) {
+	var nbElements = x.nbRows;
+	for (var i = 0; i < nbElements; ++i) {
 		dotProd += x.data[i] * y.data[i]; 
 	}
 	
@@ -1792,8 +2028,8 @@ Matrix_.vectorDotProduct = function(x, y) {
 *
 * @summary Returns a QR decomposition of a matrix, using Givens rotations.
 *
-* @description This function computes a QR decomposition of a matrix A, using Givens rotations 
-* as described in the algorithm 5.2.4 (and above discussion therein) of the first reference.
+* @description This function computes a QR decomposition of an m by n matrix A with m >= n, 
+* using Givens rotations as described in the algorithm 5.2.4 (and above discussion therein) of the first reference.
 * 
 * To be noted that the 'givens' internal function used in this function is not the same
 * as the one described in the first reference, but is the continuous one described
@@ -1803,19 +2039,17 @@ Matrix_.vectorDotProduct = function(x, y) {
 * @see <a href="http://www.netlib.org/lapack/lawnspdf/lawn150.pdf">Anderson, Edward (4 December 2000). Discontinuous Plane Rotations and the Symmetric Eigenvalue Problem. LAPACK Working Note. University of Tennessee at Knoxville and Oak Ridge National Laboratory.</a>
 *
 * @param {Matrix_} A an m by n matrix, with m >= n.
-* @param {object} opt the optional parameters for the algorithm.
-* @param {boolean} opt.qLess a boolean parameter enabling to discard the computation of the Q matrix; defaults to false.
+* @param {object} opt optional parameters for the algorithm.
+* @param {boolean} opt.qLess boolean parameter to be set to true to discard the computation of the Q matrix; defaults to false.
 * @return {<Array.<Matrix_>|Matrix_} either an R matrix if opt.qLess is set to true or an array of two matrices [Q, R] otherwise, 
 * with Q and R satisfying the following properties:
-* - Q is an m by m matrix 
-* - R is an m by n matrix
+* - Q is an orthogonal m by m matrix, with a determinant equals to 1 (i.e., a rotation)
+* - R is an m by n upper triangular matrix, with its bottom (m−n) rows consisting entirely of zeroes
 * - A = Q*R
-* - Q is an orthogonal matrix, with a determinant equals to 1 (i.e., a rotation)
-* - R is an upper triangular matrix, with its bottom (m−n) rows consisting entirely of zeroes
 *
 * @example
-* qrDecomposition(Matrix_([[1],[2],[3]]), Matrix_([[1],[2],[3]]));
-* // XX
+* qrDecomposition(Matrix_([[2,3], [0,4]]));
+* // [Matrix_([[1,0], [0,1]]), Matrix_([[2,3], [0,4]])]
 */
 Matrix_.qrDecomposition = function(A, opt) {
 	/**
@@ -1829,10 +2063,6 @@ Matrix_.qrDecomposition = function(A, opt) {
     * @param {number} a, a real number
     * @param {number} b, a real number
     * @return {<Array.<number>} an array of three real numbers - c at array index 0, s at array index 1 and r at array index 2 -, satisfying the matrix equation above.
-    * 
-    * @example
-    * givens(X, y);
-    * // XX
     */
 	function givens(a, b) {
 		var c;
@@ -1886,12 +2116,12 @@ Matrix_.qrDecomposition = function(A, opt) {
 	var n = A.nbColumns;
 
 	// Create a copy of A so that it is not overwritten
-	var rr = new Matrix_(A); // represents R
+	var R = new Matrix_(A); // represents R
 	
 	// Create the matrix that will hold Q
-	var qq = null;
+	var Q = null;
 	if (!isQLessDecomposition) {
-		qq = Matrix_.identity(m); // represents Q
+		Q = Matrix_.identity(m); // represents Q
 	}
 	
 	// Core of the algorithm
@@ -1900,33 +2130,42 @@ Matrix_.qrDecomposition = function(A, opt) {
 			// This loop iteration will set R(i,j) to 0 using an appropriate Givens rotation
 			
 			// Builds G(i-1, i, theta)	
-			var a = rr.data[(i-2) * rr.nbColumns + (j-1)]; // R(i-1, j)
-			var b = rr.data[(i-1) * rr.nbColumns + (j-1)]; // R(i, j)
+			var R_im_j_idx = (i-2) * R.nbColumns + (j-1);
+			var R_i_j_idx = (i-1) * R.nbColumns + (j-1);
+			
+			var a = R.data[R_im_j_idx]; // R(i-1, j)
+			var b = R.data[R_i_j_idx]; // R(i, j)
 			var givensArr = givens(a, b);
 			var c = givensArr[0];
 			var s = givensArr[1];
 			var r = givensArr[2];
 			
 			// Update R (left multiply R with the transpose of the Givens rotation, c.f. 5.1.9 of the first reference)		
-				// Loop below unrolled for k = j, since R(i,j) must be made zero (this can help avoiding "fake" non-zeroes)
-			rr.data[(i-2) * rr.nbColumns + (j-1)] = r; // R(i-1, j) = r
-			rr.data[(i-1) * rr.nbColumns + (j-1)] = 0; // R(i, j) = 0
+				// Loop below unrolled for k = j, since R(i,j) must be made zero
+			R.data[R_im_j_idx] = r; // R(i-1, j) = r
+			R.data[R_i_j_idx] = 0; // R(i, j) = 0
 
 				// Loop resumed at k = j+1
 			for (var k = j+1; k <= n; ++k) {
-				var t1 = rr.data[(i-2) * rr.nbColumns + (k-1)]; // t1 = R(i-1, k)
-				var t2 = rr.data[(i-1) * rr.nbColumns + (k-1)]; // t2 = R(i, k)
-				rr.data[(i-2) * rr.nbColumns + (k-1)] = c*t1 - s*t2; // R(i-1, k) = ...
-				rr.data[(i-1) * rr.nbColumns + (k-1)] = s*t1 + c*t2; // R(i, k) = ...
+				var R_im_k_idx = (i-2) * R.nbColumns + (k-1);
+				var R_i_k_idx = (i-1) * R.nbColumns + (k-1);
+			
+				var t1 = R.data[R_im_k_idx]; // t1 = R(i-1, k)
+				var t2 = R.data[R_i_k_idx]; // t2 = R(i, k)
+				R.data[R_im_k_idx] = c*t1 - s*t2; // R(i-1, k) = ...
+				R.data[R_i_k_idx] = s*t1 + c*t2; // R(i, k) = ...
 			}
 			
 			// Update Q (right multiply Q with the Givens rotation, c.f. 5.1.9 of the first reference)
 			if (!isQLessDecomposition) {
 				for (var k = 1; k <= m; ++k) {
-					var t1 = qq.data[(k-1) * qq.nbColumns + (i-2)] // t1 = Q(k,i-1)
-					var t2 = qq.data[(k-1) * qq.nbColumns + (i-1)] // t2 = Q(k,i)
-					qq.data[(k-1) * qq.nbColumns + (i-2)] = c*t1 - s*t2; // Q(k,i-1) = ...
-					qq.data[(k-1) * qq.nbColumns + (i-1)] = s*t1 + c*t2; // Q(k,i) = ...
+					var Q_k_im_idx = (k-1) * Q.nbColumns + (i-2);
+					var Q_k_i_idx = (k-1) * Q.nbColumns + (i-1);
+				
+					var t1 = Q.data[Q_k_im_idx] // t1 = Q(k,i-1)
+					var t2 = Q.data[Q_k_i_idx] // t2 = Q(k,i)
+					Q.data[Q_k_im_idx] = c*t1 - s*t2; // Q(k,i-1) = ...
+					Q.data[Q_k_i_idx] = s*t1 + c*t2; // Q(k,i) = ...
 				}
 			}
 		}
@@ -1934,42 +2173,52 @@ Matrix_.qrDecomposition = function(A, opt) {
 	
 	// Return either the computed [Q, R] pair or the matrix R
 	if (!isQLessDecomposition) {
-		return [qq, rr];
+		return [Q, R];
 	}
 	else {
-		return rr;
+		return R;
 	}
 }
 
-
-
-
-//James Demmel and Kresimir Veselic, Jacobi’s Method is More Accurate than QR, SIAM Journal on Matrix Analysis and Applications, 1992, Vol. 13, No. 4 : pp. 1204-1245
-//https://doi.org/10.1137/0613074
-// Algorithm 4.1
-// Assume m >= n; otherwise, trasnpose A and retranspose before the end
-// int gsl_linalg_SV_decomp_jacobi
-/*
-A general rectangular M-by-N matrix A has a singular value decomposition (SVD) into the product of an M-by-N orthogonal matrix U, an N-by-N diagonal matrix of singular values S and the transpose of an N-by-N orthogonal square matrix V,
-
-A = U S V^T
-
-m >= n, golub 2.4.3
-
-The singulmar values \sigma_i = S_{ii} are all non-negative and are generally chosen to form a non-increasing sequence \sigma_1 >= \sigma_2 >= ... >= \sigma_N >= 0.
-
-The singular value decomposition of a matrix has many practical uses. The condition number of the matrix is given by the ratio of the largest singular value to the smallest singular value. The presence of a zero singular value indicates that the matrix is singular. The number of non-zero singular values indicates the rank of the matrix. In practice singular value decomposition of a rank-deficient matrix will not produce exact zeroes for singular values, due to finite numerical precision. Small singular values should be edited by choosing a suitable tolerance.
-
-For a rank-deficient matrix, the null space of A is given by the columns of V corresponding to the zero singular values. Similarly, the range of A is given by columns of U corresponding to the non-zero singular values.
-
-Note that the routines here compute the “thin” version of the SVD with U as M-by-N orthogonal matrix. This allows in-place computation and is the most commonly-used form in practice. Mathematically, the “full” SVD is defined with U as an M-by-M orthogonal matrix and S as an M-by-N diagonal matrix (with additional rows of zeros). 
-*/
-
-
-//Z = null(A) is an orthonormal basis for the null space of A obtained from the singular value decomposition. That is, A*Z has negligible elements, size(Z,2) is the nullity of A, and Z'*Z = I.
-/*
-
-
+/**
+* @function svdDecomposition
+*
+* @summary Returns a singular value decomposition of a matrix, using a one-sided Jacobi algorithm.
+*
+* @description This function computes a singular value decomposition of an m by n matrix A with m >= n, 
+* using the one-sided Jacobi algorithm described in the algorithm 4.1 of the first reference, 
+* together with some computational improvements described in the second reference.
+* 
+* The computed decomposition can either be the thin or the full singular value decomposition,
+* c.f. the third reference for the associated definitions.
+*
+* To be noted that a singular value decomposition of a rank-deficient matrix might not produce exact zero singular values 
+* due to finite numerical precision.
+* 
+* @see <a href="https://doi.org/10.1137/0613074">James Demmel and Kresimir Veselic, Jacobi’s Method is More Accurate than QR, SIAM Journal on Matrix Analysis and Applications, 1992, Vol. 13, No. 4 : pp. 1204-1245</a>
+* @see <a href="https://epubs.siam.org/doi/abs/10.1137/0910023">P. P. M. de Rijk, A One-Sided Jacobi Algorithm for Computing the Singular Value Decomposition on a Vector Computer, SIAM Journal on Scientific and Statistical Computing, 1989, Vol. 10, No. 2 : pp. 359-371</a>
+* @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
+*
+* @param {Matrix_} A an m by n matrix, with m >= n.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-16.
+* @param {number} opt.maxIter maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 100.
+* @param {string} opt.svdForm string either equal to 'full' to compute the full singular value decomposition of the matrix A, or equal to 'thin' to compute
+* the thin singular value decomposition of the matrix A; defaults to 'thin'.
+* @return {<Array.<Matrix_>} an array of three matrices [U, S, V], with U, S and V satisfying the following properties:
+* - If opt.svdForm is equal to 'thin':
+* -- U is an m by n orthogonal matrix
+* -- S is an n by n diagonal matrix, with its diagonal elements S_ii, i=1..n satisfying S_11 >= ... >= S_nn >= 0 
+* - If opt.svdForm is equal to 'full':
+* -- U is an m by m orthogonal matrix
+* -- S is an m by n matrix, with its elements S_ii, i=1..n satisfying S_11 >= ... >= S_nn >= 0 and S_ij = 0, i=1..m, j=1..n, j <> i
+* - In all cases:
+* - V is an n by n orthogonal matrix 
+* - A = U*S*V^t
+*
+* @example
+* svdDecomposition(Matrix_([[1,0], [0,1]]));
+* // [Matrix_([[1,0], [0,1]]), Matrix_([[1,0], [0,1]]), Matrix_([[1,0], [0,1]])]
 */
 Matrix_.svdDecomposition = function(A, opt) {
 	// ------
@@ -1990,7 +2239,7 @@ Matrix_.svdDecomposition = function(A, opt) {
 		throw new Error('first input must be a matrix');
 	}
 	if (A.nbRows < A.nbColumns) {
-		throw new Error('matrix has more columns than rows: ' + '(' + A.nbRows + ') v.s. ' + '(' + A.nbColumns + ')');
+		throw new Error('matrix has more columns than rows: ' + A.nbColumns + ' v.s. ' + A.nbRows);
 	}
 	
 	
@@ -2010,9 +2259,9 @@ Matrix_.svdDecomposition = function(A, opt) {
 	
 	// ------
 	
-	// Core of the algorithm, guaranteed to converge per theorem 4.9 of the reference
+	// Core of the algorithm, guaranteed to converge per theorem 4.9 of the first reference
 	var iter = 0;
-	var u_columns_two_norm_sq = new Array(n);
+	var u_columns_two_norm_sq = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
 	while (true) {
 		// Update the number of iterations
 		++iter;
@@ -2124,13 +2373,18 @@ Matrix_.svdDecomposition = function(A, opt) {
 	
 	// Compute and sort the singular values of A in increasing order 
 	// together with their V matrix column indexes
-	var sigmas = new Array(n);
+	var sigmas = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+	var sigmas_idx = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
 	for (var j = 1; j <= n; ++j) {
 		// Compute sigma_j
-		var singVal_j = uu.vectorNorm('two', 'column', j);
-		sigmas[j-1] = [singVal_j, j];
+		var singVal_j = Math.sqrt(u_columns_two_norm_sq[j-1]); // == uu.vectorNorm('two', 'column', j);
+		sigmas[j-1] = singVal_j; 
+		
+		// TODO: Replace "numerically zero" singular values with 0
+		
+		sigmas_idx[j-1] = j;
 	}
-	sigmas.sort(function(a, b) { return b[0] - a[0]; });
+	sigmas_idx.sort(function(a, b) { return sigmas[b-1] - sigmas[a-1]; });
 	
 	// Compute the thin U,S and V matrices
 	var uuu = Matrix_.zeros(m, n); 
@@ -2138,15 +2392,15 @@ Matrix_.svdDecomposition = function(A, opt) {
 	var vvv = Matrix_.zeros(n, n);
 	for (var j = 1; j <= n; ++j) {
 		// Extract singluar values information
-		var sigma_j = sigmas[j-1][0];
-		var sigma_j_col_idx = sigmas[j-1][1];
+		var sigma_j_col_idx = sigmas_idx[j-1];
+		var sigma_j = sigmas[sigma_j_col_idx-1];
 
 		// Thin S(j,j) must be equal to sigma_j
 		sss.data[(j-1) * sss.nbColumns + (j-1)] = sigma_j;
 		
 		// Thin U(:,j) must be equal to the normalized column of the intermediate U
 		// corresponding to sigma_j
-		if (sigma_j != 0) {
+		if (sigma_j != 0) { 
 			for (var i = 1; i <= m; ++i) {
 				uuu.data[(i-1) * uuu.nbColumns + (j-1)] = uu.data[(i-1) * uu.nbColumns + (sigma_j_col_idx-1)] / sigma_j;
 			}
@@ -2164,6 +2418,8 @@ Matrix_.svdDecomposition = function(A, opt) {
 		return [uuu, sss, vvv];
 	}
 	
+	// ------
+	
 	// Additional work is needed in order to achieve the full singular value decomposition of A with:
     // - A = U*S*V^t
 	// - U is an orthogonal square m by m matrix
@@ -2171,8 +2427,8 @@ Matrix_.svdDecomposition = function(A, opt) {
 	//   verifying S(i,i) = sigma_i and sigma_1 >= ... >= sigma_n >= 0
 	// - V is an orthogonal square n by n matrix
 	
-	// Full U computation is made through a QR decomposition of U and completing the missing
-	// columns of U by those of Q
+	// Full U computation is made through a QR decomposition of thin U and completing the missing
+	// columns of thin U by those of Q
 	//
 	// Full S computation is made by extending the thin S with zeroes
 	var qr = Matrix_.qrDecomposition(uuu);
@@ -2182,7 +2438,8 @@ Matrix_.svdDecomposition = function(A, opt) {
 	var ssss = Matrix_.zeros(m, n);
 	for (var j = 1; j <= n; ++j) {
 		// Extract singluar values information
-		var sigma_j = sigmas[j-1][0];
+		var sigma_j_col_idx = sigmas_idx[j-1];
+		var sigma_j = sigmas[sigma_j_col_idx-1];
 		
 		// Full S(j,j) must be equal to sigma_j
 		ssss.data[(j-1) * ssss.nbColumns + (j-1)] = sigma_j;
@@ -2215,15 +2472,63 @@ Matrix_.svdDecomposition = function(A, opt) {
 }
 
 
-//* @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
+/**
+* @function nullSpace
+*
+* @summary Returns an orthonormal basis of the null space of a matrix.
+*
+* @description This function computes an orthonormal basis of the null space of an m by n matrix A, 
+* obtained from a singular value decomposition of this matrix.
+* 
+* As a singular value decomposition of a rank-deficient matrix might not produce exact zero singular values
+* due to finite numerical precision, the dimension of the null space of the matrix A is numerically defined as
+* the number of singular values strictly lower than an optional tolerance eps.
+*
+* To be noted that in case the matrix A is of full-rank, a zero vector is returned.
+* 
+* @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
+*
+* @param {Matrix_} A an m by n matrix.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps numerical tolerance under which a singular value is considered as zero, a strictly positive real number; defaults to max(m,n) * eps(s_1), where eps(s_1) is the distance from the greatest singular value s_1 of A to the next larger floating-point number.
+* @return {Matrix_} either an m by 1 matrix made of zeroes in case the matrix A is of full-rank, or an m by p orthogonal matrix
+* where p is equal to the numerical dimension of the null space of the matrix A.
+*
+* @example
+* nullSpace(Matrix_([[2,1],[-4,-2]]));
+* // Matrix_([-0.4472135954999578, 0.8944271909999159])
+*/
 Matrix_.nullSpace = function(A, opt) {
+	// ------
+	
+	// Internal function used to automatically adapt the precision
+	// of the numerical rank computation
+	function nextUp(x) {
+		var EPSILON = Math.pow(2, -52)
+		var MAX_VALUE = Number.MAX_VALUE
+		var MIN_VALUE = Math.pow(2, -1022)
+
+		if (x !== x) return x
+		if (x === -1 / 0) return -MAX_VALUE
+		if (x === 1 / 0) return +1 / 0
+		if (x === MAX_VALUE) return +1 / 0
+		var y = x * (x < 0 ? 1 - EPSILON / 2 : 1 + EPSILON)
+		if (y === x) y = MIN_VALUE * EPSILON > 0 ? x + MIN_VALUE * EPSILON : x + MIN_VALUE
+		if (y === +1 / 0) y = +MAX_VALUE
+		var b = x + (y - x) / 2
+		if (x < b && b < y) y = b
+		var c = (y + x) / 2
+		if (x < c && c < y) y = c
+		return y === 0 ? -0 : y
+	}
+	
     // ------
    
     // Decode options
     if (opt === undefined) {
         opt = {};
     }
-    var eps = opt.eps || 1e-16;
+    var eps = opt.eps || undefined;
 
    
     // ------
@@ -2239,33 +2544,38 @@ Matrix_.nullSpace = function(A, opt) {
     // Initializations
     var m = A.nbRows;
     var n = A.nbColumns;
-    var a_ns;
+    var a_ns = null;
    
     // ------
    
     // Depending on the shape of the matrix A, a different algorithm is used:
     // - m >= n: an orthogonal basis of Ker(A) is directly read from a thin SVD
-    // decomposition of the matrix A, c.f. corollary 2.4.6 of the first reference
+    // decomposition of the matrix A, c.f. corollary 2.4.6 of the reference
     //
     // - m < n: an orthogonal basis of Ker(A) is obtained by computing the orthogonal
     // complement of an orthogonal basis of Range(A^t), this orthogonal basis being directly
-    // read from a thin SVD decomposition of A^t, c.f. corollary 2.4.6 of the first reference
+    // read from a thin SVD decomposition of A^t, c.f. corollary 2.4.6 of the reference
     //
     // The underlying properties which justifies this approach is that
     // R^m = Range(A^t) _|_ Ker(A) for any m by n real matrix A
     if (m >= n) {
         // Compute a thin SVD decomposition of A: A = U*S*V^t
-		var svd = Matrix_.svdDecomposition(A, {maxIter: -1});
+		var svd = Matrix_.svdDecomposition(A, {maxIter: -1});		
         var u = svd[0];
         var s = svd[1];
         var v = svd[2];
        
+		// Compute the default tolerance, if required
+		if (eps === undefined) {
+			eps = m * (nextUp(s.data[0]) - s.data[0]);
+		}
+	   
         // Determine the numerical rank of A
         var r;
         for (r = n; r >= 1; --r) {
             // Comparison of the r-th greatest singular value of A with the tolerance parameter to determine
             // the first "zero" singular value of A
-            if (s.data[(r-1)*s.nbColumns + (r-1)] > m * eps) {
+            if (s.data[(r-1)*s.nbColumns + (r-1)] > eps) {
                 break;
             }
         }
@@ -2280,8 +2590,8 @@ Matrix_.nullSpace = function(A, opt) {
         }
         else {
             // Extract from V an orthogonal basis of Ker(A) of dimension n-p
-            a_ns = new Matrix_.zeros(n, n-p);
-            for (var j = p+1; j <= n; ++j) {
+            a_ns = new Matrix_.zeros(n, n - p);
+            for (var j = p + 1; j <= n; ++j) {
                 for (var i = 1; i <= n; ++i) {
                     a_ns.data[(i-1)*a_ns.nbColumns + ((j-(p+1)+1)-1)] = v.data[(i-1)*v.nbColumns + (j-1)];
                 }
@@ -2295,12 +2605,17 @@ Matrix_.nullSpace = function(A, opt) {
         var s = svd[1];
         var v = svd[2];
        
+		// Compute the default tolerance, if required
+		if (eps === undefined) {
+			eps = n * (nextUp(s.data[0]) - s.data[0]);
+		}
+	   
         // Determine the numerical rank of A^t
         var r;
         for (r = m; r >= 1; --r) {
             // Comparison of the r-th greatest singular value of A^t with the tolerance parameter to determine
             // the first "zero" singular value of A^t
-            if (s.data[(r-1)*s.nbColumns + (r-1)] > n * eps) {
+            if (s.data[(r-1)*s.nbColumns + (r-1)] > eps) {
                 break;
             }
         }
@@ -2350,28 +2665,110 @@ Matrix_.nullSpace = function(A, opt) {
 
 
 /**
-* @function linsolveRandomizedExtendedKaczmarz
+* @function linsolveBackwardSubstitution
 *
-* @summary TODO
+* @summary Returns the solution of an upper triangular square system of linear equations.
 *
-* @description TODO, with convergence depending on the square condition number of the matrix A.
+* @description This function computes the solution of an upper triangular square system of linear equations Ax = b,
+* as described in the algorithm 3.1.2 of the reference.
 * 
-* @see <a href="https://arxiv.org/abs/1205.5770">Zouzias, Anastasios and Freris, Nikolaos, Randomized Extended Kaczmarz for Solving Least-Squares, 05/2012, eprint arXiv:1205.5770</a>
+* To be noted that the system of linear equations must be solvable (i.e., no zero elements must be present on the matrix A diagonal).
+*
+* @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
+*
+* @param {Matrix_} A a n by n matrix.
+* @param {Matrix_} b a n by 1 matrix.
+* @return {<Matrix_} an n by 1 matrix x^* satisfying Ax^* = b.
+*
+* @example
+* linsolveBackSubstitution(Matrix_([[1,2], [0,1]]), Matrix_([3,1]));
+* // Matrix_([1,1])
+*/
+Matrix_.linsolveBackSubstitution = function(A, b, out) {
+	// ------
+	
+	// Misc. checks
+	if (!(A instanceof Matrix_)) {
+		throw new Error('first input must be a matrix');
+	}
+	if (!(b instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	
+	if (!A.isSquare()) {
+		throw new Error('matrix is not square: ' + '(' + A.nbRows + ',' + A.nbColumns + ')');
+	}
+	if (A.nbRows !== b.nbRows) {
+		throw new Error('matrix and second member sizes do not match: ' + '(' + A.nbRows + ',' + A.nbColumns + 
+		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+	if (b.nbColumns !== 1) {
+		throw new Error('b is not a vector: ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+
+	// ------
+	
+	// Initializations
+	var n = A.nbColumns;
+
+	// Result matrix allocation
+	var x = allocateMatrix_(n, 1, out); // the solution vector
+
+	// ------
+	
+	// Compute the solution to Ax = b, with a a square invertible upper triangular matrix,
+	// using the row-oriented back substitution algorithm described in section 3.1.2 of the reference.
+	for (var i = n; i >= 1; --i) {
+		x.data[i-1] = b.data[i-1];
+		for (var j = i + 1; j <= n; ++j) {
+			x.data[i-1] = x.data[i-1] - A.data[(i-1) * A.nbColumns + (j-1)] * x.data[j-1];
+		}
+		var a_ii = A.data[(i-1) * A.nbColumns + (i-1)];
+		if (a_ii == 0) {
+			throw new Error('input matrix is not invertible: zero diagonal coefficient at index ' + i);
+		}
+		else {
+			x.data[i-1] = x.data[i-1] / a_ii;
+		}
+	}
+
+	// Return the computed solution
+	return x;
+}
+
+
+/**
+* @function linsolveExtendedKaczmarz
+*
+* @summary Returns the solution of a system of linear equations, using the extended Kaczmarz method.
+*
+* @description This function computes the solution of a system of linear equations Ax = b, using the 
+* extended Kaczmarz iterative method in either its deterministic form (c.f. the first reference) 
+* or its randomized form (c.f. the second reference).
+* 
+* To be noted that the extended Kaczmarz method allows to compute the solution of a system of 
+* linear equations Ax = b even if this system is not solvable; in this case, the computed solution is
+* the solution of minimum euclidian norm of the linear least squares problem argmin_x ||Ax - b||_2.
+*
+* @see <a href="https://www.tandfonline.com/doi/abs/10.1080/00207169508804364">Popa, Constantin. (1995). Least-squares solution of overdetermined inconsistent linear systems using Kaczmarz's relaxation. International Journal of Computer Mathematics. 55. 79-89.</a>
+* @see <a href="https://epubs.siam.org/doi/abs/10.1137/120889897">Anastasios Zouzias and Nikolaos M. Freris, Randomized Extended Kaczmarz for Solving Least Squares, SIAM Journal on Matrix Analysis and Applications, 2013, Vol. 34, No. 2 : pp. 773-793</a>
 *
 * @param {Matrix_} A a m by n matrix.
 * @param {Matrix_} b a m by 1 matrix.
-* @param {object} opt the optional parameters for the algorithm.
-* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-12.
-aram {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 100000.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-12.
+* @param {number} opt.maxIter maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 100000.
+* @param {boolean} opt.randomized whether to use the deterministic extended Kaczmarz method (true) or the randomized extended Kaczmarz method (false); defaults to false.
 * @return {<Matrix_} an n by 1 matrix x^* satisfying the following properties:
 * - If the linear system of equations Ax = b is square with A invertible, then x^* is the unique solution of this system
-* - If the linear system of equations Ax = b is not square (i.e., overdetermined or underdetermined), then x^* is the minimum euclidian norm solution of the least square problem min ||Ax - b||_2
+* - If the linear system of equations Ax = b is not square (i.e., overdetermined or underdetermined) or is square with A non invertible, then x^* is the minimum euclidian norm solution
+* of the linear least squares problem argmin_x ||Ax - b||_2
 *
 * @example
-* linsolveRandomizedExtendedKaczmarz(X);
-* // XX
+* linsolveExtendedKaczmarz(Matrix_([[3,2,-1], [2,-2,4], [-1, 0.5, -1]]), Matrix_([1,-2,0]));
+* // Matrix_([1, -2, -2])
 */
-Matrix_.linsolveRandomizedExtendedKaczmarz = function(A, b, opt) {
+Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 	// ------
 	
 	// Decode options
@@ -2380,6 +2777,10 @@ Matrix_.linsolveRandomizedExtendedKaczmarz = function(A, b, opt) {
 	}
 	var eps = opt.eps || 1e-12;
 	var maxIterations = opt.maxIter || 100000;
+	var randomized = false;
+	if (opt.randomized !== undefined) {
+		randomized = opt.randomized;
+	}
 	
 	
 	// ------
@@ -2406,128 +2807,207 @@ Matrix_.linsolveRandomizedExtendedKaczmarz = function(A, b, opt) {
 	// Initializations
 	var m = A.nbRows;
 	var n = A.nbColumns;
-	var x_k = new Matrix_.zeros(n, 1); // the current solution
+	var x_k = Matrix_.zeros(n, 1); // the current solution
 	var z_k = Matrix_.copy(b); // the current "adjusted" b
 	
-	var x_res = new Matrix_.zeros(m, 1); // the x residuals vector
-	var b_res = new Matrix_.zeros(m, 1); // the b residuals vector
-	var a_x_k = new Matrix_.zeros(m, 1); // A*x_k
-	var ta_z_k = new Matrix_.zeros(n, 1); // A^t*z_k
+	var x_res = Matrix_.zeros(m, 1); // the x residuals vector
+	var b_res = Matrix_.zeros(m, 1); // the b residuals vector
+	var a_x_k = Matrix_.zeros(m, 1); // A*x_k
 
 	// Preliminary computation of the Frobenius norm of A
 	var a_frob_norm = A.matrixNorm('frobenius');
-	var a_frob_norm_sq = a_frob_norm * a_frob_norm;
+	var a_frob_norm_sq = a_frob_norm * a_frob_norm;	
 	
 	// Limit case: null matrix
 	if (a_frob_norm === 0) {
 		return x_k;
 	}
 	
-	// Preliminary computation of the squares of the 2-norms of the rows of A,
-	// as well as the probabilities q_i with their associated sampler.
-	var a_rows_two_norm_sq = new Array(m);
-	var q = new Array(m);
+	// Preliminary computation of the squares of the 2-norms of the rows of A.
+	var a_rows_two_norm_sq = typeof Float64Array === 'function' ? new Float64Array(m) : new Array(m);
 	for (var i = 1; i <= m; ++i) {
 		var a_i_two_norm = A.vectorNorm('two', 'row', i);
 		a_rows_two_norm_sq[i-1] = a_i_two_norm * a_i_two_norm;
-		
-		q[i-1] = a_rows_two_norm_sq[i-1]/a_frob_norm_sq;
 	}
-	var qSampler = new aliasMethodSampler_(q);
 	
-	// Preliminary computation of the squares of the 2-norms of the columns of A,
-	// as well as the probabilities p_j with their associated sampler.
-	var a_columns_two_norm_sq = new Array(n);
-	var p = new Array(n);
+	// Preliminary computation of the squares of the 2-norms of the columns of A.
+	var a_columns_two_norm_sq = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
 	for (var j = 1; j <= n; ++j) {
 		var alpha_j_two_norm = A.vectorNorm('two', 'column', j);
 		a_columns_two_norm_sq[j-1] = alpha_j_two_norm * alpha_j_two_norm;
-		
-		p[j-1] = a_columns_two_norm_sq[j-1]/a_frob_norm_sq;
 	}
-	var pSampler = new aliasMethodSampler_(p);
-	
 	
 	// ------
 	
-	// Main loop until convergence, guaranteed as per theorem 8 of the reference.	
-	var iter = 0;
-	while (true) {
-		// Update the number of iterations
-		++iter;
+	// Deterministic Extended Kaczmarz, c.f. algorithm R of the first reference.
+	if (randomized == false) {
+		// Main loop until convergence, guaranteed as per theorem 3.1 of the first reference.	
+		var iter = 0;
+		while (true) {
+			// Update the number of iterations
+			++iter;
 
-		// Check the number of iterations
-		if (maxIterations !== -1 && iter > maxIterations) {
-			throw new Error('maximum number of iterations reached: ' + maxIterations);
-		}
-		
-		
-		// Pick a column index j with probability p_j
-		var j = pSampler.sample() + 1;
-		
-		// Orthogonally project the current iterate y_k onto the hyperplane generated 
-		// by the column A(:,j)
-			// Compute <A(:,j)/z_k>
-		var a_j_z_k = 0;
-		for (var i = 1; i <= m; ++i) {
-			a_j_z_k += A.data[(i-1) * A.nbColumns + (j-1)] * z_k.data[(i-1) * z_k.nbColumns + 0];
-		}
-		
-			// Update z_k: z_k+1 = z_k - <A(:,j)/z_k>/||A(:,j)||_2^2 * A(:,j)
-		for (var i = 1; i <= m; ++i) {
-			z_k.data[(i-1) * z_k.nbColumns + 0] -= a_j_z_k / a_columns_two_norm_sq[j-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
-		}
+			// Check the number of iterations
+			if (maxIterations !== -1 && iter > maxIterations) {
+				throw new Error('maximum number of iterations reached: ' + maxIterations);
+			}
+			
+			// Orthogonally project the current iterate z_k onto the hyperplane generated 
+			// by the columns A(:,j), j=1..n
+			for (var j = 1; j <= n; ++j) {
+				if (a_columns_two_norm_sq[j-1] == 0) {
+					continue;
+				}
+				
+				// Compute <A(:,j)/z_k>
+				var a_j_z_k = 0;
+				for (var i = 1; i <= m; ++i) {
+					a_j_z_k += A.data[(i-1) * A.nbColumns + (j-1)] * z_k.data[(i-1) * z_k.nbColumns + 0];
+				}
+				
+				// Update z_k: z_k+1 = z_k - <A(:,j)/z_k>/||A(:,j)||_2^2 * A(:,j)
+				for (var i = 1; i <= m; ++i) {
+					z_k.data[(i-1) * z_k.nbColumns + 0] -= a_j_z_k / a_columns_two_norm_sq[j-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+				}
+			}
+			
+			// Orthogonally project the current iterate x_k onto the solution hyperplane 
+			// of <A(i,:)/x_k> = b(i) - z_k(i), i=1..m
+			for (var i = 1; i <= m; ++i) {
+				if (a_rows_two_norm_sq[i-1] == 0) {
+					continue;
+				}
+				
+				// Compute r_k = <A(i,:)/x_k> - (b(i) - z_k(i))
+				var a_i_x_k = 0;
+				for (var j = 1; j <= n; ++j) {
+					a_i_x_k += A.data[(i-1) * A.nbColumns + (j-1)] * x_k.data[(j-1) * x_k.nbColumns];
+				}
+				var r_k = a_i_x_k - (b.data[(i-1) * b.nbColumns + 0] - z_k.data[(i-1) * z_k.nbColumns + 0]);
+				
+				// Update x_k: x_k+1 = x_k - r_k/||A(i,:)||_2^2 * A(i,:)
+				for (var j = 1; j <= n; ++j) {
+					x_k.data[(j-1) * x_k.nbColumns] -= r_k / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+				}
+			}
 
-
-		// Pick a row index i with probability q_i
-		var i = qSampler.sample() + 1;
-		
-		// Orthogonally project the current iterate x_k onto the solution hyperplane 
-		// of <A(i,:)/x_k> = b(i) - z_k(i)
-			// Compute r_k = <A(i,:)/x_k> - (b(i) - z_k(i))
-		var a_i_x_k = 0;
-		for (var j = 1; j <= n; ++j) {
-			a_i_x_k += A.data[(i-1) * A.nbColumns + (j-1)] * x_k.data[(j-1) * x_k.nbColumns];
-		}
-		var r_k = a_i_x_k - (b.data[(i-1) * b.nbColumns + 0] - z_k.data[(i-1) * z_k.nbColumns + 0]);
-
-			// Update x_k: x_k+1 = x_k - r_k/||A(i,:)||_2^2 * A(i,:)
-		for (var j = 1; j <= n; ++j) {
-			x_k.data[(j-1) * x_k.nbColumns] -= r_k / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
-		}
-
-		
-		// Convergence conditions every 8 min(m, n) iterations: 
-		// - ||Ax_k - (b - z_k)||_2 <= eps * ||A||_f * ||x_k||_2
-		// - ||A^tz_k||_2 <= eps * ||A||_f^2 * ||x_k||_2
-		if (iter % 8 * Math.min(m, n) === 0) {
+			// Convergence condition (adapted from formula 4.3 of the first reference):
+			// - ||Ax_k - (b - z_k)||_2 <= eps * ||A||_f * ||x_k||_2
+			
 			// Compute ||x_k||_2
 			var x_k_two_norm = x_k.vectorNorm('two');
 			
 			// Compute ||Ax_k - (b - z_k)||_2
-			a_x_k =  Matrix_.axy(1, A, x_k, a_x_k);
-			b_res = Matrix_.axpby(1, b, -1, z_k, b_res);
-			x_res = Matrix_.axpby(1, a_x_k, -1, b_res, x_res);
+			a_x_k =  Matrix_.xy(A, x_k, a_x_k);
+			b_res = Matrix_.xmy(b, z_k, b_res);
+			x_res = Matrix_.xmy(a_x_k, b_res, x_res);
 			var x_res_two_norm = x_res.vectorNorm('two');
 			
-			// Compute ||A^tz_k||_2
-			ta_z_k = Matrix_.atxy(1, A, z_k, ta_z_k);
-			var ta_z_k_two_norm = ta_z_k.vectorNorm('two');
-			
-			if (x_res_two_norm <= eps * a_frob_norm * x_k_two_norm && 
-				ta_z_k_two_norm <= eps * a_frob_norm_sq * x_k_two_norm) {
+			// Test the convergence condition		
+			if (x_res_two_norm <= eps * a_frob_norm * x_k_two_norm) {
 				break;
 			}
 		}
 	}
 	
+	// Randomized Extended Kaczmarz, c.f. algorithm 3 of the second reference.
+	else {
+		// Initializations
+		var ta_z_k = Matrix_.zeros(n, 1); // A^t*z_k
+		
+		// ------
+
+		// Preliminary computation of the probabilities q_i, with their associated sampler.
+		var q = typeof Float64Array === 'function' ? new Float64Array(m) : new Array(m);
+		for (var i = 1; i <= m; ++i) {
+			q[i-1] = a_rows_two_norm_sq[i-1]/a_frob_norm_sq;
+		}
+		var qSampler = new aliasMethodSampler_(q);
 	
+		// Preliminary computation of theprobabilities p_j with their associated sampler.
+		var p = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var j = 1; j <= n; ++j) {
+			p[j-1] = a_columns_two_norm_sq[j-1]/a_frob_norm_sq;
+		}
+		var pSampler = new aliasMethodSampler_(p);
+	
+		
+		// ------
+		
+		// Main loop until convergence, guaranteed as per theorem 4.1 of the second reference.	
+		var iter = 0;
+		while (true) {
+			// Update the number of iterations
+			++iter;
+
+			// Check the number of iterations
+			if (maxIterations !== -1 && iter > maxIterations) {
+				throw new Error('maximum number of iterations reached: ' + maxIterations);
+			}
+			
+			// Pick a column index j with probability p_j
+			var j = pSampler.sample() + 1;
+			
+			// Orthogonally project the current iterate z_k onto the hyperplane generated 
+			// by the column A(:,j)
+				// Compute <A(:,j)/z_k>
+			var a_j_z_k = 0;
+			for (var i = 1; i <= m; ++i) {
+				a_j_z_k += A.data[(i-1) * A.nbColumns + (j-1)] * z_k.data[(i-1) * z_k.nbColumns + 0];
+			}
+			
+				// Update z_k: z_k+1 = z_k - <A(:,j)/z_k>/||A(:,j)||_2^2 * A(:,j)
+			for (var i = 1; i <= m; ++i) {
+				z_k.data[(i-1) * z_k.nbColumns + 0] -= a_j_z_k / a_columns_two_norm_sq[j-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+			}
+
+			// Pick a row index i with probability q_i
+			var i = qSampler.sample() + 1;
+			
+			// Orthogonally project the current iterate x_k onto the solution hyperplane 
+			// of <A(i,:)/x_k> = b(i) - z_k(i)
+				// Compute r_k = <A(i,:)/x_k> - (b(i) - z_k(i))
+			var a_i_x_k = 0;
+			for (var j = 1; j <= n; ++j) {
+				a_i_x_k += A.data[(i-1) * A.nbColumns + (j-1)] * x_k.data[(j-1) * x_k.nbColumns];
+			}
+			var r_k = a_i_x_k - (b.data[(i-1) * b.nbColumns + 0] - z_k.data[(i-1) * z_k.nbColumns + 0]);
+
+				// Update x_k: x_k+1 = x_k - r_k/||A(i,:)||_2^2 * A(i,:)
+			for (var j = 1; j <= n; ++j) {
+				x_k.data[(j-1) * x_k.nbColumns] -= r_k / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+			}
+			
+			// Convergence conditions every 8 min(m, n) iterations: 
+			// - ||Ax_k - (b - z_k)||_2 <= eps * ||A||_f * ||x_k||_2
+			// - ||A^tz_k||_2 <= eps * ||A||_f^2 * ||x_k||_2
+			if (iter % 8 * Math.min(m, n) === 0) {
+				// Compute ||x_k||_2
+				var x_k_two_norm = x_k.vectorNorm('two');
+				
+				// Compute ||Ax_k - (b - z_k)||_2
+				a_x_k =  Matrix_.xy(A, x_k, a_x_k);
+				b_res = Matrix_.xmy(b, z_k, b_res);
+				x_res = Matrix_.xmy(a_x_k, b_res, x_res);
+				var x_res_two_norm = x_res.vectorNorm('two');
+				
+				// Compute ||A^tz_k||_2
+				ta_z_k = Matrix_.txy(A, z_k, ta_z_k);
+				var ta_z_k_two_norm = ta_z_k.vectorNorm('two');
+				
+				if (x_res_two_norm <= eps * a_frob_norm * x_k_two_norm && 
+					ta_z_k_two_norm <= eps * a_frob_norm_sq * x_k_two_norm) {
+					break;
+				}
+			}
+		}
+	}
+
 	// ------
 	
 	// Return the computed solution
 	return x_k;
 }
-
 
 /**
  * @file Functions related to covariance matrix computations for portfolio allocation.
@@ -2789,18 +3269,6 @@ self.binomial_ = binomial_;
 /* End Wrapper private methods - Unit tests usage only */
  
 
-
-/**
- * Constructs a new AliasMethod to sample from a discrete distribution and
- * hand back outcomes based on the probability distribution.
- * <p>
- * Given as input a list of probabilities corresponding to outcomes 0, 1,
- * ..., n - 1, this constructor creates the probability and alias tables
- * needed to efficiently sample from this distribution.
- *
- * @param p the list of probabilities.
- */
- 
 /**
 * @function aliasMethodSampler_
 *
@@ -2833,8 +3301,8 @@ function aliasMethodSampler_(p) {
 	// ----
 
 	// Initializations.
-	this.prob = new Array(p.length);
-	this.alias = new Array(p.length);
+	this.prob = typeof Float64Array === 'function' ? new Float64Array(p.length) : new Array(p.length);
+	this.alias = typeof Uint32Array === 'function' ? new Uint32Array(p.length) : new Array(p.length);
 
 	// TODO: Checks on probabilities (positive, sum to one)
 
@@ -2842,9 +3310,9 @@ function aliasMethodSampler_(p) {
     var avgProb = 1 / p.length;
 		 
 	// Initializations of the small and large stacks, together with their associated indexes.
-	var small = new Array(p.length);
+	var small = typeof Uint32Array === 'function' ? new Uint32Array(p.length) : new Array(p.length);
 	var s = 0;
-	var large = new Array(p.length);
+	var large = typeof Uint32Array === 'function' ? new Uint32Array(p.length) : new Array(p.length);
 	var l = 0;
 		
 	// Population of the small and large stacks with the probabilities indexes.
@@ -2928,9 +3396,7 @@ function aliasMethodSampler_(p) {
 		}
     }
 }
-	
 
-	
 	
  /**
 * @function compositionsIterator_
@@ -3237,7 +3703,7 @@ function subsetsIterator_(n) {
 	*/
 	this.next = function() {
 		// The output array containing the computed subset
-		var nextSubset = [];
+		var nextSubset = new Array(0);
 		
 		if (this.mtc) { // There is still a subset to generate
 			var j = 0;
@@ -3909,38 +4375,71 @@ function sampleCovariance_(x, y) {
 
 /* Start Wrapper private methods - Unit tests usage only */
 self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
-self.nonNegativeOrthantEuclideanProjection_ = nonNegativeOrthantEuclideanProjection_;
 /* End Wrapper private methods - Unit tests usage only */
  
  
-function nonNegativeOrthantEuclideanProjection_(x, out) {
-	// Misc. checks
-	if (!(x instanceof Matrix_)) {
-		throw new Error('input must be a matrix');
-	}
-	if (!x.isVector()) {
-		throw new Error('input must be a vector');
-	}
-	
-	// Result matrix allocation
-	var obj = allocateMatrix_(x.nbRows, 1, out);
-	
-	// Computation of proj(x_i)_[0, +infinity[, i = 1..x.nbRows
-	for (var i = 1; i <= x.nbRows; ++i) {
-		obj.data[(i-1)*x.nbColumns] = Math.max(0, x.data[(i-1)*x.nbColumns]);
-	}
-	
-	// Return the computed matrix
-	return obj;
-}
-
  
- function lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, opt) {
+/**
+* @function lpsolvePrimalDualHybridGradient_
+*
+* @summary Returns an optimal solution to a linear program, using a primal-dual hybrid gradient algorithm.
+*
+* @description This function computes an optimal solution to a linear program using a 
+* preconditioned primal-dual hybrid gradient algorithm, c.f. the first reference.
+*
+* The linear program to solve is assumed to be provided in the following format:
+*
+* min <c/x>
+*
+* s.t. Ae*x = be (equality constraints)
+*      Ai*x <= bi (inequality constraints)
+*      lb <= x <= ub (bound constraints)
+*
+* with:
+* - c an n by 1 matrix
+* - Ae an optional me by n matrix
+* - be an optional me by 1 matrix
+* - Ai an optional mi by n matrix
+* - bi an optional mi by 1 matrix
+* - lb an optional n by 1 matrix, which can contain negative infinity values (-Infinity) corresponding to unbounded variables on the negaitve axis
+* - ub an optional n by 1 matrix, which can contain positive infinity values (Infinity) corresponding to unbounded variables on the positive axis
+*
+* and with:
+* - lb assumed to be an n by 1 matrix made of zeroes if not provided
+* - ub assumed to be an n by 1 matrix made of positive infinity values if not provided
+* 
+* To be noted that the algorithm used internally requires the linear problem to be feasible and bounded
+* (i.e., admit a finite optimal solution) to converge.
+* 
+* @see <a href="http://ieeexplore.ieee.org/document/6126441/">T. Pock and A. Chambolle, "Diagonal preconditioning for first order primal-dual algorithms in convex optimization" 2011 International Conference on Computer Vision, Barcelona, 2011, pp. 1762-1769.</a>
+* @see <a href="https://arxiv.org/abs/1305.0546">Tom Goldstein, Min Li, Xiaoming Yuan, Ernie Esser, Richard Baraniuk, "Adaptive Primal-Dual Hybrid Gradient Methods forSaddle-Point Problems", 05/2013, eprint arXiv:1305.0546</a>
+*
+* @param {Matrix_} Ae an optional me by n matrix; must be null if not provided.
+* @param {Matrix_} be an optional me by 1 matrix; must be null if not provided.
+* @param {Matrix_} Ai an optional mi by n matrix; must be null if not provided.
+* @param {Matrix_} bi an optional mi by 1 matrix; must be null if not provided.
+* @param {Matrix_} c an n by n matrix.
+* @param {Matrix_} lb an optional n by 1 matrix; must be null if not provided.
+* @param {Matrix_} ub an optional n by 1 matrix; must be null if not provided.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-08.
+* @param {number} opt.maxIter maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 100000.
+* @return {Array<Object>} an array arr containing two elements: 
+* - arr[0] an n by 1 matrix containing the optimal solution x^* to the linear program
+* - arr[1] the optimal value of the function x -> <c/x>, i.e. <c/x^*>
+*
+* @example
+* lpsolvePrimalDualHybridGradient_(X);
+* // X
+*/
+ function lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, lb, ub, opt) {
+    // ------
+    
 	// Decode options
 	if (opt === undefined) {
 		opt = {};
 	}
-	var optimalityEps = opt.optimalityEps || 1e-08;
+	var eps = opt.eps || 1e-08;
 	var maxIterations = opt.maxIter || 100000;
 	
 
@@ -3949,6 +4448,8 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 	// Misc. checks
 	var eqContraints = false;
 	var ineqContraints = false;
+	var boundContraints = false;
+	
 	if (Ae !== null && be !== null) {
 		eqContraints = true;
 	}
@@ -3967,6 +4468,16 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 	}
 	else if (Ai === null && bi !== null) {
 		throw new Error('inequality constraints matrix is missing');
+	}
+	
+	if (lb !== null && ub !== null) {
+	    boundContraints = true;
+	}
+	else if (lb !== null && ub === null ) {
+    	throw new Error('upper bounds constraints vector is missing');
+	}
+	else if (lb === null && ub !== null ) {
+    	throw new Error('lower bounds constraints vector is missing');
 	}
 	
 	if (!(c instanceof Matrix_)) {
@@ -4011,6 +4522,25 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 			throw new Error('fourth input is not a vector: ' + bi.nbColumns + '-' + bi.nbRows);
 		}
 	}
+	
+	if (boundContraints) {
+		if (lb.nbRows !== null) {
+			if (!(lb instanceof Matrix_)) {
+				throw new Error('sixth input must be a matrix');
+			}
+			if (lb.nbRows !== c.nbRows) {
+				throw new Error('sixth input number of rows and fifth input number of rows do not match: ' + lb.nbRows + '-' + c.nbRows);
+			}
+		}
+        if (ub.nbRows !== null) {
+			if (!(ub instanceof Matrix_)) {
+				throw new Error('seventh input must be a matrix');
+			}
+			if (ub.nbRows !== c.nbRows) {
+				throw new Error('seventh input number of rows and fifth input number of rows do not match: ' + ub.nbRows + '-' + c.nbRows);
+			}
+		}
+	}
 
 	
 	// ------
@@ -4021,29 +4551,21 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 	var ye_k = null;
 	var ye_kp = null;
 	var res_ye_kp_ye_k = null;
-	var pe_k = null;
-	var be_inf_norm = 0;
 	if (eqContraints) {
 	    me = Ae.nbRows; // the number of equality constaints
     	ye_k = Matrix_.zeros(me, 1); // the dual iterate ye_k
     	ye_kp = Matrix_.zeros(me, 1); // the dual iterate ye_k+1
     	res_ye_kp_ye_k = Matrix_.zeros(me, 1); // the residual ye_kp - ye_k
-    	pe_k = Matrix_.zeros(me, 1); // the degree of primal feasibility on equality constraints
-		be_inf_norm = be.vectorNorm('infinity');
 	}
 	var mi = 0;
 	var yi_k = null;
 	var yi_kp = null;
 	var res_yi_kp_yi_k = null;
-	var pi_k = null;
-	var bi_inf_norm = 0;
 	if (ineqContraints) {
 	    mi = Ai.nbRows; // the number of inequality (<=) constaints
     	yi_k = Matrix_.zeros(mi, 1); // the dual iterate yi_k
     	yi_kp = Matrix_.zeros(mi, 1); // the dual iterate yi_k+1
     	res_yi_kp_yi_k = Matrix_.zeros(mi, 1); // the residual yi_kp - yi_k
-    	pi_k = Matrix_.zeros(mi, 1); // the degree of primal feasibility on inequality constraints
-		bi_inf_norm = bi.vectorNorm('infinity');
 	}
 	var m = me + mi; // the total number of constraints
 	
@@ -4055,8 +4577,8 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 	var res_x_kp_x_k = Matrix_.zeros(n, 1); // the residual x_kp - x_k
 
     // Misc.
-	var fctVal = Number.MAX_VALUE; // the value of the objective function
 	var tmp_vec_n = Matrix_.zeros(n, 1); // a temporary placeholder vector of dimension n
+	var ttmp_vec_n = Matrix_.zeros(n, 1); // a temporary placeholder vector of dimension n
 	var tmp_vec_me = null;
 	if (eqContraints) {
 		tmp_vec_me = Matrix_.zeros(me, 1); // a temporary placeholder vector of dimension me
@@ -4067,45 +4589,67 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 	}
 	
 	// Computation of the diagonal matrices T and S = [Se Si]^t with alpha = 1
-	// and mu = 0.95, nu = 0.95 (so that mu * nu < 1), c.f. formula 10 and
-	// remark 3 of the reference.
-	var mu = 0.95;
-	var nu = 0.95;
+	// and mu = 0.9995, nu = 0.9995 (so that mu * nu < 1), c.f. formula 10 and
+	// remark 3 of the first reference.
+	var mu = 0.9995;
+	var nu = 0.9995;
 	var T = Matrix_.fill(n, 1, 
 				function(i,j) { 
 						var columnNorm = 0;
 						if (eqContraints) {
-						    columnNorm += Ae.vectorNorm('one', 'column', i); 
+						    var aeColNorm = Ae.vectorNorm('one', 'column', i); 
+							columnNorm += aeColNorm;
 						}
 						if (ineqContraints) {
-						    columnNorm += Ai.vectorNorm('one', 'column', i);
+						    var aiColNorm = Ai.vectorNorm('one', 'column', i);
+							columnNorm += aiColNorm;
 						}
-						return mu * 1/columnNorm; // Ae and Ai do not contain any null column;
+						if (columnNorm == 0) { // in case there is no coefficient in the column, a value of 1 is harmless
+							columnNorm = 1;
+						}
+						return mu * 1/columnNorm;
 				});
+	
 	var Se = null;
 	if (eqContraints) {
 	    Se = Matrix_.fill(me, 1, 
 	                      function(i,j) { 
-						    return nu * 1/Ae.vectorNorm('one', 'row', i); // Ae does not contain any null row;
+						    var aeRowNorm = Ae.vectorNorm('one', 'row', i);
+							if (aeRowNorm == 0) { // in case there is no coefficient in the row, a value of 1 is harmless
+								aeRowNorm = 1;
+							}
+							return nu * 1/aeRowNorm;
 				          });
 	}
 	var Si = null;
 	if (ineqContraints) {
 	    Si = Matrix_.fill(mi, 1, 
 	                      function(i,j) { 
-			        	    return nu * 1/Ai.vectorNorm('one', 'row', i); // Ai does not contain any null row;
+						    var aiRowNorm = Ai.vectorNorm('one', 'row', i);
+							if (aiRowNorm == 0) { // in case there is no coefficient in the row, a value of 1 is harmless
+								aiRowNorm = 1;
+							}
+			        	    return nu * 1/aiRowNorm;
 				          });
 	}
 	
 	// ------
 	
-	// Main loop of the algorithm
-	// The convergence is guaranteed by the theorem 1 of the reference
-	// in case both the primal and the dual problems admit an optimum.
+	// Main loop of the algorithm, c.f. formula 18 of the first reference.
+	//
+	// The convergence is guaranteed by the theorem 1 of the first reference
+	// in case the primal linear program admit a finite optimal solution.
+	//
+	//
+	// To be noted that the formulation used below is slightly different from
+	// the formulation in formula 17 of the first reference (equality constraints only).
+	//
+	// To arrive at this form, the formulation below mixes formula 17 of the first reference,
+	// formula 26 of the second reference, and additional bound constraints on x.
 	var iter = 0;
 	while (true) {
 		// Check the number of iterations
-		if (iter > maxIterations) {
+		if (maxIterations !== -1 && iter > maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 
@@ -4113,19 +4657,37 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 		++iter;
 
 		// Primal update: 
-		// - x_k+1 = proj(x_k - T*(A^t*y_k + c))_[0, +infinity[, with A = [Ae Ai]^t and y_k = [ye yi]^t
-		x_kp = Matrix_.copy(c, x_kp);
-		if (eqContraints) {
-		    tmp_vec_n = Matrix_.atxy(1, Ae, ye_k, tmp_vec_n);
-			x_kp = Matrix_.axpby(1, tmp_vec_n, 1, x_kp, x_kp);
+		// - x_k+1 = proj(x_k - T*(A^t*y_k + c))_[0, +infinity[, with A = [Ae Ai]^t and y_k = [ye yi]^t (no bound constraints)
+		// - x_k+1 = proj(x_k - T*(A^t*y_k + c))_[lb, ub], with A = [Ae Ai]^t and y_k = [ye yi]^t (bound constraints)
+		if (eqContraints && ineqContraints) {
+			x_kp = Matrix_.xpy(Matrix_.xpy(Matrix_.txy(Ae, ye_k, tmp_vec_n), Matrix_.txy(Ai, yi_k, ttmp_vec_n), tmp_vec_n), c, x_kp);
 		}
-		if (ineqContraints) {
-		    tmp_vec_n = Matrix_.atxy(1, Ai, yi_k, tmp_vec_n);
-			x_kp = Matrix_.axpby(1, tmp_vec_n, 1, x_kp, x_kp);
+		else if (eqContraints) {
+			x_kp = Matrix_.xpy(Matrix_.txy(Ae, ye_k, tmp_vec_n), c, x_kp);
 		}
-		tmp_vec_n = Matrix_.elementwiseProduct(x_kp, T, tmp_vec_n);
-		x_kp = Matrix_.axpby(1, x_k, -1, tmp_vec_n, x_kp);
-		x_kp = nonNegativeOrthantEuclideanProjection_(x_kp, x_kp);
+		else if (ineqContraints) {
+			x_kp = Matrix_.xpy( Matrix_.txy(Ai, yi_k, tmp_vec_n), c, x_kp);
+		}
+		x_kp = Matrix_.xmy(x_k, Matrix_.elementwiseProduct(x_kp, T, tmp_vec_n), x_kp);
+		if (boundContraints) {
+			// Projection on the interval [lb, ub]
+			for (var i = 1; i <= n; ++i) {
+				if (x_kp.data[i-1] < lb.data[i-1]) {
+					x_kp.data[i-1] = lb.data[i-1];
+				}
+				else if (x_kp.data[i-1] > ub.data[i-1]) {
+					x_kp.data[i-1] = ub.data[i-1];
+				}
+			}
+		}
+		else {			
+			// Projection on the non-negative orthant
+			for (var i = 1; i <= n; ++i) {
+				if (x_kp.data[i-1] < 0) {
+					x_kp.data[i-1] = 0;
+				}
+			}
+		}
 
 		// Relaxed iterate update:
 		// - z_k = 2*x_k+1 - x_k
@@ -4135,84 +4697,48 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 		// - ye_k+1 = ye_k + Se*(Ae*z_k - be) (equality constraints)
 		// - yi_k+1 = proj(yi_k + Si*(Ai*z_k - bi))_[0, +infinity[ (inequality constraints)
 		if (eqContraints) {
-			tmp_vec_me = Matrix_.axy(1, Ae, z_k, tmp_vec_me);
-			ye_kp = Matrix_.axpby(1, tmp_vec_me, -1, be, ye_kp);
-			tmp_vec_me = Matrix_.elementwiseProduct(ye_kp, Se, tmp_vec_me);
-			ye_kp = Matrix_.axpby(1, ye_k, 1, tmp_vec_me, ye_kp);
+			ye_kp = Matrix_.xpy(ye_k, Matrix_.elementwiseProduct(Matrix_.xmy(Matrix_.xy(Ae, z_k, tmp_vec_me), be, tmp_vec_me), Se, tmp_vec_me), ye_kp);
 		}
 		if (ineqContraints) {
-			tmp_vec_mi = Matrix_.axy(1, Ai, z_k, tmp_vec_mi);
-			yi_kp = Matrix_.axpby(1, tmp_vec_mi, -1, bi, yi_kp);
-			tmp_vec_mi = Matrix_.elementwiseProduct(yi_kp, Si, tmp_vec_mi);
-			yi_kp = Matrix_.axpby(1, yi_k, 1, tmp_vec_mi, yi_kp);
-			yi_kp = nonNegativeOrthantEuclideanProjection_(yi_kp, yi_kp);
+			yi_kp = Matrix_.xpy(yi_k, Matrix_.elementwiseProduct(Matrix_.xmy(Matrix_.xy(Ai, z_k, tmp_vec_mi), bi, tmp_vec_mi), Si, tmp_vec_mi), yi_kp);
+			
+			// Projection on the non-negative orthant
+			for (var i = 1; i <= mi; ++i) {
+				if (yi_kp.data[i-1] < 0) {
+					yi_kp.data[i-1] = 0;
+				}
+			}
 		}
-
-		// Compute the new objective function value (not in the reference)
-		var newFctVal = Matrix_.vectorDotProduct(c, x_kp);
-		
+	
 		// Convergence conditions for (x_k, y_k = [ye yi]^t) to be a saddle point of the min-max problem:
 		// - Convergence of the primal iterates (relative) x_k: ||x_k+1 - x_k||_inf <= eps * ||x_k+1||_inf
 		// - Convergence of the dual iterates (relative) y_k: ||y_k+1 - y_k||_inf <= eps * ||y_k+1||_inf
-		// - Convergence of the objective function values (relative): |<c/x_k> - <c/x_k+1>| <= eps * |<c/x_k+1>|
-		//
-		// Then, as the problem is a linear programming problem, it can be additionally checked:
-		// - Primal feasibility (absolute) Ae*x_k = be (equality constraints) and Ai*x_k <= bi (inequality constraints): 
-		//  ||Ae*x_k - be||_inf <= eps and ||(Ai*x_k - bi)^+||_inf <= eps
-		// - Primal feasibility x_k >= 0: guaranteed per construction of x_k
-		res_x_kp_x_k = Matrix_.axpby(1, x_kp, -1, x_k, res_x_kp_x_k);
+		res_x_kp_x_k = Matrix_.xmy(x_kp, x_k, res_x_kp_x_k);
 		var res_x_kp_x_k_inf_norm = res_x_kp_x_k.vectorNorm('infinity');
 		var x_kp_inf_norm = x_kp.vectorNorm('infinity');
 		
-		var res_y_kp_y_k_inf_norm = 0;
-		var y_kp_inf_norm = 0;
+		var res_ye_kp_ye_k_inf_norm = 0;
+		var ye_kp_inf_norm = 0;
 		if (eqContraints) {
-		    res_ye_kp_ye_k = Matrix_.axpby(1, ye_kp, -1, ye_k, res_ye_kp_ye_k);
-		    res_y_kp_y_k_inf_norm = Math.max(res_ye_kp_ye_k.vectorNorm('infinity'), 
-		                                     res_y_kp_y_k_inf_norm);
+		    res_ye_kp_ye_k = Matrix_.xmy(ye_kp, ye_k, res_ye_kp_ye_k);
+		    res_ye_kp_ye_k_inf_norm = res_ye_kp_ye_k.vectorNorm('infinity');
 											 
-			y_kp_inf_norm = Math.max(ye_kp.vectorNorm('infinity'), y_kp_inf_norm);
-		}
-		if (ineqContraints) {
-		    res_yi_kp_yi_k = Matrix_.axpby(1, yi_kp, -1, yi_k, res_yi_kp_yi_k);
-		    res_y_kp_y_k_inf_norm = Math.max(res_yi_kp_yi_k.vectorNorm('infinity'), 
-		                                     res_y_kp_y_k_inf_norm);
-			
-			y_kp_inf_norm = Math.max(yi_kp.vectorNorm('infinity'), y_kp_inf_norm);
+			ye_kp_inf_norm = ye_kp.vectorNorm('infinity');
 		}
 		
-		var res_f_kp_f_k_inf_norm = Math.abs(newFctVal - fctVal);
-        var f_kp_inf_norm = Math.abs(newFctVal);
-        
-		if (res_x_kp_x_k_inf_norm <= optimalityEps * x_kp_inf_norm  && 
-		    res_y_kp_y_k_inf_norm <= optimalityEps * y_kp_inf_norm &&
-		    res_f_kp_f_k_inf_norm <= optimalityEps * f_kp_inf_norm) {
-			// Compute the degree of primal feasibility 
-			var p_k_eq = true;
-			var p_k_ineq = true;
+		var res_yi_kp_yi_k_inf_norm = 0;
+		var yi_kp_inf_norm = 0;
+		if (ineqContraints) {
+		    res_yi_kp_yi_k = Matrix_.xmy(yi_kp, yi_k, res_yi_kp_yi_k);
+		    res_yi_kp_yi_k_inf_norm = res_yi_kp_yi_k.vectorNorm('infinity');
 			
-			// Compute the degree of primal feasibility on equality constraints
-			// pe_k = Ae*x_k+1 - be
-			if (eqContraints) {
-			    tmp_vec_me = Matrix_.axy(1, Ae, x_kp, tmp_vec_me);
-				pe_k = Matrix_.axpby(1, tmp_vec_me, -1, be, pe_k);
-			    p_k_eq = pe_k.vectorNorm('infinity') <= optimalityEps * be_inf_norm;
-			}
-
-			// Compute the degree of primal feasibility on inequality constraints
-			// pi_k = (Ai*x_k+1 - bi)^+
-			if (ineqContraints) {
-			    tmp_vec_mi = Matrix_.axy(1, Ai, x_kp, tmp_vec_mi);
-				pi_k = Matrix_.axpby(1, tmp_vec_mi, -1, bi, pi_k);
-				pi_k = nonNegativeOrthantEuclideanProjection_(pi_k, pi_k);
-				
-				p_k_ineq = pi_k.vectorNorm('infinity') <= optimalityEps * bi_inf_norm;
-			}
-			
-			// Convergence condition
-			if (p_k_eq && p_k_ineq) {
-				break;
-			}
+			yi_kp_inf_norm = yi_kp.vectorNorm('infinity');
+		}
+		
+		if (res_x_kp_x_k_inf_norm <= eps * x_kp_inf_norm  && 
+		    res_ye_kp_ye_k_inf_norm <= eps * ye_kp_inf_norm &&
+			res_yi_kp_yi_k_inf_norm <= eps * yi_kp_inf_norm) {
+			break;
 		}
 		
 		// Prepare the next iteration:
@@ -4225,17 +4751,17 @@ function nonNegativeOrthantEuclideanProjection_(x, out) {
 		if (ineqContraints) {
 		    yi_k = Matrix_.copy(yi_kp, yi_k);
 		}
-		fctVal = newFctVal;
 	}
 	
+	// Compute the objective function value.
+	var fctVal = Matrix_.vectorDotProduct(c, x_kp);
+
 	// Return the computed primal iterate and the associated objective
 	// function value.
-	return [x_kp, newFctVal];		
+	return [x_kp, fctVal];		
  }
  
  
- 
-
 
 /**
 * @file Functions related to computations on the unit simplex.
@@ -4373,7 +4899,7 @@ function simplexRandomSampler_(n) {
 			this.x[i] = e;
 			
 			// Compute the running sum of the exponential variables, for the subsequant normalization step.
-			sum = sum + e;
+			sum += e;
 		}
 
 		// Normalization of the computed coordinates of the point being sampled, so that
@@ -4683,13 +5209,13 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 	var assetsToClustersWeightsT = assetsToClustersWeights.transpose()
 	
 	// 3a - Compute the the covariance matrix associated to the weighted clusters space, using formula Var(A*X) = A * Var(X) * A'.
-	var clustersSigma = Matrix_.product(assetsToClustersWeights, Matrix_.product(sigma, assetsToClustersWeightsT));
+	var clustersSigma = Matrix_.xy(assetsToClustersWeights, Matrix_.xy(sigma, assetsToClustersWeightsT));
 	
 	// 3b - Compute ERC weights in the clusters space
 	var clustersWeights = self.equalRiskContributionWeights(clustersSigma, opt);
 	
 	// 3c - Compute original assets weights, using formula A' * Y
-	var weights = Matrix_.product(assetsToClustersWeightsT, new Matrix_(clustersWeights));
+	var weights = Matrix_.xy(assetsToClustersWeightsT, new Matrix_(clustersWeights));
 	
 	// Return them (already normalized)
 	return weights.toArray();
@@ -4785,7 +5311,7 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 		//
 		// Note: all risk contributions are equal, by definition of the ERC portfolio
 		assetsWeightsMatrix = new Matrix_(assetsWeights);
-		var rcValue =  assetsWeightsMatrix.getValueAt(1,1) * Matrix_.product(subsetSigma, assetsWeightsMatrix).getValueAt(1,1) // = x_1 * (Sigma*x)_1
+		var rcValue =  assetsWeightsMatrix.getValueAt(1,1) * Matrix_.xy(subsetSigma, assetsWeightsMatrix).getValueAt(1,1) // = x_1 * (Sigma*x)_1
 		
 		// If the risk contribution of the current subset is lower than the current minimum risk contribution, it
 		// becomes the new minimum risk contribution and the current subset becomes the new list of associated assets.
@@ -4834,8 +5360,8 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 * 
 * @see <a href="https://ssrn.com/abstract=1949003">Carvalho, Raul Leote de and Xiao, Lu and Moulin, Pierre, Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description (September 13, 2011). The Journal of Portfolio Management, vol. 38, no. 3, Spring 2012.</a>
 * 
-* @param {Matrix_|<Array.<number>} sigma the variance vector (sigma_i),i=1..n of the n assets in the considered universe, column Matrix (i.e., vector) or array of n real numbers statisfying sigma[i-1] = sigma_i.
-* @param {object} opt the optional parameters for the algorithm, unused.
+* @param {Matrix_|<Array.<number>} sigma the variance vector (sigma_i),i=1..n of the n assets in the considered universe, an n by 1 matrix (i.e., vector) or an array of n real numbers statisfying sigma[i-1] = sigma_i.
+* @param {object} opt optional parameters for the algorithm, unused.
 * @return {Array.<number>} the weights corresponding to the equal risk budget portfolio, array of n real numbers.
 *
 * @example
@@ -4873,20 +5399,15 @@ self.equalRiskBudgetWeights = function (sigma, opt) {
 * @summary Compute the weights of the equal risk contribution portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only portfolio
-* of n assets with equal risk contributions, defined as the weights with the property that the contribution 
-* of each asset to the risk of the portfolio is equal.
+* of n assets with equal risk contributions.
+*
+* This portfolio has the property that the contribution of each asset to the risk of the portfolio is equal,
+* and is a special case of the more generic risk budgeting portfolio, with all risk budgets
+* equal, c.f. the first reference.
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
-* 
-* This portfolio is a trade-off between the MV portfolio and the EW portfolio.
-* It can be viewed as an ERB portfolio tilted toward the assets less correlated with other assets.
 *
-* This portfolio maximizes the Sharpe ratio if the Sharpe ratio for each stock is the same and all pair-wise correlations are equal.
-*
-* This portfolio is a special case of the more generic risk budgeting portfolio, with all risk budgets
-* equal.
-*
-* The algorithm used is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
+* To be noted that the algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is definite positive.
 *
 * @see <a href="http://www.iijournals.com/doi/abs/10.3905/jpm.2010.36.4.060">Maillard, S., Roncalli, T., Teiletche, J.: The properties of equally weighted risk contribution portfolios. J. Portf. Manag. 36, 60–70 (2010)</a>
@@ -4935,8 +5456,6 @@ self.equalRiskContributionWeights = function (sigma, opt) {
 *
 * This portfolio is unique.
 *
-* This portfolio maximizes the Sharpe ratio if the returns and volatilities are the same for all assets and all pair-wise correlations are equal.
-* 
 * @see <a href="https://academic.oup.com/rfs/article-abstract/22/5/1915/1592901/Optimal-Versus-Naive-Diversification-How">Victor DeMiguel, Lorenzo Garlappi, Raman Uppal; Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?. Rev Financ Stud 2009; 22 (5): 1915-1953. doi: 10.1093/rfs/hhm075</a>
 * 
 * @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
@@ -4976,13 +5495,14 @@ self.equalWeights = function (nbAssets, opt) {
 * @summary Compute the weights of the global minimum variance portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only
-* global minimum variance portfolio of n assets, defined as the weights which minimizes the variance of the portfolio.
+* global minimum variance portfolio of n assets.
 *
-* This portfolio lies on the Markowitz efficient frontier.
+* This portfolio is Markowitz-efficient (i.e., it lies on the Markowitz efficient frontier) and is the portfolio
+* with the lowest variance among all the feasible portfolios.
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 * 
-* The algorithm used is a cyclical coordinate descent, c.f. the reference, whose convergence is guaranteed
+* To be noted that the algorithm used internally is a cyclical coordinate descent, c.f. the reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is definite positive.
 *
 * @see <a href="https://ssrn.com/abstract=2595051">Richard, Jean-Charles and Roncalli, Thierry, Smart Beta: Managing Diversification of Minimum Variance Portfolios (March 2015)</a>
@@ -5022,8 +5542,8 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	x = x.normalize(x);
 	
 	// Preparational computations
-	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
-	var sigma_x_2 = Matrix_.product(sigma, x); // SIGMA*x
+	var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
+	var sigma_x_2 = Matrix_.xy(sigma, x); // SIGMA*x
 	var var_x = Matrix_.vectorDotProduct(sigma_x, x); // sigma(x), the portfolio variance
 	var obj = 0.5 * var_x - x.sum();
 	
@@ -5059,7 +5579,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 			x.setValueAt(i, 1, xi_star_1);
 
     	      // Case #1 updated SIGMA*x and x'*SIGMA*x products
-    	    sigma_x = Matrix_.product(sigma, x, sigma_x);
+    	    sigma_x = Matrix_.xy(sigma, x, sigma_x);
     	    var_x = Matrix_.vectorDotProduct(sigma_x, x);
 			
 			  // Case #1 objective function computation
@@ -5073,7 +5593,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 				x.setValueAt(i, 1, xi_star_2);
 				
 				// Case #2 updated SIGMA*x and x'*SIGMA*x products
-				sigma_x_2 = Matrix_.product(sigma, x, sigma_x_2);
+				sigma_x_2 = Matrix_.xy(sigma, x, sigma_x_2);
 				var var_x_2 = Matrix_.vectorDotProduct(sigma_x_2, x);
 				
 				// Case #2 objective function computation
@@ -5194,6 +5714,123 @@ self.gridSearchWeights = function (nbAssets, fct, opt) {
 
 
 /**
+ * @file Functions related to minimax weights portfolio.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function minimaxWeights
+*
+* @summary Compute the weights of a minimax portfolio.
+*
+* @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only 
+* minimax portfolio of n assets.
+*
+* Optionally, the following constraint can be added:
+* - Partial investment contraint, replacing the full investment contraint
+*
+* A minimax portfolio has the property that it maximizes the minimum possible return over the period on which it is computed,
+* c.f. the first reference.
+*
+* This portfolio might not be unique.
+*
+* @see <a href="http://www.jstor.org/stable/2634472">Young, M. (1998). A Minimax Portfolio Selection Rule with Linear Programming Solution. Management Science, 44(5), 673-683.</a>
+* @see <a href="https://link.springer.com/article/10.1007/s11135-005-1054-0">Yuanyao Ding, (2006), Portfolio Selection under Maximum Minimum Criterion, Quality & Quantity: International Journal of Methodology, 40, (3), 457-468</a>
+*
+* @param {Array.<Array.<number>>} assetsReturns an array of n arrays of T real numbers representing the returns of n assets over T periods of time.
+* @param {object} opt optional parameters for the algorithm.
+* @param {boolean} opt.contraints.partialInvestment parameter set to true in case the full investment constraint of the portfolio must be replaced
+* by a partial investment constraint; defaults to false.
+* @return {Array.<number>} the weights corresponding to a minimax portfolio, array of real numbers of length n.
+*
+* @example
+* minimaxWeights([[0.01, -0.02, 0.01], [-0.05, 0.03, 0.01]]);
+* // ~[ 0.727, 0.273 ]
+*/
+self.minimaxWeights = function (assetsReturns, opt) {
+	// TODO: Checks, if enabled
+
+	// Decode options
+	if (opt === undefined) {
+		opt = { contraints: {} };
+	}
+	var partialInvestmentContraint = false;
+	if (opt.contraints.partialInvestment !== undefined) {
+		partialInvestmentContraint = opt.contraints.partialInvestment;
+	}
+	
+	// Initializations
+	var nbAssets = assetsReturns.length;
+	var nbPeriods = assetsReturns[0].length;
+	
+	
+	// ----
+	
+	// The minimax portfolio is the solution to a linear programming problem,
+	// choosen to be the one of the formula 21 of the second reference instead of
+	// the one of the section 1.1 of the first reference.
+	//
+	// In other zords, no minimum return is imposed on the portfolio, 
+	// so that the linear program is always feasible.
+
+		// Build the objective function (c.f. formula 1a of the first reference):
+		// - Maximize the minimum portfolio return
+	var c = Matrix_.fill(nbAssets + 1, 1, function(i,j) { return i <= nbAssets ? 0 : -1; }); // c = [0,...,0,-1]
+	
+		// Build the equality constraints (c.f. formula 1d of the first reference for the inequality equivalent):
+		// - Full investment (optional)
+	var Ae = null;
+	var be = null;
+	if (partialInvestmentContraint === false) {
+		Ae = Matrix_.fill(1, nbAssets + 1, function(i,j) { return j <= nbAssets ? 1 : 0; }); // Ae = [1,...,1,0]
+		be = Matrix_.ones(1,1); // be = [1]
+	}
+	
+		// Build the inequality constraints (c.f. formula 1b of the first reference):
+		// - Portfolio return greater than or equal to the minimum portfolio return, for each period
+		// - Partial investment (optional)
+	var Ai = Matrix_.fill(nbPeriods + (partialInvestmentContraint ? 1 : 0), nbAssets + 1, 
+						  function(i,j) { 
+								if (i <= nbPeriods) { return j <= nbAssets ? -assetsReturns[j-1][i-1] : 1; }
+								else if (i == nbPeriods + 1) { return j <= nbAssets ? 1 : 0; }
+						  }); // Ai = [[-ret11,...,-retN1,1]...[-ret1T,...,-retNT,1] (optional: , [1,...,1,0])]
+	var bi = Matrix_.fill(nbPeriods + (partialInvestmentContraint ? 1 : 0), 1, 
+						  function(i,j) { 
+							  if (i <= nbPeriods) { return 0; }
+							  else if (i == nbPeriods + 1) { return 1; }
+						  }); // bi = [0, ..., 0 (optional: , 1)]
+	
+		// Build the bound constraints (c.f. formula 1e of the first reference + the definition of M_p):
+		// - No short sales
+		// - Absence of leverage
+		// - "Unbounded" minimum portfolio return
+	var lb = Matrix_.fill(nbAssets + 1, 1, function(i,j) { return i <= nbAssets ? 0 : -Infinity; }); // lb = [0,...,0, -Infinity]
+	var ub = Matrix_.fill(nbAssets + 1, 1, function(i,j) { return i <= nbAssets ? 1 : Infinity; });  // ub = [1,...,1, Infinity]
+	
+		// Solve the constructed linear program, which is:
+		// - Bounded: the portfolio weights belong to the unit simplex
+		//            the minimum portfolio return is bounded below by the minimum portfolio return over all the periods
+		// - Feasible: the portfolio with the minimum return over all the periods is a solution to the linear program
+		//
+		// Note: given the assumptions above, the convergence of the primal-dual hybrid gradient algorithm is guaranteed.
+	var lpSolution = lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, lb, ub, {maxIter: -1});
+	
+	
+	// ----
+	
+	// Extract the computed portfolio weights.
+	var weights = Matrix_.fill(nbAssets, 1, function(i,j) {  return lpSolution[0].getValueAt(i, 1); });
+
+	// Return the computed weights.
+	return weights.toArray();
+}
+
+/**
  * @file Functions related to minimum correlation (heuristic) portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -5283,7 +5920,7 @@ self.minCorrWeights = function (sigma, opt) {
 	var weights = new Matrix_(ranks, 1).normalize();
 	
 	// Step 6: Combine rank portfolio weight estimates with Adjusted Correlation Matrix
-	weights = Matrix_.product(adjustedRho, weights).normalize();
+	weights = Matrix_.xy(adjustedRho, weights).normalize();
 	
 	// Step 7: Scale portfolio weights by assets standard deviations
 	weights = Matrix_.vectorHadamardProduct(weights, invStddevs).normalize();
@@ -5315,7 +5952,7 @@ self.minCorrWeights = function (sigma, opt) {
 * 
 * This portfolio maximizes the Sharpe ratio if the Sharpe ratio of each asset is the same.
 *
-* The algorithm used is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
+* The algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is definite positive.
 *
 * @see <a href="http://www.iijournals.com/doi/abs/10.3905/JPM.2008.35.1.40">Toward Maximum Diversification by Y. Choueifaty, Y. Coignard, The Journal of Portfolio Management, Fall 2008, Vol. 35, No. 1: pp. 40-51</a>
@@ -5359,8 +5996,8 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 	x = x.normalize(x);
 	
 	// Preparational computations
-	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
-	var sigma_x_2 = Matrix_.product(sigma, x); // SIGMA*x
+	var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
+	var sigma_x_2 = Matrix_.xy(sigma, x); // SIGMA*x
 	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
 	var dr = Matrix_.vectorDotProduct(stddevs, x) / s_x; // diversification ratio DR
 	
@@ -5396,7 +6033,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 			x.setValueAt(i, 1, xi_star_1);
 
     	      // Case #1 updated SIGMA*x and x'*SIGMA*x products
-    	    sigma_x = Matrix_.product(sigma, x, sigma_x)
+    	    sigma_x = Matrix_.xy(sigma, x, sigma_x)
     	    s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x));
 			
 			  // Case #1 diversification ratio computation
@@ -5410,7 +6047,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 				x.setValueAt(i, 1, xi_star_2);
 				
 				// Case #2 updated SIGMA*x and x'*SIGMA*x products
-				sigma_x_2 = Matrix_.product(sigma, x, sigma_x_2);
+				sigma_x_2 = Matrix_.xy(sigma, x, sigma_x_2);
 				var s_x_2 = Math.sqrt(Matrix_.vectorDotProduct(sigma_x_2, x));
 				
 				// Case #2 diversification ratio computation
@@ -5539,26 +6176,31 @@ self.minVarWeights = function (sigma, opt) {
 /**
 * @function randomWeights
 *
-* @summary Compute the weights of a random weighted portfolio.
+* @summary Compute the weights of a randomly generated portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only 
-* random portfolio of n assets, optionally satisfying:
-* - Cardinality constraints on the number of assets hold
+* random portfolio of n assets.
 *
-* This kind of portfolio has several applications in asset allocation, c.f. the first reference, as
+* Optionally, the following constraints can be added:
+* - Minimum number of assets to include in the portfolio
+* - Maximum number of assets to include in the portfolio
+*
+* This portfolio is not unique.
+*
+* Random portfolios have several applications in asset allocation, c.f. the first reference, as
 * well as in trading strategies evaluation, c.f. the second reference.
 *
-* The algorithms used internally by this function should allow the random portfolios to be generated uniformly
+* To be noted that the algorithms used internally allow the random portfolios to be generated uniformly
 * among all the feasible portfolios.
 *
 * @see <a href="https://arxiv.org/abs/1008.3718">William T. Shaw, Monte Carlo Portfolio Optimization for General Investor Risk-Return Objectives and Arbitrary Return Distributions: a Solution for Long-only Portfolios</a>
-* @see <a href="https://ssrn.com/abstract=881735"> Burns, Patrick, Random Portfolios for Evaluating Trading Strategies (January 13, 2006)</a>
+* @see <a href="https://ssrn.com/abstract=881735">Burns, Patrick, Random Portfolios for Evaluating Trading Strategies (January 13, 2006)</a>
 *
 * @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
-* @param {object} opt the optional parameters for the algorithm.
+* @param {object} opt optional parameters for the algorithm.
 * @param {number} opt.contraints.minAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
 * @param {number} opt.contraints.maxAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets.
-* @return {Array.<number>} the weights corresponding to a random weighted portfolio, array of real numbers of length nbAssets.
+* @return {Array.<number>} the weights corresponding to a random portfolio, array of real numbers of length nbAssets.
 *
 * @example
 * randomWeights(5);
@@ -5637,12 +6279,14 @@ self.randomWeights = function (nbAssets, opt) {
 * @summary Compute the weights of the risk budgeting portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only portfolio
-* of n assets with risk budgeting contraints, defined as the weights with the property that the total contribution 
+* of n assets with risk budgeting contraints.
+*
+* This portfolio has the property that the total contribution 
 * of each asset to the risk of the portfolio is equal to a pre-determined budget weight.
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 * 
-* The algorithm used is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
+* To be noted that the algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is definite positive.
 *
 * @see <a href="https://ssrn.com/abstract=2009778">Bruder, Benjamin and Roncalli, Thierry, Managing Risk Exposures Using the Risk Budgeting Approach (January 20, 2012).</a>
@@ -5688,7 +6332,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 	x = x.normalize(x);
 	
 	// Preparational computations
-	var sigma_x = Matrix_.product(sigma, x); // SIGMA*x
+	var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
 	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
 	
 	// Main loop until convergence, guaranteed as per hypotheses on sigma and b
@@ -5720,7 +6364,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
     	    x.setValueAt(i,1,xi_star);
     	    
     	    // Compute the updated SIGMA*x and x'*SIGMA*x products for convergence condition evaluation + next loop evaluation
-    	    sigma_x = Matrix_.product(sigma, x, sigma_x)
+    	    sigma_x = Matrix_.xy(sigma, x, sigma_x)
     	    s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x));
     	    
     	    // Update the convergence condition: |RC_i* - b_i| <= eps, i = 1..nbAssets
@@ -5785,8 +6429,11 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 self.roundedWeights = function (originalWeights, k) {
 	// ------
 	
-	// Direct call to the simplex rational rounding method
-	return simplexRationalRounding_(originalWeights, k);
+	// Call to the simplex rational rounding method
+	var roundedWeights = simplexRationalRounding_(originalWeights, k);
+
+	// Return the computed weights
+	return roundedWeights;	
 }
 
 /**

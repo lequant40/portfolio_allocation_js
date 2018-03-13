@@ -102,7 +102,7 @@ QUnit.test('Matrix-vector product', function(assert) {
   // Test matrix-vector product using static data
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
   var vec = new PortfolioAllocation.Matrix([1,2,3]);
-  var prodVec = PortfolioAllocation.Matrix.product(mat, vec);
+  var prodVec = PortfolioAllocation.Matrix.xy(mat, vec);
 
   var expectedResVec = new PortfolioAllocation.Matrix([14,32]);
   assert.equal(PortfolioAllocation.Matrix.areEqual(prodVec, expectedResVec), true, 'Matrix-vector product');

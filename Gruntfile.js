@@ -75,7 +75,7 @@ module.exports = function(grunt) {
 
 	concat: {
 	  portfolio_allocation: {
-	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/vector.js', 'lib/matrix/covmatrix.js', 'lib/stats/*.js', 'lib/allocation/*.js', 'lib/footer.js'],
+	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/covmatrix.js', 'lib/stats/*.js', 'lib/allocation/*.js', 'lib/footer.js'],
 	    dest: 'dist/portfolio_allocation.dev.js',
 	  }
 	},

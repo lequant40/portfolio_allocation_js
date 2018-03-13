@@ -5,27 +5,52 @@ QUnit.module('Combinatorics internal module', {
   }
 });
 
-/*
+
 QUnit.test('Alias method sampler', function(assert) {    
   // Test with random data
   {
-	  var aliasSampler = new PortfolioAllocation.aliasMethodSampler_([0, 0.1, 0.4, 0.5]);
-	  console.log(aliasSampler.sample());
-	  console.log(aliasSampler.sample());
-	  console.log(aliasSampler.sample());
-	  console.log(aliasSampler.sample());
+	  // Setup parameters of the random test
+	  var nbTests = 10;
+	  var minSizeProbabilityDistribution = 1;
+	  var maxSizeProbabilityDistribution = 50;
+	  var nbSamplesToDraw = 100;
+	  
+	  // For each test, generate a probability distribution, and then sample
+	  // from this probability distribution, ensuring the generated values are coherent.
+	  for (var i = 0; i < nbTests; ++i) {
+		// Generate a random discrete probability distribution of a random size
+		var sizeProbabilityDistribution = Math.floor(Math.random()*(maxSizeProbabilityDistribution - minSizeProbabilityDistribution + 1) + minSizeProbabilityDistribution);
+		var probabilityDistribution = new Array(sizeProbabilityDistribution);
+		var normalizationConstant = 0;
+		for (var j = 0; j < probabilityDistribution.length; ++j) { 
+			probabilityDistribution[j] = Math.random(); 
+			normalizationConstant += probabilityDistribution[j];
+		}
+		for (var j = 0; j < probabilityDistribution.length; ++j) { 
+			probabilityDistribution[j] /= normalizationConstant;
+		}
+		
+		// Construct an alias sampler associated to the generated probability distribution.
+		var aliasSampler = new PortfolioAllocation.aliasMethodSampler_(probabilityDistribution);
+		
+		// Sample from the alias sampler.
+		for (var j = 0; j < nbSamplesToDraw; ++j) {
+			var s = aliasSampler.sample();
+			assert.equal(s >= 0 && s <= probabilityDistribution.length -1, true, "Alias method sampler, elements in correct range - Test " + i + "," + j);
+		}
+	  }	  
   }
 
 });
-*/
+
 
 QUnit.test('Next composition computation', function(assert) {    
   // Reference: Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
   // Test with the static data examples of section 5
   {
-	  var expectedValues = [[true,[6,0,0]],[true, [5,1,0]],[true, [4,2,0]],[true, [3,3,0]],[true, [2,4,0]],[true, [1,5,0]],[true, [0,6,0]],[true, [5,0,1]],[true, [4,1,1]],[true, [3,2,1]],[true, [2,3,1]],[true, [1,4,1]],[true, [0,5,1]],[true, [4,0,2]],[true, [3,1,2]],[true, [2,2,2]],[true, [1,3,2]],[true, [0,4,2]],[true, [3,0,3]],[true, [2,1,3]],[true, [1,2,3]],[true, [0,3,3]],[true, [2,0,4]],[true, [1,1,4]],[true, [0,2,4]],[true, [1,0,5]],[true, [0,1,5]],[false, [0,0,6]]];
-	  
-	  var nextCompositionIterator = new PortfolioAllocation.compositionsIterator_(6, 3);
+	var expectedValues = [[true,[6,0,0]],[true, [5,1,0]],[true, [4,2,0]],[true, [3,3,0]],[true, [2,4,0]],[true, [1,5,0]],[true, [0,6,0]],[true, [5,0,1]],[true, [4,1,1]],[true, [3,2,1]],[true, [2,3,1]],[true, [1,4,1]],[true, [0,5,1]],[true, [4,0,2]],[true, [3,1,2]],[true, [2,2,2]],[true, [1,3,2]],[true, [0,4,2]],[true, [3,0,3]],[true, [2,1,3]],[true, [1,2,3]],[true, [0,3,3]],[true, [2,0,4]],[true, [1,1,4]],[true, [0,2,4]],[true, [1,0,5]],[true, [0,1,5]],[false, [0,0,6]]];
+
+	var nextCompositionIterator = new PortfolioAllocation.compositionsIterator_(6, 3);
 	  for (var i = 0; i < expectedValues.length; ++i) {
 		var nextComposition = nextCompositionIterator.next();
 		assert.deepEqual(nextComposition, expectedValues[i], 'Next composition - Test 1 #' + i);

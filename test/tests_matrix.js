@@ -34,6 +34,7 @@ QUnit.module('Matrix internal module', {
 });
 
 
+
 QUnit.test('Matrix basic manipulations', function(assert) {    
   // Test non square matrix using random data
   {
@@ -99,9 +100,9 @@ QUnit.test('Matrix-matrix product', function(assert) {
   var mat1 = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
   var mat2 = new PortfolioAllocation.Matrix([[1,2], [2,4], [3,6]]);
 
-  var prodMat = PortfolioAllocation.Matrix.product(mat1, mat2);
+  var prodMat = PortfolioAllocation.Matrix.xy(mat1, mat2);
   var expectedResMat = new PortfolioAllocation.Matrix([[14,28], [32,64]]);
-  assert.equal(PortfolioAllocation.Matrix.areEqual(prodMat, expectedResMat), true, 'Matrix-matrix product');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(prodMat, expectedResMat), true, 'Matrix-matrix XY');
 
   var axyMat = PortfolioAllocation.Matrix.axy(2, mat1, mat2);
   var expectedResMat = new PortfolioAllocation.Matrix([[28,56], [64, 128]]);
@@ -109,11 +110,11 @@ QUnit.test('Matrix-matrix product', function(assert) {
 
   var mat3 = mat1.transpose();
   var atxyMat = PortfolioAllocation.Matrix.atxy(2, mat3, mat2);
-  assert.equal(PortfolioAllocation.Matrix.areEqual(atxyMat, expectedResMat), true, 'Matrix-matrix ATXY');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(atxyMat, expectedResMat), true, 'Matrix-matrix AX^tY');
 
   var mat4 = mat2.transpose();
   var axtyMat = PortfolioAllocation.Matrix.axty(2, mat1, mat4);
-  assert.equal(PortfolioAllocation.Matrix.areEqual(axtyMat, expectedResMat), true, 'Matrix-matrix AXTY');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(axtyMat, expectedResMat), true, 'Matrix-matrix AXY^t');
   
   // TODO: use random data
 });
@@ -305,7 +306,7 @@ QUnit.test('QR decomposition', function(assert) {
   // TODO: Test error case
 });
 
-QUnit.test('Singular value decomposition', function(assert) {    
+QUnit.test('Singular value decomposition', function(assert) {      
   // Test using static data, m = n case
   // Validated with Matlab
   {
@@ -362,33 +363,35 @@ QUnit.test('Singular value decomposition', function(assert) {
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(V, expectedV), true, 'SVD decomposition, thin - #2 3/3');	  
   }
 
-
-  // TODO: Test using random data: check dimensions, formula, properties
+  // Test using static data, based on discussion: https://lists.gnu.org/archive/html/bug-gsl/2005-04/msg00008.html 
+  {
+	var mat1 = new PortfolioAllocation.Matrix([[1,0,0,0], [0,1,0,0], [0,0,0,0], [0,0,0,1]]);
+	var mat2 = new PortfolioAllocation.Matrix([[1,0,0,0], [0,1,0,0], [0,0,0.1,0], [0,0,0,1]]);
+	
+    // Computation of a SVD decomposition of mat1
+    var svd = PortfolioAllocation.Matrix.svdDecomposition(mat1);
+    var S1 = svd[1];
+	
+	var expectedS1 = new PortfolioAllocation.Matrix([[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,0]]);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(S1, expectedS1), true, 'SVD decomposition, GSL error case - #1 1/2');
+	
+    // Computation of a SVD decomposition of mat2
+    var svd = PortfolioAllocation.Matrix.svdDecomposition(mat2);
+    var S2 = svd[1];
+	
+	var expectedS2 = new PortfolioAllocation.Matrix([[1,0,0,0], [0,1,0,0], [0,0,1,0], [0,0,0,0.1]]);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(S2, expectedS2), true, 'SVD decomposition, GSL error case - #1 2/2');
+  }
   
-  // TODO: Test error case
-  /*
-  Hello all,
-
-I think that there is a bug in gsl_linalg_SV_decomp_jacobi. Given the 
-following matrix: 
-
-1 0 0 0
-0 1 0 0
-0 0 z 0
-0 0 0 1
-
-for z = 0, the singular values computed by SV_decomp_jacobi seem to be wrong:
-SV_decomp:        [ 1, 1, 1, 0]
-SV_decomp_mod:    [ 1, 1, 1, 0]
-SV_decomp_jacobi: [ 1, 1, 0, 0]
-                          ^
-                          WRONG?
-                              
-for z = 0.1 the singular values are correct but not ordered: 
-SV_decomp:        [ 1, 1, 1, 0.1]
-SV_decomp_mod:    [ 1, 1, 1, 0.1]
-SV_decomp_jacobi: [ 1, 1, 0.1, 1]
-*/
+  // Unsupported case, m < n case
+  {
+      var mat = new PortfolioAllocation.Matrix([[-3,5,7], [2,6,4]]);
+      assert.throws(function() { PortfolioAllocation.Matrix.svdDecomposition(mat); },
+		                         new Error('matrix has more columns than rows: 3 v.s. 2'),
+		                         "SVD decomposition, unsupported m < n case");
+  }
+  
+    // TODO: Test using random data
 });
 
 
@@ -445,6 +448,24 @@ QUnit.test('Nullspace computation', function(assert) {
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(ns, expectedNs), true, 'Nullspace computation, m > n - #2');
   }
   
+  // Test using static data, m = n case, nullspace of dimension 1 but of numerical dimension close to 0
+  // Validated with Wolfram Alpha
+  {
+  	  var mat = new PortfolioAllocation.Matrix([[2,1],[-4,-2]]);
+	  
+	  // Computation of an orthogonal basis of Ker(A) with default tolerance
+	  var ns = PortfolioAllocation.Matrix.nullSpace(mat);
+	  
+	  var expectedNs = new PortfolioAllocation.Matrix([-0.4472135954999578, 0.8944271909999159]);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(ns, expectedNs), true, 'Nullspace computation, m == n - #1 1/2');
+	  
+	  // Computation of an orthogonal basis of Ker(A) with 1e-16 tolerance
+	  var ns = PortfolioAllocation.Matrix.nullSpace(mat, {eps: 1e-16});
+	  
+	  var expectedNs = new PortfolioAllocation.Matrix([0, 0]);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(ns, expectedNs), true, 'Nullspace computation, m == n - #1 2/2');
+  }
+   
    // TODO: Test random data
 });
 
@@ -628,15 +649,30 @@ QUnit.test('Matrix row/columns norms computation', function(assert) {
 });
 
 
-QUnit.test('Linear system solver - Randomized Kaczmarz algorithm', function(assert) {    
+QUnit.test('Linear system solver - Upper triangular system solve via back substitution', function(assert) {    
+  // Test using static data  
+  {
+      var A = new PortfolioAllocation.Matrix([[1, 2, 1, -1], [0, -4, 1, 7], [0, 0, -2, 1], [0, 0, 0, -1]]);
+	  var b = new PortfolioAllocation.Matrix([5, 1, 1, 3]);
+      var expectedX = new PortfolioAllocation.Matrix([16, -6, -2, -3]);
+	  
+	  var x = PortfolioAllocation.Matrix.linsolveBackSubstitution(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Upper triangular linear system solve - Back substitution algorithm #1');
+  }
+  
+  // TODO: Test random data
+});
+
+
+QUnit.test('Linear system solver - Extended Kaczmarz algorithm', function(assert) {    
   // Limit case: null matrix; in this case, the least square solution is null as well
   {
 	  var A = new PortfolioAllocation.Matrix([[0,0,0], [0,0,0], [0, 0, 0]]);
 	  var b = new PortfolioAllocation.Matrix([1,2,3]);
       var expectedX = new PortfolioAllocation.Matrix([0, 0, 0]);
 
-	  var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
-	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Kaczmarz algorithm #1');
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Extended Kaczmarz algorithm #1');
   }
   
   // Test using static data
@@ -646,8 +682,8 @@ QUnit.test('Linear system solver - Randomized Kaczmarz algorithm', function(asse
 	  var b = new PortfolioAllocation.Matrix([1,-2,0]);
       var expectedX = new PortfolioAllocation.Matrix([1, -2, -2]);
 
-	  var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
-	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #2');
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Extended Kaczmarz algorithm #2');
   }
   
   // Reference: Tanabe, K.: An algorithm for the constrained maximization in nonlinear programming, Research Memorandum No. 31, The Institute of Statistical Mathematics, 1969.
@@ -658,8 +694,8 @@ QUnit.test('Linear system solver - Randomized Kaczmarz algorithm', function(asse
 	var b = new PortfolioAllocation.Matrix([1.4, 2.2, 15.0, 2.1]);
 	var expectedX = new PortfolioAllocation.Matrix([1, 1, 1, 1]);
 	
-	var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
-	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #3');
+	var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Extended Kaczmarz algorithm #3');
 	
 	
 	// Problem 4
@@ -669,8 +705,8 @@ QUnit.test('Linear system solver - Randomized Kaczmarz algorithm', function(asse
 	// The expected solution below verifies ||A*x - b||_inf ~= 1e-13, but ||x||_2 ~= 1.96, which is less than 2, hence why it is preferred to the true solution.
 	var expectedX = new PortfolioAllocation.Matrix([1.1538461538462281, 0.7692307692307582, 1.153846153846079, 0.7692307692307796]);
 
-	var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
-	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #4');
+	var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Extended Kaczmarz algorithm #4');
 	
 	
 	// Problem 6
@@ -681,19 +717,168 @@ QUnit.test('Linear system solver - Randomized Kaczmarz algorithm', function(asse
 	// To also be noted that the solution in the reference is almost the same as the expected solution below.
 	var expectedX = new PortfolioAllocation.Matrix([1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999996, 1.0000000000000004, 0.9999999999999996, 1.0000000000000004, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999999,                  1,                  1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999998, 1.0000000000000002, 0.9999999999999992,  1.000000000000001, 0.9999999999999987,  1.000000000000002, 0.9999999999999974, 1.0000000000000024, 0.9999999999999983, 0.9999999999999991,  1.000000000000007, 0.9999999999999785, 1.0000000000000522, 0.9999999999998842, 1.0000000000002456, 0.9999999999994922,  1.000000000001035, 0.9999999999979075, 1.0000000000042115,  0.999999999991547, 1.0000000000169387, 0.9999999999660868, 1.0000000000678653, 0.9999999998642277, 1.0000000002715892,  0.999999999456776, 1.0000000010864951, 0.9999999978269619, 1.0000000043461248,  0.999999991307702, 1.0000000173846435,  0.999999965230667, 1.0000000695387083,  0.999999860922549, 1.0000002781549087, 0.9999994436902785, 1.0000011126189468, 0.9999977747641977,  1.000004450463144, 0.9999910991076416, 1.0000178016489207, 0.9999643972454112,  1.000071203336108, 0.9998576020201143, 1.0002847611904067, 0.9994306166966817, 1.0011382102966262, 0.9977258046468135, 1.0045394897460913, 0.9909566243489603, 1.0179443359374987, 0.9646809895833339, 1.0683593749999998, 0.8723958333333336, 1.2187499999999998, 0.7083333333333335]);
 	
-	var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b);
-	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Kaczmarz algorithm #5');
+	var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Extended Kaczmarz algorithm #5');
   }
   
-  	/*var A = new PortfolioAllocation.Matrix([[    0.632810907566168,  0.07458558260068052,  0.18972932155688532,    0.368496003408602 ],
+  // Test using static data
+  // Source: http://www.math.usm.edu/lambers/mat419/lecture15.pdf
+  {
+	  var A = new PortfolioAllocation.Matrix([[1,1,1], [-1,-1,1]]);
+	  var b = new PortfolioAllocation.Matrix([1,0]);
+      var expectedX = new PortfolioAllocation.Matrix([1/4, 1/4, 1/2]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-12), true, 'Linear system solve (underdetermined) - Extended Kaczmarz algorithm #6');
+  }
+  
+  // Test using static data
+  // Source: http://math.oit.edu/~watermang/math_341/341_ch8/F13_341_book_sec_8-5.pdf
+  {
+	  var A = new PortfolioAllocation.Matrix([[1.3,0.6], [4.7, 1.5], [3.1, 5.2]]);
+	  var b = new PortfolioAllocation.Matrix([3.3, 13.5, -0.1]);
+      var expectedX = new PortfolioAllocation.Matrix([3.5526, -2.1374]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-04), true, 'Linear system solve (overdetermined) - Extended Kaczmarz algorithm #7');
+  }
+  
+  // Test using static data
+  // Source: Internet
+  {
+	  var A = new PortfolioAllocation.Matrix([[1, 0, -1, 2], [1, 1, 1, -1], [0, -1, -2, 3], [5, 2, -1, 4], [-1, 2, 5, -8]]);
+	  var b = new PortfolioAllocation.Matrix([-1, 2, -3, 1, 7]);
+      var expectedX = new PortfolioAllocation.Matrix([0.5, 0.5, 0.5, -0.5]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve (overdetermined, rank deficient) - Extended Kaczmarz algorithm #8');
+  }
+  
+  // Test using static data
+  // Source: Internet
+  {
+	  var A = new PortfolioAllocation.Matrix([[1,3,-2,3,8,0], [-3,0,0,1,9,4], [-2,3,-2,4,17,4]]);
+	  var b = new PortfolioAllocation.Matrix([1, 2, -3]);
+      var expectedX = new PortfolioAllocation.Matrix([-0.0783, -0.0778, 0.0519, -0.0604, -0.0504, 0.0698]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-04), true, 'Linear system solve (overdetermined, rank deficient) - Extended Kaczmarz algorithm #9');
+  }
+  
+  
+  /*
+  	var A = new PortfolioAllocation.Matrix([[    0.632810907566168,  0.07458558260068052,  0.18972932155688532,    0.368496003408602 ],
 											[  0.07458558260068052, 0.014210261176971236,  0.02239443845104238,   0.0379808829726669 ],
 											[  0.18972932155688532,  0.02239443845104238,  0.05694725645543196,    0.110387626650411 ],
 											[    0.368496003408602,   0.0379808829726669,    0.110387626650411,  0.22012749378552407 ]]);
 	var b = new PortfolioAllocation.Matrix([ 0.0034247797381810052, 0.11594559772023327,  0.002703559429703406, -0.11522437741175573 ]);
 	// cond(2-norm) =   14319829869135788.0000
 	 
-	var x = PortfolioAllocation.Matrix.linsolveRandomizedKaczmarz(A, b);
+	var x = PortfolioAllocation.Matrix.linsolveRandomizedExtendedKaczmarz(A, b, {maxIter: -1});
 	*/
   // TODO: Test random data
 });
  
+ QUnit.test('Linear system solver - Randomized extended Kaczmarz algorithm', function(assert) {    
+  // Limit case: null matrix; in this case, the least square solution is null as well
+  {
+	  var A = new PortfolioAllocation.Matrix([[0,0,0], [0,0,0], [0, 0, 0]]);
+	  var b = new PortfolioAllocation.Matrix([1,2,3]);
+      var expectedX = new PortfolioAllocation.Matrix([0, 0, 0]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Linear system solve - Randomized extended Kaczmarz algorithm #1');
+  }
+  
+  // Test using static data
+  {
+      // Source: https://en.wikipedia.org/wiki/System_of_linear_equations
+	  var A = new PortfolioAllocation.Matrix([[3,2,-1], [2,-2,4], [-1, 0.5, -1]]);
+	  var b = new PortfolioAllocation.Matrix([1,-2,0]);
+      var expectedX = new PortfolioAllocation.Matrix([1, -2, -2]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Randomized extended Kaczmarz algorithm #2');
+  }
+  
+  // Reference: Tanabe, K.: An algorithm for the constrained maximization in nonlinear programming, Research Memorandum No. 31, The Institute of Statistical Mathematics, 1969.
+  // Test using static data
+  {
+	// Problem 1
+	var A = new PortfolioAllocation.Matrix([[-3.2, 2.9, 1.6, 0.1], [0.0, -1.1, 2.3, 1.0], [5.1, 4.8, 0.2, 4.9], [2.0, 1.1, 1.9, -2.9]]);
+	var b = new PortfolioAllocation.Matrix([1.4, 2.2, 15.0, 2.1]);
+	var expectedX = new PortfolioAllocation.Matrix([1, 1, 1, 1]);
+	
+	var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Randomized extended Kaczmarz algorithm #3');
+	
+	
+	// Problem 4
+	var A = new PortfolioAllocation.Matrix([[1, 3, 2, -1], [1, 2, -1, -2], [1, -1, 	2, 3], [2, 1, 1, 1], [5, 5, 4, 1], [4, -1, 5, 7]]);
+	var b = new PortfolioAllocation.Matrix([5, 0, 5, 5, 15, 15]);
+	// To be noted that the true solution in the reference is [1, 1, 1, 1], with A*x - b == 0 and ||x||_2 == 2
+	// The expected solution below verifies ||A*x - b||_inf ~= 1e-13, but ||x||_2 ~= 1.96, which is less than 2, hence why it is preferred to the true solution.
+	var expectedX = new PortfolioAllocation.Matrix([1.1538461538462281, 0.7692307692307582, 1.153846153846079, 0.7692307692307796]);
+
+	var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Randomized extended Kaczmarz algorithm #4');
+	
+	
+	// Problem 6
+	var A = PortfolioAllocation.Matrix.fill(84, 84, function(i,j) { if (i == j) { return 6; } else if (j == i+1) { return 1; } else if (i == j+1) { return 8; } else { return 0;} });
+	var b = PortfolioAllocation.Matrix.fill(84, 1, function(i,j) { if (i == 1) { return 7; } else if (i == 84) { return 14; } else { return 15;} });
+	// To be noted that the true solution in the reference is [1, ..., 1], with A*x - b == 0 and ||x||_2 ~> 9.16
+	// The expected solution below verifies ||A*x - b||_inf ~= 1e-13, but ||x||_2 ~> 9.15, which is less than 9.16, hence why it is preferred to the true solution.
+	// To also be noted that the solution in the reference is almost the same as the expected solution below.
+	var expectedX = new PortfolioAllocation.Matrix([1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999996, 1.0000000000000004, 0.9999999999999996, 1.0000000000000004, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999997, 1.0000000000000002, 0.9999999999999999,                  1,                  1, 0.9999999999999999, 1.0000000000000002, 0.9999999999999998, 1.0000000000000002, 0.9999999999999992,  1.000000000000001, 0.9999999999999987,  1.000000000000002, 0.9999999999999974, 1.0000000000000024, 0.9999999999999983, 0.9999999999999991,  1.000000000000007, 0.9999999999999785, 1.0000000000000522, 0.9999999999998842, 1.0000000000002456, 0.9999999999994922,  1.000000000001035, 0.9999999999979075, 1.0000000000042115,  0.999999999991547, 1.0000000000169387, 0.9999999999660868, 1.0000000000678653, 0.9999999998642277, 1.0000000002715892,  0.999999999456776, 1.0000000010864951, 0.9999999978269619, 1.0000000043461248,  0.999999991307702, 1.0000000173846435,  0.999999965230667, 1.0000000695387083,  0.999999860922549, 1.0000002781549087, 0.9999994436902785, 1.0000011126189468, 0.9999977747641977,  1.000004450463144, 0.9999910991076416, 1.0000178016489207, 0.9999643972454112,  1.000071203336108, 0.9998576020201143, 1.0002847611904067, 0.9994306166966817, 1.0011382102966262, 0.9977258046468135, 1.0045394897460913, 0.9909566243489603, 1.0179443359374987, 0.9646809895833339, 1.0683593749999998, 0.8723958333333336, 1.2187499999999998, 0.7083333333333335]);
+	
+	var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve - Randomized extended Kaczmarz algorithm #5');
+  }
+  
+  // Test using static data
+  // Source: http://www.math.usm.edu/lambers/mat419/lecture15.pdf
+  {
+	  var A = new PortfolioAllocation.Matrix([[1,1,1], [-1,-1,1]]);
+	  var b = new PortfolioAllocation.Matrix([1,0]);
+      var expectedX = new PortfolioAllocation.Matrix([1/4, 1/4, 1/2]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-12), true, 'Linear system solve (underdetermined) - Randomized extended Kaczmarz algorithm #6');
+  }
+  
+  // Test using static data
+  // Source: http://math.oit.edu/~watermang/math_341/341_ch8/F13_341_book_sec_8-5.pdf
+  {
+	  var A = new PortfolioAllocation.Matrix([[1.3,0.6], [4.7, 1.5], [3.1, 5.2]]);
+	  var b = new PortfolioAllocation.Matrix([3.3, 13.5, -0.1]);
+      var expectedX = new PortfolioAllocation.Matrix([3.5526, -2.1374]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-04), true, 'Linear system solve (overdetermined) - Randomized extended Kaczmarz algorithm #7');
+  }
+  
+  // Test using static data
+  // Source: Internet
+  {
+	  var A = new PortfolioAllocation.Matrix([[1, 0, -1, 2], [1, 1, 1, -1], [0, -1, -2, 3], [5, 2, -1, 4], [-1, 2, 5, -8]]);
+	  var b = new PortfolioAllocation.Matrix([-1, 2, -3, 1, 7]);
+      var expectedX = new PortfolioAllocation.Matrix([0.5, 0.5, 0.5, -0.5]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-10), true, 'Linear system solve (overdetermined, rank deficient) - Randomized extended Kaczmarz algorithm #8');
+  }
+  
+  // Test using static data
+  // Source: Internet
+  {
+	  var A = new PortfolioAllocation.Matrix([[1,3,-2,3,8,0], [-3,0,0,1,9,4], [-2,3,-2,4,17,4]]);
+	  var b = new PortfolioAllocation.Matrix([1, 2, -3]);
+      var expectedX = new PortfolioAllocation.Matrix([-0.0783, -0.0778, 0.0519, -0.0604, -0.0504, 0.0698]);
+
+	  var x = PortfolioAllocation.Matrix.linsolveExtendedKaczmarz(A, b, {randomized: true});
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-04), true, 'Linear system solve (overdetermined, rank deficient) - Randomized extendedKaczmarz algorithm #9');
+  }
+
+  // TODO: Test random data
+});
