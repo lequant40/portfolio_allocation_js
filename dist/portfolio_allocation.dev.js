@@ -2498,30 +2498,7 @@ Matrix_.svdDecomposition = function(A, opt) {
 * nullSpace(Matrix_([[2,1],[-4,-2]]));
 * // Matrix_([-0.4472135954999578, 0.8944271909999159])
 */
-Matrix_.nullSpace = function(A, opt) {
-	// ------
-	
-	// Internal function used to automatically adapt the precision
-	// of the numerical rank computation
-	function nextUp(x) {
-		var EPSILON = Math.pow(2, -52)
-		var MAX_VALUE = Number.MAX_VALUE
-		var MIN_VALUE = Math.pow(2, -1022)
-
-		if (x !== x) return x
-		if (x === -1 / 0) return -MAX_VALUE
-		if (x === 1 / 0) return +1 / 0
-		if (x === MAX_VALUE) return +1 / 0
-		var y = x * (x < 0 ? 1 - EPSILON / 2 : 1 + EPSILON)
-		if (y === x) y = MIN_VALUE * EPSILON > 0 ? x + MIN_VALUE * EPSILON : x + MIN_VALUE
-		if (y === +1 / 0) y = +MAX_VALUE
-		var b = x + (y - x) / 2
-		if (x < b && b < y) y = b
-		var c = (y + x) / 2
-		if (x < c && c < y) y = c
-		return y === 0 ? -0 : y
-	}
-	
+Matrix_.nullSpace = function(A, opt) {	
     // ------
    
     // Decode options
@@ -2547,7 +2524,7 @@ Matrix_.nullSpace = function(A, opt) {
     var a_ns = null;
    
     // ------
-   
+
     // Depending on the shape of the matrix A, a different algorithm is used:
     // - m >= n: an orthogonal basis of Ker(A) is directly read from a thin SVD
     // decomposition of the matrix A, c.f. corollary 2.4.6 of the reference
@@ -2567,7 +2544,7 @@ Matrix_.nullSpace = function(A, opt) {
        
 		// Compute the default tolerance, if required
 		if (eps === undefined) {
-			eps = m * (nextUp(s.data[0]) - s.data[0]);
+			eps = m * (nextUp_(s.data[0]) - s.data[0]);
 		}
 	   
         // Determine the numerical rank of A
@@ -2607,7 +2584,7 @@ Matrix_.nullSpace = function(A, opt) {
        
 		// Compute the default tolerance, if required
 		if (eps === undefined) {
-			eps = n * (nextUp(s.data[0]) - s.data[0]);
+			eps = n * (nextUp_(s.data[0]) - s.data[0]);
 		}
 	   
         // Determine the numerical rank of A^t
@@ -3804,7 +3781,59 @@ self.ftca_ = function(correlationMatrix, threshold) { return ftca_(correlationMa
 /* End Wrapper private methods - Unit tests usage only */
  
 
-/**
+  /**
+* @function nextUp_
+*
+* @summary Returns the next double-precision number larger than a number.
+*
+* @description This function computes the next double-precision number
+* larger than a number x.
+*
+* This function has been copied/pasted from https://gist.github.com/Yaffle/4654250
+*
+* @param {number} x a real number.
+* @return {number} the next double-precision number larger than x, a real number.
+*
+* @example
+* nextUp_(1.0000000000000002);
+* // 
+*/
+function nextUp_(x) {
+	var EPSILON = Math.pow(2, -52);
+	var MAX_VALUE = (2 - EPSILON) * Math.pow(2, 1023);
+	var MIN_VALUE = Math.pow(2, -1022);
+
+	if (x !== x) {
+	  return x;
+	}
+	if (x === -1 / 0) {
+	  return -MAX_VALUE;
+	}
+	if (x === +1 / 0) {
+	  return +1 / 0;
+	}
+	if (x === +MAX_VALUE) {
+	  return +1 / 0;
+	}
+	var y = x * (x < 0 ? 1 - EPSILON / 2 : 1 + EPSILON);
+	if (y === x) {
+	  y = MIN_VALUE * EPSILON > 0 ? x + MIN_VALUE * EPSILON : x + MIN_VALUE;
+	}
+	if (y === +1 / 0) {
+	  y = +MAX_VALUE;
+	}
+	var b = x + (y - x) / 2;
+	if (x < b && b < y) {
+	  y = b;
+	}
+	var c = (y + x) / 2;
+	if (x < c && c < y) {
+	  y = c;
+	}
+	return y === 0 ? -0 : y;
+}
+	
+ /**
 * @function hypot_
 *
 * @summary Returns the square root of the sum of the squares of two numbers (i.e., the hypotenuse).
@@ -4413,6 +4442,7 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 * 
 * @see <a href="http://ieeexplore.ieee.org/document/6126441/">T. Pock and A. Chambolle, "Diagonal preconditioning for first order primal-dual algorithms in convex optimization" 2011 International Conference on Computer Vision, Barcelona, 2011, pp. 1762-1769.</a>
 * @see <a href="https://arxiv.org/abs/1305.0546">Tom Goldstein, Min Li, Xiaoming Yuan, Ernie Esser, Richard Baraniuk, "Adaptive Primal-Dual Hybrid Gradient Methods forSaddle-Point Problems", 05/2013, eprint arXiv:1305.0546</a>
+* @see <a href="http://www.numerical.rl.ac.uk/reports/drRAL2001034.pdf">D. Ruiz ,A scaling algorithm to equilibrate both rows and column norms in matrices, Tech.Report RT/APO/01/4, ENSEEIHT-IRIT, 2001.</a>
 *
 * @param {Matrix_} Ae an optional me by n matrix; must be null if not provided.
 * @param {Matrix_} be an optional me by 1 matrix; must be null if not provided.
@@ -4429,8 +4459,8 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 * - arr[1] the optimal value of the function x -> <c/x>, i.e. <c/x^*>
 *
 * @example
-* lpsolvePrimalDualHybridGradient_(X);
-* // X
+* lpsolvePrimalDualHybridGradient_(Matrix_([[1, 1]]), Matrix_([1]), null, null, Matrix_([1, 2]), null, null); // Solves min x + 2*y on the unit simplex of R^2
+* // [Matrix_([~1, ~0]), ~1]
 */
  function lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, lb, ub, opt) {
     // ------
@@ -4591,6 +4621,10 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 	// Computation of the diagonal matrices T and S = [Se Si]^t with alpha = 1
 	// and mu = 0.9995, nu = 0.9995 (so that mu * nu < 1), c.f. formula 10 and
 	// remark 3 of the first reference.
+	//
+	// Note: in case a column or a row of the matrix [Ae Ai]^t has all its elements equal to zero,
+	// the associated value in T or S is replaced by 1; this is standard practice, c.f. for instance
+	// section 2 of the third reference.
 	var mu = 0.9995;
 	var nu = 0.9995;
 	var T = Matrix_.fill(n, 1, 
@@ -4604,7 +4638,7 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 						    var aiColNorm = Ai.vectorNorm('one', 'column', i);
 							columnNorm += aiColNorm;
 						}
-						if (columnNorm == 0) { // in case there is no coefficient in the column, a value of 1 is harmless
+						if (columnNorm == 0) {
 							columnNorm = 1;
 						}
 						return mu * 1/columnNorm;
