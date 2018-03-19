@@ -6,6 +6,18 @@ QUnit.module('Statistics internal module', {
 });
 
 
+
+QUnit.test('Median computation', function(assert) {    
+  // Test with static data
+  {
+	  assert.equal(PortfolioAllocation.median_([2,4,1]), 2, 'Median computation #1');
+	  assert.equal(PortfolioAllocation.median_([2,4,1,3]), 2.5, 'Median computation #2');
+  }  
+  
+  //TODO: use random data
+});
+
+
 QUnit.test('Hypothenuse computation', function(assert) {    
   // Tests with static data
   {

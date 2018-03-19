@@ -6,6 +6,46 @@ QUnit.module('Simplex internal module', {
 });
 
 
+QUnit.test('Simplex sparse euclidian projection computation', function(assert) {    
+  // Test with static data
+  // Reference for the initial point: Nelson Maculan, Geraldo Galdinode, Paula Jr., A linear-time median-finding algorithm for projecting a vector on the simplex of R^n
+  {
+	  var testValues = [[0.5, 0.1, 0.2, 0.2, 0.3, 0.2, 0.3]];
+	  var expectedValues = [[[1, 0, 0, 0, 0, 0, 0],
+	                         [0.6, 0, 0, 0, 0.4, 0, 0],
+							 [0.4666666666666666, 0, 0, 0, 0.2666666666666666, 0, 0.2666666666666666],
+							 [0.425, 0, 0.125, 0, 0.22499999999999998, 0, 0.22499999999999998],
+							 [0.4, 0, 0.1, 0.1, 0.19999999999999998, 0, 0.19999999999999998],
+							 [0.38333333333333336, 0, 0.08333333333333336, 0.08333333333333336, 0.18333333333333335, 0.08333333333333336, 0.18333333333333335],
+							 [0.38333333333333336, 0, 0.08333333333333336, 0.08333333333333336, 0.18333333333333335, 0.08333333333333336, 0.18333333333333335]]];
+	  
+	  for (var i = 0; i < testValues.length; ++i) {
+		  for (var k = 0; k < testValues[i].length; ++k) {
+			var projection = PortfolioAllocation.simplexSparseEuclidianProjection_(testValues[i], k+1);
+			var expectedProjection = expectedValues[i][k];
+			
+			assert.deepEqual(projection, expectedProjection, 'Simplex sparse euclidian projection - Test 1 #' + i + '/' + (k+1));
+		  }
+      } 
+	  
+  }
+});
+
+QUnit.test('Simplex euclidian projection computation', function(assert) {    
+  // Test with static data
+  // Reference for the initial point: Nelson Maculan, Geraldo Galdinode, Paula Jr., A linear-time median-finding algorithm for projecting a vector on the simplex of R^n
+  {
+	  var testValues = [[0.5, 0.1, 0.2, 0.2, 0.3, 0.2, 0.3]];
+	  var expectedValues = [[0.38333333333333336, 0, 0.08333333333333336, 0.08333333333333336, 0.18333333333333335, 0.08333333333333336, 0.18333333333333335]];
+	  
+	  for (var i = 0; i < testValues.length; ++i) {
+	      assert.deepEqual(PortfolioAllocation.simplexEuclidianProjection_(testValues[i]), expectedValues[i], 'Simplex euclidian projection - Test 1 #' + i);
+      } 
+	  
+  }
+});
+
+
 QUnit.test('Simplex rational rounding point computation', function(assert) {    
   // Test with static data
   {

@@ -6,6 +6,339 @@ QUnit.module('Optimisation internal module', {
 });
 
 
+QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searching algorithm', function(assert) {    
+	// Functions to generate random feasible instances of the continuous quadratic knapsack problem
+	function generateRandomDimension(min, max) { // used for n
+		return Math.floor(Math.random()*(max-min+1) + min);
+	}
+	
+	function generateRandomValue(minVal, maxVal) { // used for r		
+		return Math.random() * (maxVal - minVal) + minVal;
+	}
+	
+	function generateRandomBounds(n, b, r) { // used for l and u
+		var minVal = -10;
+		var maxVal = 10;
+		
+		var l = PortfolioAllocation.Matrix.zeros(n, 1);
+		var u = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		do {
+			for (var i = 0; i < n; ++i) {
+				var lb = generateRandomValue(minVal, maxVal);
+				l.data[i] = lb;
+			}
+		} while (PortfolioAllocation.Matrix.vectorDotProduct(b, l) > r) // feasibility criterion: sum b_i * l_i <= r (because b_i > 0)
+		
+		do {
+			for (var i = 0; i < n; ++i) {
+				var ub = generateRandomValue(l.data[i], maxVal); // ensure l <= u
+				u.data[i] = ub; 
+			}
+		} while (PortfolioAllocation.Matrix.vectorDotProduct(b, u) < r) // feasibility criterion: sum b_i * u_i >= r (because b_i > 0)
+
+		return [l, u];
+	}
+	
+	function generateRandomStriclyPositiveVector(n) { // used for d and b
+		var minVal = 0;
+		var maxVal = 10;
+		
+		var v = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		for (var i = 0; i < n; ++i) {
+			v.data[i] = maxVal - generateRandomValue(minVal, maxVal); // ]minVal, maxVal]
+		}
+		
+		return v;
+	}
+	
+	function generateRandomVector(n) { // used for a
+		var minVal = -10;
+		var maxVal = 10;
+		
+		var v = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		for (var i = 0; i < n; ++i) {
+			v.data[i] = generateRandomValue(minVal, maxVal);
+		}
+		
+		return v;
+	}
+	
+	// Test non-supported problems: 
+	// - b_i <= 0
+	// - d_i <= 0
+	{
+		var n = generateRandomDimension(1, 100);
+		var d = generateRandomStriclyPositiveVector(n);
+		var a = generateRandomVector(n);
+		var b = generateRandomStriclyPositiveVector(n);
+		var r = generateRandomValue(-10, 10);
+		var bounds = generateRandomBounds(n, b, r);
+		var l = bounds[0];
+		var u = bounds[1];
+		
+		var m = generateRandomDimension(1, n); // coordinate of b/d to alter
+		var b_old = b.data[m-1];
+		var d_old = d.data[m-1];
+		
+		// Test b_i = 0
+		b.data[m-1] = 0;
+		assert.throws(function() { PortfolioAllocation.qksolveBS_(d, a, b, r, l, u) },
+							       new Error('negative element detected in b'),
+								  "Unsupported problem - Null b element");
+
+		// Test b_i < 0
+		b.data[m-1] = Math.random() - 1;
+		assert.throws(function() { PortfolioAllocation.qksolveBS_(d, a, b, r, l, u) },
+							       new Error('negative element detected in b'),
+								  "Unsupported problem - Strictly negative b element");
+		
+		// Restore b
+		b.data[m-1] = b_old;
+		
+		// Test d_i = 0
+		d.data[m-1] = 0;
+		assert.throws(function() { PortfolioAllocation.qksolveBS_(d, a, b, r, l, u) },
+							       new Error('negative element detected in d'),
+								  "Unsupported problem - Null d element");
+				
+		// Test d_i < 0
+		d.data[m-1] = Math.random() - 1;
+		assert.throws(function() { PortfolioAllocation.qksolveBS_(d, a, b, r, l, u) },
+							       new Error('negative element detected in d'),
+								  "Unsupported problem - Strictly negative d element");
+	}
+	
+	// Test infeasible problems:
+	// - u_i < l_i
+	// - sum b_i * l_i > r
+	// - sum b_i * u_i < r
+	{
+		var n = generateRandomDimension(1, 100);
+		var d = generateRandomStriclyPositiveVector(n);
+		var a = generateRandomVector(n);
+		var b = generateRandomStriclyPositiveVector(n);
+		var r = generateRandomValue(-10, 10);
+		var bounds = generateRandomBounds(n, b, r);
+		var l = bounds[0];
+		var u = bounds[1];
+		
+		var m = generateRandomDimension(1, n); // coordinate of l/u to alter
+		var l_old = l.data[m-1];
+		var u_old = u.data[m-1];
+		
+		// Test u_i < l_i
+		l.data[m-1] = u_old;
+		u.data[m-1] = l_old;
+		assert.throws(function() { PortfolioAllocation.qksolveBS_(d, a, b, r, l, u) },
+							       new Error('infeasible problem detected'),
+								  "Infeasible problem - Lower bounds strictly greater than upper bounds");
+								  
+		// Restore l and u
+		l.data[m-1] = l_old;
+		u.data[m-1] = u_old;
+		
+		// Test infeasible lower bounds condition - sum b_i * l_i > r
+		l.data[m-1] = (-(PortfolioAllocation.Matrix.vectorDotProduct(b, l) - b.data[m-1]*l.data[m-1]) + r + (1 - Math.random()))/b.data[m-1];
+		assert.throws(function() { PortfolioAllocation.qksolveBS_(d, a, b, r, l, u) },
+							       new Error('infeasible problem detected'),
+								  "Infeasible problem - Lower bounds incompatible with b and r");
+		
+		// Restore l
+		l.data[m-1] = l_old;	
+		
+		// Test infeasible upper bounds condition - sum b_i * u_i < r
+		u.data[m-1] = (-(PortfolioAllocation.Matrix.vectorDotProduct(b, u) - b.data[m-1]*u.data[m-1]) + r - (1 - Math.random()))/b.data[m-1];
+		assert.throws(function() { PortfolioAllocation.qksolveBS_(d, a, b, r, l, u) },
+							       new Error('infeasible problem detected'),
+								  "Infeasible problem - Upper bounds incompatible with b and r");
+	}
+
+	// Test feasible random problems
+	// Reference: Krzysztof C. Kiwiel, Breakpoint searching algorithms for the continuous quadratic knapsack problem
+	{
+		var nbTests = 10;
+		for (var k = 0; k < nbTests; ++k) {
+			var n = generateRandomDimension(1, 100);
+			var d = generateRandomStriclyPositiveVector(n);
+			var a = generateRandomVector(n);
+			var b = generateRandomStriclyPositiveVector(n);
+			var r = generateRandomValue(-10, 10);
+			var bounds = generateRandomBounds(n, b, r);
+			var l = bounds[0];
+			var u = bounds[1];
+			
+			var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, { outputLagrangeMultiplier:true });
+			var x = sol[0];
+			var f_x = sol[1];
+			var t = sol[2];
+			
+			// Check that f_x corresponds to the value of the function f at point x
+			var expected_f_x = 1/2 * PortfolioAllocation.Matrix.vectorDotProduct(x, PortfolioAllocation.Matrix.elementwiseProduct(x, d)) 
+							   - PortfolioAllocation.Matrix.vectorDotProduct(a, x);
+			assert.equal(Math.abs(f_x - expected_f_x) <= Math.abs(expected_f_x) * 1e-16, true, 'Feasible problem ' + (k+1) + ' - 1/3');
+			
+			// Check that x corresponds to the point x(t), using formula 2.1 of the reference.
+			var x_t = PortfolioAllocation.Matrix.elementwiseProduct(PortfolioAllocation.Matrix.axpby(1, a, -t, b), d.elemMap(function(i,j,val) { return 1/val;}));
+			for (var i = 0; i < n; ++i) {
+				x_t.data[i] = Math.min(Math.max(l.data[i], x_t.data[i]), u.data[i]);
+			}
+			assert.equal(PortfolioAllocation.Matrix.areEqual(x, x_t, 1e-14), true, 'Feasible problem ' + (k+1) + ' - 2/3');
+			
+			// Check that the point x corresponds to the point x^* in which the function f attain its minimum,
+			// which reduces to checking that <b/x> = r, since the previous check ensured that it exists t such that x = x(t).
+			assert.equal(Math.abs(PortfolioAllocation.Matrix.vectorDotProduct(b, x) - r) <= Math.abs(r) * 1e-12, true, 'Feasible problem ' + (k+1) + ' - 3/3');
+		}
+	}
+	
+	// Tests with static data
+	// Reference: Krzysztof C. Kiwiel, Breakpoint searching algorithms for the continuous quadratic knapsack problem
+	// Exemple 9.1
+	{
+		var d = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var a = new PortfolioAllocation.Matrix([0, 0, 0]);
+		var b = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var r = -1;
+		var l = new PortfolioAllocation.Matrix([0, -1, -2]);
+		var u = new PortfolioAllocation.Matrix([0, 0, 0]);
+		
+		var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, { outputLagrangeMultiplier:true });
+		
+		var expectedX = new PortfolioAllocation.Matrix([0, -0.5, -0.5 ]);
+		var expectedMinVal = 0.25;
+		var expectedLagrangeMultiplier = 0.5;
+		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedX, 1e-16), true, 'Feasible #1 - 1/3');
+		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #1 - 2/3');
+		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #1 - 3/3');
+		
+	}
+	
+	// Exemple 9.2
+	{
+		var d = new PortfolioAllocation.Matrix([1, 1, 1, 1, 1]);
+		var a = new PortfolioAllocation.Matrix([1, 1, 0, 0, 0]);
+		var b = new PortfolioAllocation.Matrix([1, 1, 1, 1, 1]);
+		var r = 1;
+		var l = new PortfolioAllocation.Matrix([0, 0, 0, 0, 0]);
+		var u = new PortfolioAllocation.Matrix([10, 10, 10, 10, 10]); // u = is actually not bounded, but 10 is sufficient
+		
+		var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, { outputLagrangeMultiplier:true });
+		
+		var expectedX = new PortfolioAllocation.Matrix([0.5, 0.5, 0, 0, 0]);
+		var expectedMinVal =  -0.75;
+		var expectedLagrangeMultiplier = 0.5;
+		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedX, 1e-16), true, 'Feasible #2 - 1/3');
+		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #2 - 2/3');
+		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #2 - 3/3');
+	}
+	
+	// Exemple 9.3
+	{
+		var d = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var a = new PortfolioAllocation.Matrix([0, 0.1, 0.2]);
+		var b = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var r = 1;
+		var l = new PortfolioAllocation.Matrix([0, 0, 0]);
+		var u = new PortfolioAllocation.Matrix([10, 10, 10]); // u = is actually not bounded, but 10 is sufficient
+		
+		var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, { outputLagrangeMultiplier:true });	
+
+		var expectedX = new PortfolioAllocation.Matrix([ 0.2333333333333333, 0.3333333333333333, 0.43333333333333335 ]);
+		var expectedMinVal = 0.05666666666666667;
+		var expectedLagrangeMultiplier = -7/30;
+		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedX, 1e-16), true, 'Feasible #3 - 1/3');
+		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #3 - 2/3');
+		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #3 - 3/3');
+	}
+	
+	// Exemple 9.4
+	{
+		var d = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var a = new PortfolioAllocation.Matrix([0, 0, 2]);
+		var b = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var r = 1;
+		var l = new PortfolioAllocation.Matrix([0, 0, 0]);
+		var u = new PortfolioAllocation.Matrix([10, 10, 10]); // u = is actually not bounded, but 10 is sufficient
+		
+		var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, { outputLagrangeMultiplier:true });
+		
+		var expectedX = new PortfolioAllocation.Matrix([0, 0, 1]);
+		var expectedMinVal = -1.5;
+		var expectedLagrangeMultiplier = 1;
+		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedX, 1e-16), true, 'Feasible #4 - 1/3');
+		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #4 - 2/3');
+		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #4 - 3/3');
+	}
+
+	// Exemple 9.5
+	{
+		var d = new PortfolioAllocation.Matrix([1, 1]);
+		var a = new PortfolioAllocation.Matrix([0, 0]);
+		var b = new PortfolioAllocation.Matrix([1, 1]);
+		var r = -2;
+		var l = new PortfolioAllocation.Matrix([-2, -2]);
+		var u = new PortfolioAllocation.Matrix([-1, 0]); 
+		
+		var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, { outputLagrangeMultiplier:true });
+		
+		var expectedX = new PortfolioAllocation.Matrix([-1, -1]);
+		var expectedMinVal = 1;
+		var expectedLagrangeMultiplier = 1;
+		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedX, 1e-16), true, 'Feasible #5 - 1/3');
+		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #5 - 2/3');
+		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #5 - 3/3');
+	}
+	
+	// Exemple 9.6
+	{
+		var d = new PortfolioAllocation.Matrix([1]);
+		var a = new PortfolioAllocation.Matrix([2]);
+		var b = new PortfolioAllocation.Matrix([1]);
+		var r = 1;
+		var l = new PortfolioAllocation.Matrix([0]);
+		var u = new PortfolioAllocation.Matrix([1]); 
+		
+		var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, {outputLagrangeMultiplier:true});
+		
+		var expectedX = new PortfolioAllocation.Matrix([1]);
+		var expectedMinVal = -1.5;
+		var expectedLagrangeMultiplier = 1; // the reference is wrong here: t^* = 3/2 would imply x(t) = 0.5 while the linear constraint is x = 1 !
+		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedX, 1e-16), true, 'Feasible #6 - 1/3');
+		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #6 - 2/3');
+		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #6 - 3/3');
+	}
+	
+	// Exemple 9.7
+	{
+		var d = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var a = new PortfolioAllocation.Matrix([0, -1, -2]);
+		var b = new PortfolioAllocation.Matrix([1, 1, 1]);
+		var r = 2;
+		var l = new PortfolioAllocation.Matrix([0, 0, 0]);
+		var u = new PortfolioAllocation.Matrix([3, 3, 3]); 
+		
+		var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, {outputLagrangeMultiplier:true});
+
+		var expectedX = new PortfolioAllocation.Matrix([1.5, 0.5, 0]);
+		var expectedMinVal = 1.75;
+		var expectedLagrangeMultiplier = -3/2;
+		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedX, 1e-16), true, 'Feasible #7 - 1/3');
+		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #7 - 2/3');
+		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #7 - 3/3');
+	}
+
+	// TODO: Test with random data
+});
+
 QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(assert) {    
   // Reference:  Vanderbei, Robert J, Linear Programming Foundations and Extensions 4th edition
   // Problem, p. 11
@@ -53,7 +386,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var bi = new PortfolioAllocation.Matrix([5, 11, 8]);
 	var c = new PortfolioAllocation.Matrix([-5, -4, -3]);
 	
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(null, null, Ai, bi, c, null, null);
+	var sol = PortfolioAllocation.lpsolvePDHG_(null, null, Ai, bi, c, null, null);
 
 	var expectedX = new PortfolioAllocation.Matrix([2, 0, 1]);
 	var expectedMinVal = -13;
@@ -68,7 +401,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var bi = new PortfolioAllocation.Matrix([12, 8, 10]);
 	var c = new PortfolioAllocation.Matrix([-3, -2]);
 	
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(null, null, Ai, bi, c, null, null);
+	var sol = PortfolioAllocation.lpsolvePDHG_(null, null, Ai, bi, c, null, null);
 	
 	var expectedX = new PortfolioAllocation.Matrix([6, 2]);
 	var expectedMinVal = -22;
@@ -84,7 +417,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var be = new PortfolioAllocation.Matrix([20, 8]);
 	var c = new PortfolioAllocation.Matrix([1, 6, -7, 1, 5]);
 	
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(Ae, be, null, null, c, null, null);
+	var sol = PortfolioAllocation.lpsolvePDHG_(Ae, be, null, null, c, null, null);
 	
 	var expectedX = new PortfolioAllocation.Matrix([0, 4/7, 12/7, 0, 0]);
 	var expectedMinVal = -60/7;
@@ -102,7 +435,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var be = new PortfolioAllocation.Matrix([-1, -0.3, -0.3, -0.4]);
 	var c = new PortfolioAllocation.Matrix([4.1, 4.3, 5.8, 6.0, 7.6, 7.5, 7.3, 6.9, 7.3]);
 	 
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(Ae, be, null, null, c, null, null);
+	var sol = PortfolioAllocation.lpsolvePDHG_(Ae, be, null, null, c, null, null);
 	
 	var expectedX = new PortfolioAllocation.Matrix([0, 0.6, 0, 0.4, 0, 0, 0, 0, 0]);
 	var expectedMinVal = 4.98;
@@ -121,7 +454,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var bi = new PortfolioAllocation.Matrix([44, 512, 300]);
 	var c = new PortfolioAllocation.Matrix([-30000, -20000]);
 	
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(null, null, Ai, bi, c, null, null);
+	var sol = PortfolioAllocation.lpsolvePDHG_(null, null, Ai, bi, c, null, null);
 	
 	var expectedX = new PortfolioAllocation.Matrix([20, 24]);
 	var expectedMinVal = -1080000;
@@ -163,7 +496,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var bi = new PortfolioAllocation.Matrix([80, 0, 80, 0, 0, 0, 500, 0, 500, 0, 0, 0, 0, 0, 0, 0, 0, 310, 300]);
 	var c = new PortfolioAllocation.Matrix([0, -0.4, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.32, 0, 0, 0, -0.6, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -0.48, 0, 0, 10]);
 	
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, null, null);
+	var sol = PortfolioAllocation.lpsolvePDHG_(Ae, be, Ai, bi, c, null, null);
 	
 	var expectedMinVal = -4.6475314286e02; // Direclty from Netlib README file
 
@@ -226,7 +559,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var bi = new PortfolioAllocation.Matrix([300, 0, 0, 0, 0, 0, 300, 0, 0, 0, 0, 0, 300, 0, 0, 0, 0, 0, 300, 0, 0, 0, 0, 0, 300, 0, 0, 0, 0, 0]);  // 2 null rows at indexes 2 and 3
 	var c = new PortfolioAllocation.Matrix([0, 0, 0, -1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 	
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, null, null);
+	var sol = PortfolioAllocation.lpsolvePDHG_(Ae, be, Ai, bi, c, null, null);
 	
 	var expectedMinVal = -7.0000000000e01; // Direclty from Netlib README file
 
@@ -255,7 +588,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	var ub = new PortfolioAllocation.Matrix([0.75, 0.75, 0.75, 0.75, 0.75, Infinity]);
 	var lb = new PortfolioAllocation.Matrix([0, 0, 0, 0, 0, -Infinity]);
 	
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(null, null, Ai, bi, c, lb, ub);
+	var sol = PortfolioAllocation.lpsolvePDHG_(null, null, Ai, bi, c, lb, ub);
 
 	var expectedX = new PortfolioAllocation.Matrix([0, 0, 0.459596, 0, 0.540404, 0.000985]);
 	var expectedMinVal = -0.000985;
@@ -264,7 +597,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
 	assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-03, true, 'Maximin - 2/2');
   }
 
-  
+
   // Reference: http://www.numerical.rl.ac.uk/cute/netlib.html, BOEING2 problem
   /*
   {
@@ -435,7 +768,7 @@ QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(a
     var ub = new PortfolioAllocation.Matrix([Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, Infinity, 0, Infinity, 0, 0, 0, 7, 7, 2, 2, 7, 7, 2, 2, 7, 7, 2, 2, 14, 2, 7, 2, 7, 2, 7, 2, 7, 7, 2, 2, 7, 7, 2, 2, 7, 2, 7, 7, 2, 2, 14, 2, 14, 2, 7, 2, 14, 2, 7, 7, 7, 7, 14, 7, 14, 7]);
 	var lb = new PortfolioAllocation.Matrix([0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, -100, 0, -90, -45, -45, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]);
 
-	var sol = PortfolioAllocation.lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, lb, ub, {maxIter: 10000});
+	var sol = PortfolioAllocation.lpsolvePDHG_(Ae, be, Ai, bi, c, lb, ub, {maxIter: 10000});
   }*/
 });
 

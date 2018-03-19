@@ -1324,14 +1324,14 @@ Matrix_.copy = function(A, out) {
 * @summary Returns the elementwise product of a matrix with another matrix.
 *
 * @description This function computes the elementwise product Z = X.*Y of a matrix X with another matrix Y,
-* where A is a n by m matrix and B is either a n by m matrix (full matrix elementwise product), or
+* where X is a n by m matrix and Y is either a n by m matrix (full matrix elementwise product), or
 * a n by 1 matrix (row matrix elementwise product) or a 1 by m matrix (column matrix elementwise product).
 *
-* When used with a n by 1 matrix, this function mimics the behavior of a left multiplication of X with
-* a diagonal matrix made of the n by 1 matrix elements: Z = Diag(Y) * X.
+* When used with an n by 1 matrix Y, this function mimics the behavior of a left multiplication of X with
+* a diagonal n by n matrix Diag(Y): Z = Diag(Y) * X.
 *
-* When used with a 1 by m matrix, this function mimics the behavior of a right multiplication of X with
-* a diagonal matrix made of the 1 by m matrix elements: Z = X * Diag(Y).
+* When used with an 1 by m matrix Y, this function mimics the behavior of a right multiplication of X with
+* a diagonal m by m matrix Diag(Y): Z = X * Diag(Y).
 *
 * @param {Matrix_} X a n by m matrix.
 * @param {Matrix_} Y a m by p matrix, a n by 1 matrix or a 1 by m matrix.
@@ -3775,12 +3775,57 @@ function binomial_(n, k) {
  */
 
 /* Start Wrapper private methods - Unit tests usage only */
+self.median_ = median_;
 self.hypot_ = function(x, y) { return hypot_(x, y); }
 self.rank_ = function(x, order) { return rank_(x, order); }
 self.ftca_ = function(correlationMatrix, threshold) { return ftca_(correlationMatrix, threshold); }
 /* End Wrapper private methods - Unit tests usage only */
- 
 
+
+/**
+* @function median_
+*
+* @summary Compute the median of a serie of values.
+*
+* @description This function returns the median of a serie of values [x_1,...,x_n], 
+* which is defined as:
+* - When n is odd, the (n+1)/2-th smallest element of the p values x_1,...,x_n
+* - When n is even, the mean of the n/2-th and n/2 + 1-th smallest elements of the p values x_1,...,x_n
+*
+* The algorithm used internally is a O(pimplemented uses a full sort of the values.
+*
+* @see <a href="https://en.wikipedia.org/wiki/Median">Median</a>
+* 
+* @param {Array.<number>} x an array of real numbers.
+* @return {number} the median of the values of the array x.
+*
+* @example
+* median_([2,4,1]);
+* // 2
+*
+* median_([2,4,1,3]);
+* // 2.5
+*/
+function median_(x) {
+	// Initialisations.
+	var n = x.length;
+	var xx = x.slice(); // to avoid altering the array x
+	
+	// Sort the array in ascending order.
+	xx.sort(function(a, b) {
+		return a - b;
+	});
+	
+	// Depending on the parity of n, use the appropriate formula to compute the median.
+	if (n % 2 === 0) { // n is even
+		return (xx[n/2 - 1] + xx[n/2]) / 2;
+	}
+	else { // n is odd
+		return xx[(n+1)/2 - 1];
+	}
+}
+
+ 
   /**
 * @function nextUp_
 *
@@ -4403,22 +4448,449 @@ function sampleCovariance_(x, y) {
  */
 
 /* Start Wrapper private methods - Unit tests usage only */
-self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
+self.lpsolvePDHG_ = lpsolvePDHG_;
+self.qpsolveGSMO_ = qpsolveGSMO_;
+self.qksolveBS_ = qksolveBS_;
 /* End Wrapper private methods - Unit tests usage only */
  
+
+/**
+* @function qksolveBS_
+*
+* @summary Returns an optimal solution to the continuous quadratic knapsack problem, 
+* using a breakpoint searching algorithm.
+*
+* @description This function computes an optimal solution to the continuous quadratic
+* knapsack problem using an O(n) breakpoint searching algorithm, c.f. the first reference.
+*
+* The problem to solve is assumed to be provided in the following format:
+*
+* min f(x) = 1/2 * <d*x/x> - <a/x>
+*
+* s.t. <b/x> = r (single linear equality constraint)
+*      l <= x <= u (bound constraints)
+*
+* with:
+* - d an n by 1 matrix with strictly positive elements, representing a diagonal n by n matrix
+* - a an n by 1 matrix
+* - r a real number
+* - b an n by 1 matrix with strictly positive elements
+* - l an n by 1 matrix
+* - u an n by 1 matrix
+* 
+* To be noted that the algorithm used internally is able to detect the non-feasibility of the problem
+* thanks to modifications based on the second reference, in which case an error is returned.
+* 
+* @see <a href="https://link.springer.com/article/10.1007/s10107-006-0050-z">Kiwiel, K.C., Breakpoint searching algorithms for the continuous quadratic knapsack problem, Math. Program. (2008) 112: 473</a>
+* @see <a href="https://www.sciencedirect.com/science/article/pii/0167637784900105">Peter Brucker, An O(n) algorithm for quadratic knapsack problems, Operations Research Letters, Volume 3, Issue 3, 1984, Pages 163-166</a>
+*
+* @param {Matrix_} d an n by 1 matrix with strictly positive elements.
+* @param {Matrix_} a an n by 1 matrix.
+* @param {Matrix_} b an n by 1 matrix with strictly positive elements.
+* @param {number} r a real number.
+* @param {Matrix_} l an n by 1 matrix.
+* @param {Matrix_} u an n by 1 matrix.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps tolerance when assessing the numerical equality <b/x> = r , a strictly positive real number; defaults to 1e-16.
+* @param {boolean} opt.outputLagrangeMultiplier boolean indicating if the Lagrange multiplier associated to the optimal solution of the problem 
+* must be provided in output (true) or not (false); defaults to false.
+* @return {Array<Object>} an array arr containing:
+* - If opt.outputLagrangeMultiplier is set to false, two elements:
+* -- arr[0] an n by 1 matrix containing the optimal solution x^* to the problem
+* -- arr[1] the optimal value of the function, f(x^*)
+*
+* - If opt.outputLagrangeMultiplier is set to true, three elements:
+* -- arr[0] an n by 1 matrix containing the optimal solution x^* to the problem
+* -- arr[1] the optimal value of the function, f(x^*) 
+* -- arr[2] the Lagrange multiplier associated to the equality constraint of the problem, t^*
+*
+* @example
+* qksolveBS_(Matrix_([1, 1]), Matrix_([1, 1]), Matrix_([1, 1]), 1, Matrix_([0, 0]), Matrix_([1, 1])); // Compute the projection of the point [1,1] on the standard simplex of R^2
+* // [Matrix_([0.5, 0.5]), -0.75]
+*/
+function qksolveBS_(d, a, b, r, l, u, opt) {
+	// Internal function to resize an array.
+	function resizeArray(arr, n) {
+		if (arr instanceof Array) { // this restrict the size of the array to the first n elements
+			arr.length = n; 
+			return arr;
+		}
+		else if (arr instanceof Float64Array || arr instanceof Int32Array) { // this constructs a view on the first n array elements
+			return arr.subarray(0, n);
+		}
+	}
+	
+	// Internal function to compute g(t) = <b/bx(t)>, 
+	// c.f. remark 3.2 b) of the first reference.
+	function g(t) {
+		// Compute g(t) using the formula 3.5 of the first reference.
+		
+		// Initialize g(t) with the right part of formula 3.5.
+		var g_t = (p - t * q) + s;
+		
+		// Finalize the computation of g(t) by adding the left part of formula 3.5,
+		// sum b_i * x_i(t), i belonging to the set of indices I.
+		for (var j = 0; j < I.length; ++j) {
+			var i = I[j]; // i is the index belonging to the set I
+			
+			var x_i;
+			if (t <= T_u[i]) {
+				x_i = u.data[i];
+			}
+			else if (T_u[i] <= t && t <= T_l[i]) {
+				x_i = (a.data[i] - t*b.data[i]) / d.data[i];
+			}
+			else if (T_l[i] <= t) {
+				x_i = l.data[i];
+			}
+			
+			g_t += b.data[i] * x_i;
+		}
+		
+		// Return the value of g(t).
+		return g_t;
+	}
+	
+	// Internal function to compute the vector x(t).
+	function x(t) {
+		// Initialize x(t).
+		var x_t = Matrix_.zeros(n, 1);
+		
+		// Compute x(t) componentwise, using formula 2.6 of the first reference.
+		for (var i = 0; i < n; ++i) {
+			var x_i;
+			if (t_star <= T_u[i]) {
+				x_i = u.data[i];
+			}
+			else if (T_u[i] <= t_star && t_star <= T_l[i]) {
+				x_i = (a.data[i] - t_star*b.data[i]) / d.data[i];
+			}
+			else if (T_l[i] <= t_star) {
+				x_i = l.data[i];
+			}
+			x_t.data[i] = x_i;
+		}
+		
+		// Return the value of x(t).
+		return x_t;
+	}
+	
+	
+    // ------
+    
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var eps = opt.eps || 1e-16;
+	var outputLagrangeMultiplier = false || opt.outputLagrangeMultiplier;
+	
+
+	// ------
+
+	// Misc. checks
+	if (!(d instanceof Matrix_) || !d.isVector()) {
+		throw new Error('first input must be a vector');
+	}
+	if (!(a instanceof Matrix_) || !a.isVector()) {
+		throw new Error('second input must be a vector');
+	}
+	if (!(b instanceof Matrix_) || !b.isVector()) {
+		throw new Error('third input must be a vector');
+	}
+	if (!(l instanceof Matrix_) || !l.isVector()) {
+		throw new Error('fifth input must be a vector');
+	}
+	if (!(u instanceof Matrix_) || !u.isVector()) {
+		throw new Error('sixth input must be a vector');
+	}
+	
+	if (d.nbRows !== a.nbRows) {
+		throw new Error('first and second inputs number of rows do not match: ' + d.nbRows + '-' + a.nbRows);
+	}
+	if (d.nbRows !== b.nbRows) {
+		throw new Error('first and third inputs number of rows do not match: ' + d.nbRows + '-' + b.nbRows);
+	}
+	if (d.nbRows !== l.nbRows) {
+		throw new Error('first and fifth inputs number of rows do not match: ' + d.nbRows + '-' + l.nbRows);
+	}
+	if (d.nbRows !== u.nbRows) {
+		throw new Error('first and sixth inputs number of rows do not match: ' + d.nbRows + '-' + u.nbRows);
+	}
+
+
+	// ------
+	
+	// Initialisations    
+	var n = b.nbRows;
+	
+	var abs_r = Math.abs(r);
+	
+	var T = typeof Float64Array === 'function' ? new Float64Array(2*n) : new Array(2*n); // the set of breakpoints T
+	var T_l = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the list of breakpoints t_l_i, i=1..n
+	var T_u = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the list of breakpoints t_u_i, i=1...n
+	
+	var I = typeof Int32Array === 'function' ? new Int32Array(n) : new Array(n); // the set of indices I
+	for (var i = 0; i < n; ++i) {
+		I[i] = i;
+	}
+	var p = 0;
+	var q = 0;
+	var s = 0;
+	
+	
+	// ------
+	
+	// Computation of the breakpoints t_l_i and t_u_i, i = 1..n, c.f. formula 2.5 of the first reference.
+	// 
+	// In parallel:
+	// - Computation of t_1 and t_r, c.f. formula 7 of the second reference.
+	// - Basic checks on the problem constraints.
+	var t_1 = Infinity;
+	var t_r = -Infinity;
+	for (var i = 0, j = 0; i < n; ++i) {
+		// Check on lower and upper bounds l_i and u_i
+		if (l.data[i] > u.data[i]) {
+			throw new Error('infeasible problem detected');
+		}
+		
+		// Check the strict positivity of b_i
+		if (b.data[i] <= 0) {
+			throw new Error('negative element detected in b');
+		}
+
+		// Check the strict positivity of d_i
+		if (d.data[i] <= 0) {
+			throw new Error('negative element detected in d');
+		}		
+	
+		// Computation of t_l_i
+		var t_l_i = (a.data[i] - l.data[i]*d.data[i]) / b.data[i];
+		T_l[i] = t_l_i;
+		T[j++] = t_l_i;
+		
+		// Computation of t_u_i
+		var t_u_i = (a.data[i] - u.data[i]*d.data[i]) / b.data[i];
+		T_u[i] = t_u_i;
+		T[j++] = t_u_i;
+
+		// Potential update of t_1 and t_r
+		//
+		// To be noted that as t_u_i <= t_l_i, i=1..n:
+		// - t_1 is necessarily found amongst t_u_i, i=1..n
+		// - t_r is necessarily found amongst t_l_i, i=1..n
+		if (t_l_i > t_r) {
+			t_r = t_l_i;
+		}
+		if (t_u_i < t_1) {
+			t_1 = t_u_i;
+		}	
+	}
+
+	// Check the feasibility of the problem , c.f. line 2 of the 
+	// algorithm of the second reference.
+	var g_t_1 = g(t_1);
+	var g_t_r = g(t_r);
+	if (g_t_1 < r || g_t_r > r) {
+		throw new Error('infeasible problem detected');
+	}
+
+	// If the problem is feasible, it admits a unique solution x(t^*), and the problem
+	// is then to compute t^*, c.f. the theorem of the second reference.
+	var t_star = null;
+
+	// Check if t_1 or t_r is optimal, in which case the algorithm can be stopped, c.f.
+	// line 1 of the algorithm of the second reference.	
+	if (Math.abs(g_t_1 - r) <= eps * abs_r) {
+		t_star = t_1;
+	}
+	else if (Math.abs(g_t_1 - r) <= eps * abs_r) {
+		t_star = t_r;
+	}
+	// Otherwise, proceed with the core algorithm 3.1 of the first reference.
+	else {
+		// Step 0: initialisations, with some initialisations already done.
+		var t_l = t_1; // t_1 was already computed to check feasibility, so there is no need to use t_0
+		var t_u = t_r; // t_r was already computed to check feasibility, so there is no need to use t_rp
+
+		while (T.length != 0) {
+			// Step 1: Breakpoint selection
+			var t_hat = median_(T);
+
+			// Step 2: Computing g(t^)
+			var g_t_hat = g(t_hat);
+
+			// Step 3: Optimality check
+			if (Math.abs(g_t_hat - r) <= eps * abs_r) {
+				t_star = t_hat;
+				break;
+			}
+			
+			// Step 4: Lower breakpoint removal
+			else if (g_t_hat > r) {
+				t_l = t_hat;
+
+				// Update T, with T = {t in T : t^ < t}.
+				var j = 0;
+				for (var i = 0, k = T.length; i < k; ++i) {
+					if (t_hat < T[i]) { // T[i] is kept
+						T[j++] = T[i];
+					}
+				}
+				T = resizeArray(T, j);
+			}
+
+			// Step 5: Upper breakpoint removal
+			else if (g_t_hat < r) {
+				t_u = t_hat;
+				
+				// Update T, with T = {t in T : t < t^}.
+				var j = 0;
+				for (var i = 0, k = T.length; i < k; ++i) {
+					if (T[i] < t_hat) { // T[i] is kept
+						T[j++] = T[i];
+					}
+				}
+				T = resizeArray(T, j);
+			}
+		}
+			
+		// Step 6: 
+		// - Stopping criterion 
+		// - Update of I, p, q and s following the formula 3.8 of the first reference
+		//
+		// The elements of I which need to be removed are replaced by -1 in the loop below, 
+		// and are removed in a second pass on this array.
+		for (var j = 0; j < I.length; ++j) {
+			var i = I[j]; // i is the index belonging to the set I
+
+			if (T_l[i] <= t_l) {
+				I[j] = -1;
+				s += b.data[i] * l.data[i];
+			}
+			if (t_u <= T_u[i]) {
+				I[j] = -1;
+				s += b.data[i] * u.data[i];
+			}
+			if (T_u[i] <= t_l && t_u <= T_l[i]) {
+				I[j] = -1;
+				var b_d = b.data[i] / d.data[i];
+				p += a.data[i] * b_d;
+				q += b.data[i] * b_d;
+			}
+		}
+		var j = 0;
+		for (var i = 0, k = I.length; i < k; ++i) {
+			if (I[i] != -1) { // I[i] is kept unless it has been set to -1
+				I[j++] = I[i];
+			}
+		}
+		I = resizeArray(I, j);
+
+		// Test on the size of T
+		if (T.length == 0) {
+			t_star = (p + s - r) / q;
+		}
+
+	}
+
+	// Now that t^* has been computed, the last step is to compute the optimal
+	// solution of the problem, x^* = x(t^*), c.f. remark 3.2 d) of the first reference.
+	var x_star = x(t_star);
+	
+	// Compute the optimal function value f(x^*).
+	var fctVal = 1/2 * Matrix_.vectorDotProduct(x_star, Matrix_.elementwiseProduct(x_star, d)) - Matrix_.vectorDotProduct(a, x_star);
+	
+	// Return the computed solution.
+	if (outputLagrangeMultiplier === true) {
+		return [x_star, fctVal, t_star];
+	}
+	else {
+		return [x_star, fctVal];
+	}
+}
  
  
 /**
-* @function lpsolvePrimalDualHybridGradient_
+* @function qpsolveGSMO_
+*
+* @summary Returns an optimal solution to a quadratic program with a single linear constraint
+* and finite bound constraints, using a generalized sequential minimization optimization algorithm.
+*
+* @description This function computes an optimal solution to a quadratic program
+* with a single linear constraint and finite bound constraints using a GSMO algorithm, 
+* c.f. the first reference.
+*
+* The quadratic program to solve is assumed to be provided in the following format:
+*
+* min f(x) = 1/2 * <Q*x/x> + <f/x>
+*
+* s.t. <y/x> = c (single linear equality constraint)
+*      lb <= x <= ub (bound constraints)
+*
+* with:
+* - Q an n by n symmetric positive semi-definite matrix
+* - f an n by 1 matrix
+* - c a real number
+* - y an n by 1 matrix with non zero elements
+* - lb an n by 1 matrix
+* - ub an n by 1 matrix
+* 
+* To be noted that the algorithm used internally requires that the feasible set F of this quadratic program is non empty
+* and that f is bounded below on F to converge (i.e., admit a finite optimal solution). 
+*
+* Since the feasible set, if non empty, is bounded by definition, the only real assumption is then that the feasible set is non-empty.
+*
+* TODO In case the feasible set is empty, an error is returned.
+* 
+* @see <a href="https://link.springer.com/article/10.1023/A:1012431217818">Keerthi, S. & Gilbert, E. Convergence of a Generalized SMO Algorithm for SVM Classifier Design Machine Learning (2002) 46: 351.</a>
+* @see <a href="http://ieeexplore.ieee.org/document/977319/">Chih-Jen Lin, Asymptotic convergence of an SMO algorithm without any assumptions, IEEE Transactions on Neural Networks, vol. 13, no. 1, pp. 248-250, Jan 2002.</a>
+*
+* @param {Matrix_} Q an optional me by n matrix; must be null if not provided.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-08.
+* @param {number} opt.maxIter maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 10000.
+* @return {Array<Object>} an array arr containing two elements: 
+* - arr[0] an n by 1 matrix containing the optimal solution x^* to the quadratic program
+* - arr[1] the optimal value of the function f, i.e. f(x^*)
+*
+* @example
+* qpsolveGSMO_(Matrix_([[1, 1]]), Matrix_([1]), null, null, Matrix_([1, 2]), null, null); // Solves min x + 2*y on the unit simplex of R^2
+* // [Matrix_([~1, ~0]), ~1]
+*/
+ function qpsolveGSMO_(Q, f, y, c, lb, ub, opt) {
+    // ------
+    
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var eps = opt.eps || 1e-08;
+	var maxIterations = opt.maxIter || 10000;
+	
+	
+	// ------
+
+	// Misc. checks
+
+
+	// ------
+	
+	// Initializations
+	var n = ub.nbRows;
+}
+
+/**
+* @function lpsolvePDHG_
 *
 * @summary Returns an optimal solution to a linear program, using a primal-dual hybrid gradient algorithm.
 *
 * @description This function computes an optimal solution to a linear program using a 
-* preconditioned primal-dual hybrid gradient algorithm, c.f. the first reference.
+* preconditioned primal-dual hybrid gradient (PDHG) algorithm, c.f. the first reference.
 *
 * The linear program to solve is assumed to be provided in the following format:
 *
-* min <c/x>
+* min f(x) = <c/x>
 *
 * s.t. Ae*x = be (equality constraints)
 *      Ai*x <= bi (inequality constraints)
@@ -4430,15 +4902,15 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 * - be an optional me by 1 matrix
 * - Ai an optional mi by n matrix
 * - bi an optional mi by 1 matrix
-* - lb an optional n by 1 matrix, which can contain negative infinity values (-Infinity) corresponding to unbounded variables on the negaitve axis
+* - lb an optional n by 1 matrix, which can contain negative infinity values (-Infinity) corresponding to unbounded variables on the negative axis
 * - ub an optional n by 1 matrix, which can contain positive infinity values (Infinity) corresponding to unbounded variables on the positive axis
 *
 * and with:
 * - lb assumed to be an n by 1 matrix made of zeroes if not provided
 * - ub assumed to be an n by 1 matrix made of positive infinity values if not provided
 * 
-* To be noted that the algorithm used internally requires the linear problem to be feasible and bounded
-* (i.e., admit a finite optimal solution) to converge.
+* To be noted that the algorithm used internally requires the linear problem to be feasible and bounded to converge
+* (i.e., admit a finite optimal solution).
 * 
 * @see <a href="http://ieeexplore.ieee.org/document/6126441/">T. Pock and A. Chambolle, "Diagonal preconditioning for first order primal-dual algorithms in convex optimization" 2011 International Conference on Computer Vision, Barcelona, 2011, pp. 1762-1769.</a>
 * @see <a href="https://arxiv.org/abs/1305.0546">Tom Goldstein, Min Li, Xiaoming Yuan, Ernie Esser, Richard Baraniuk, "Adaptive Primal-Dual Hybrid Gradient Methods forSaddle-Point Problems", 05/2013, eprint arXiv:1305.0546</a>
@@ -4456,13 +4928,13 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 * @param {number} opt.maxIter maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 100000.
 * @return {Array<Object>} an array arr containing two elements: 
 * - arr[0] an n by 1 matrix containing the optimal solution x^* to the linear program
-* - arr[1] the optimal value of the function x -> <c/x>, i.e. <c/x^*>
+* - arr[1] the optimal value of the function f, i.e. f(x^*)
 *
 * @example
-* lpsolvePrimalDualHybridGradient_(Matrix_([[1, 1]]), Matrix_([1]), null, null, Matrix_([1, 2]), null, null); // Solves min x + 2*y on the unit simplex of R^2
+* lpsolvePDHG_(Matrix_([[1, 1]]), Matrix_([1]), null, null, Matrix_([1, 2]), null, null); // Solves min x + 2*y on the unit simplex of R^2
 * // [Matrix_([~1, ~0]), ~1]
 */
- function lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, lb, ub, opt) {
+ function lpsolvePDHG_(Ae, be, Ai, bi, c, lb, ub, opt) {
     // ------
     
 	// Decode options
@@ -4649,7 +5121,7 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 	    Se = Matrix_.fill(me, 1, 
 	                      function(i,j) { 
 						    var aeRowNorm = Ae.vectorNorm('one', 'row', i);
-							if (aeRowNorm == 0) { // in case there is no coefficient in the row, a value of 1 is harmless
+							if (aeRowNorm == 0) {
 								aeRowNorm = 1;
 							}
 							return nu * 1/aeRowNorm;
@@ -4660,7 +5132,7 @@ self.lpsolvePrimalDualHybridGradient_ = lpsolvePrimalDualHybridGradient_;
 	    Si = Matrix_.fill(mi, 1, 
 	                      function(i,j) { 
 						    var aiRowNorm = Ai.vectorNorm('one', 'row', i);
-							if (aiRowNorm == 0) { // in case there is no coefficient in the row, a value of 1 is harmless
+							if (aiRowNorm == 0) {
 								aiRowNorm = 1;
 							}
 			        	    return nu * 1/aiRowNorm;
@@ -4808,7 +5280,111 @@ self.simplexRationalRounding_ = simplexRationalRounding_;
 self.simplexRandomSampler_ = simplexRandomSampler_;
 self.simplexDeterministicRationalSampler_ = simplexDeterministicRationalSampler_;
 self.simplexRationalGirdSearch_ = simplexRationalGirdSearch_;
+self.simplexEuclidianProjection_ = simplexEuclidianProjection_;
+self.simplexSparseEuclidianProjection_ = simplexSparseEuclidianProjection_;
 /* End Wrapper private methods - Unit tests usage only */
+
+
+
+/**
+* @function simplexSparseEuclidianProjection_
+*
+* @summary Returns a closest point on the standard simplex subject to a sparsity constraint.
+*
+* @description This function computes a closest point (relative to the euclidian distance) with at most k non-zero elements
+* on the standard simplex of R^n to a point x = (x_1,...,x_n) in R^n, using the O(n ln(n)) algorithm 1 
+* of the reference.
+*
+* In other words, this function computes an at most k-sparse euclidian projection of a point x in R^n onto the standard simplex of R^n.
+*
+* @see <a href=""></a>
+*
+* @param {Array.<number>} x a point belonging to R^n, array of n real numbers.
+* @param {number} k , natural integer strictly greater than one.
+* @return {Array.<number>} the computed closest point to x, array of n real numbers.
+*
+* @example
+* simplexSparseEuclidianProjection_([X]);
+* //[X]
+*/
+function simplexSparseEuclidianProjection_(x, k) {
+	// Initializations
+	var n = x.length;
+	
+	// Compute the support of the projection
+	//
+	// The array xx_idx will contains the indices of the elements of x in descending order
+	var xx_idx = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
+	for (var i = 0; i < n;  ++i) {
+		xx_idx[i] = i;
+	}
+	xx_idx.sort(function(a, b) { return x[b] - x[a]; });
+	
+	// Compute the projection on the standard simplex of the k elements of x 
+	// belonging to the computed support 
+	var xx_k = new Array(k);
+	for (var i = 0; i < k;  ++i) {
+		xx_k[i] = x[xx_idx[i]];
+	}	
+	var proj_xx_k = simplexEuclidianProjection_(xx_k);
+	
+	// Compute the final weights vector by reconciliating the disjoints supports
+	var y = new Array(n);
+	for (var i = 0; i < k;  ++i) {
+		y[xx_idx[i]] = proj_xx_k[i];
+	}
+	for (var i = k; i < n;  ++i) {
+		y[xx_idx[i]] = 0;
+	}
+
+	// Return the computed projection
+	return y;
+}
+
+/**
+* @function simplexEuclidianProjection_
+*
+* @summary Returns the closest point on the standard simplex.
+*
+* @description This function computes the closest point (relative to the euclidian distance)
+* lying on the standard simplex of R^n to the input point x = (x_1,...,x_n) in R^n.
+*
+* In other words, this function computes the euclidian projection of the point x in R^n
+* onto the standard simplex of R^n.
+*
+* Internally, the algorithm used is an O(n) algorithm, c.f. the reference.
+*
+* @see <a href="https://link.springer.com/article/10.1007/s10107-006-0050-z">Kiwiel, K.C., Breakpoint searching algorithms for the continuous quadratic knapsack problem, Math. Program. (2008) 112: 473</a>
+*
+* @param {Array.<number>} x a point belonging to R^n, array of n real numbers.
+* @return {Array.<number>} the computed closest point to x, array of n real numbers.
+*
+* @example
+* simplexEuclidianProjection_([1, 1, 1]);
+* // [~0.33, ~0.33, ~0.33]
+*/
+function simplexEuclidianProjection_(x) {
+	// Initializations
+	var n = x.length;
+	var zeros = Matrix_.zeros(n, 1);
+	var ones = Matrix_.ones(n, 1);
+	
+	// Convert the problem of the euclidian projection on the standard simplex
+	// into the associated instance of the continuous quadratic knapsack problem.	
+	var d = ones;
+	var a = new Matrix_(x);
+	var b = ones;
+	var r = 1;
+	var l = zeros;
+	var u = ones;
+		
+	// Solve this instance.
+	var sol = qksolveBS_(d, a, b, r, l, u);
+	var y = sol[0];
+	
+	// Return the computed projection
+	return y.toArray();
+}
 
 
 /**
@@ -4819,7 +5395,7 @@ self.simplexRationalGirdSearch_ = simplexRationalGirdSearch_;
 * @description This function constructs a function to generate all the points on the k-th rational grid
 * of the unit simplex of R^n, 1/k * I_n(k), c.f. the first reference.
 * 
-* The algorithm used is based on the enumeration of all the k-compositions of the integer n, c.f. the second reference.
+* The algorithm used internally is based on the enumeration of all the k-compositions of the integer n, c.f. the second reference.
 *
 * @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic
 *  optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
@@ -4913,7 +5489,7 @@ function simplexRandomSampler_(n) {
 	* @summary Returns a random point on the unit simplex of R^n.
 	*
 	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
-	* using the algorithm 2 of the reference, which is linear with n (i.e., which has a time complexity of O(n)).
+	* using the O(n) algorithm 2 of the reference.
 	*
 	* @memberof simplexRandomSampler_
 	* @return {Array.<number>} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
@@ -4952,7 +5528,7 @@ function simplexRandomSampler_(n) {
 /**
 * @function simplexRationalRounding_
 *
-* @summary Compute a rational point on the unit simplex that is the closest to a point on the unit simplex.
+* @summary Compute a closest rational point on the unit simplex.
 *
 * @description Given a point x = (x_1,...,x_n) on the standard simplex of R^n, this function computes a proximal point xr = (xr_1,...,xr_n) on 
 * the r-th rational grid of the unit simplex of R^n, 1/r * I_n(r), with I_n(r) the set of N^n containing the points m = (m_1,...,m_n) 
@@ -5852,7 +6428,7 @@ self.minimaxWeights = function (assetsReturns, opt) {
 		// - Feasible: the portfolio with the minimum return over all the periods is a solution to the linear program
 		//
 		// Note: given the assumptions above, the convergence of the primal-dual hybrid gradient algorithm is guaranteed.
-	var lpSolution = lpsolvePrimalDualHybridGradient_(Ae, be, Ai, bi, c, lb, ub, {maxIter: -1});
+	var lpSolution = lpsolvePDHG_(Ae, be, Ai, bi, c, lb, ub, {maxIter: -1});
 	
 	
 	// ----
