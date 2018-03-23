@@ -4630,7 +4630,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	var T_l = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the list of breakpoints t_l_i, i=1..n
 	var T_u = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the list of breakpoints t_u_i, i=1...n
 	
-	var I = typeof Int32Array === 'function' ? new Int32Array(n) : new Array(n); // the set of indices I
+	var I = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n); // the set of indices I
 	for (var i = 0; i < n; ++i) {
 		I[i] = i;
 	}
@@ -4718,6 +4718,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 			var t_hat = median_(T);
 
 			// Step 2: Computing g(t^)
+			//console.log(I)
 			var g_t_hat = g(t_hat);
 
 			// Step 3: Optimality check
@@ -4753,45 +4754,48 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 				}
 				T = resizeArray(T, j);
 			}
-		}
 			
+			// Step 6: 
+			// - Update of I, p, q and s following the formula 3.8 of the first reference
+			//
+			// The elements of I which are kept after all the iterations below are copied
+			// at the beginning of the array I, and the array I is resized to the number
+			// of kept elements.
+			var k = 0;
+			for (var j = 0; j < I.length; ++j) {
+				var i = I[j]; // i is the index belonging to the set I
+				var remove_i = false;
+				
+				if (T_l[i] <= t_l) {
+					//I[j] = -1;
+					remove_i = true;
+					s += b.data[i] * l.data[i];
+				}
+				if (t_u <= T_u[i]) {
+					//I[j] = -1;
+					remove_i = true;
+					s += b.data[i] * u.data[i];
+				}
+				if (T_u[i] <= t_l && t_u <= T_l[i]) {
+					//I[j] = -1;
+					remove_i = true;
+					var b_d = b.data[i] / d.data[i];
+					p += a.data[i] * b_d;
+					q += b.data[i] * b_d;
+				}
+				
+				if (remove_i === false) {
+					I[k++] = i;
+				}
+			}
+			I = resizeArray(I, k);
+		}
+
 		// Step 6: 
-		// - Stopping criterion 
-		// - Update of I, p, q and s following the formula 3.8 of the first reference
-		//
-		// The elements of I which need to be removed are replaced by -1 in the loop below, 
-		// and are removed in a second pass on this array.
-		for (var j = 0; j < I.length; ++j) {
-			var i = I[j]; // i is the index belonging to the set I
-
-			if (T_l[i] <= t_l) {
-				I[j] = -1;
-				s += b.data[i] * l.data[i];
-			}
-			if (t_u <= T_u[i]) {
-				I[j] = -1;
-				s += b.data[i] * u.data[i];
-			}
-			if (T_u[i] <= t_l && t_u <= T_l[i]) {
-				I[j] = -1;
-				var b_d = b.data[i] / d.data[i];
-				p += a.data[i] * b_d;
-				q += b.data[i] * b_d;
-			}
-		}
-		var j = 0;
-		for (var i = 0, k = I.length; i < k; ++i) {
-			if (I[i] != -1) { // I[i] is kept unless it has been set to -1
-				I[j++] = I[i];
-			}
-		}
-		I = resizeArray(I, j);
-
-		// Test on the size of T
+		// - Stopping criterion: test on the size of T
 		if (T.length == 0) {
 			t_star = (p + s - r) / q;
 		}
-
 	}
 
 	// Now that t^* has been computed, the last step is to compute the optimal

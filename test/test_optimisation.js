@@ -426,7 +426,7 @@ QUnit.test('Continuous quadratic knapsack problem solver - Breakpoint searching 
 	{
 		var nbTests = 100;
 		for (var k = 0; k < nbTests; ++k) {
-			var n = generateRandomDimension(1, 50);
+			var n = generateRandomDimension(1, 100);
 			var d = generateRandomStriclyPositiveVector(n);
 			var a = generateRandomVector(n);
 			var b = generateRandomStriclyPositiveVector(n);
