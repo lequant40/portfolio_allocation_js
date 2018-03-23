@@ -4823,61 +4823,325 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 *
 * The quadratic program to solve is assumed to be provided in the following format:
 *
-* min f(x) = 1/2 * <Q*x/x> + <f/x>
+* min f(x) = 1/2 * <Q*x/x> + <p/x>
 *
-* s.t. <y/x> = c (single linear equality constraint)
-*      lb <= x <= ub (bound constraints)
+* s.t. <b/x> = r (single linear equality constraint)
+*      l <= x <= u (bound constraints)
 *
 * with:
-* - Q an n by n symmetric positive semi-definite matrix
-* - f an n by 1 matrix
-* - c a real number
-* - y an n by 1 matrix with non zero elements
-* - lb an n by 1 matrix
-* - ub an n by 1 matrix
+* - Q an n by n square symetric positive semi-definite matrix
+* - p an n by 1 matrix
+* - r a real number
+* - b an n by 1 matrix with strictly positive elements
+* - l an n by 1 matrix
+* - u an n by 1 matrix
 * 
 * To be noted that the algorithm used internally requires that the feasible set F of this quadratic program is non empty
-* and that f is bounded below on F to converge (i.e., admit a finite optimal solution). 
+* and that f is bounded below on F to converge (i.e., admit a finite optimal solution).
 *
-* Since the feasible set, if non empty, is bounded by definition, the only real assumption is then that the feasible set is non-empty.
+* Since the feasible set, if non empty, is bounded by definition, the main assumption 
+* is then that the feasible set is non-empty, and if this is not the case, an error is returned.
 *
-* TODO In case the feasible set is empty, an error is returned.
-* 
 * @see <a href="https://link.springer.com/article/10.1023/A:1012431217818">Keerthi, S. & Gilbert, E. Convergence of a Generalized SMO Algorithm for SVM Classifier Design Machine Learning (2002) 46: 351.</a>
-* @see <a href="http://ieeexplore.ieee.org/document/977319/">Chih-Jen Lin, Asymptotic convergence of an SMO algorithm without any assumptions, IEEE Transactions on Neural Networks, vol. 13, no. 1, pp. 248-250, Jan 2002.</a>
+* @see <a href="http://ieeexplore.ieee.org/document/6789464/">S. S. Keerthi, S. K. Shevade, C. Bhattacharyya and K. R. K. Murthy, "Improvements to Platt's SMO Algorithm for SVM Classifier Design," in Neural Computation, vol. 13, no. 3, pp. 637-649, March 1 2001.</a>
+* @see <a href="https://www.ncbi.nlm.nih.gov/pubmed/15941003">Takahashi N, Nishi T., Rigorous proof of termination of SMO algorithm for support vector machines., IEEE Trans Neural Netw. 2005 May;16(3):774-6.</a>
 *
-* @param {Matrix_} Q an optional me by n matrix; must be null if not provided.
+* @param {Matrix_} Q a square symetric positive semi-definite n by n matrix.
+* @param {Matrix_} p an n by 1 matrix.
+* @param {Matrix_} b an n by 1 matrix with strictly positive elements.
+* @param {number} r a real number.
+* @param {Matrix_} l an n by 1 matrix.
+* @param {Matrix_} u an n by 1 matrix.
 * @param {object} opt optional parameters for the algorithm.
-* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-08.
+* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
 * @param {number} opt.maxIter maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 10000.
 * @return {Array<Object>} an array arr containing two elements: 
-* - arr[0] an n by 1 matrix containing the optimal solution x^* to the quadratic program
+* - arr[0] an n by 1 matrix containing the optimal solution x^* (in case Q is positive definite) 
+* or an optimal solution x^* (in case Q is positive semi-definite) to the quadratic program
 * - arr[1] the optimal value of the function f, i.e. f(x^*)
 *
 * @example
-* qpsolveGSMO_(Matrix_([[1, 1]]), Matrix_([1]), null, null, Matrix_([1, 2]), null, null); // Solves min x + 2*y on the unit simplex of R^2
-* // [Matrix_([~1, ~0]), ~1]
+* qpsolveGSMO_(Matrix_([[2, 1], [1, 1]]), Matrix_([0, 0]), Matrix_([1, 1]), 1, Matrix_([0, 0]), Matrix_([1, 1])); // Solves min x^2 + xy + y^2/2 on the unit simplex of R^2
+* // [Matrix_([0, 1]), 0.5]
 */
- function qpsolveGSMO_(Q, f, y, c, lb, ub, opt) {
+ function qpsolveGSMO_(Q, p, b, r, l, u, opt) {
     // ------
     
 	// Decode options
 	if (opt === undefined) {
 		opt = {};
 	}
-	var eps = opt.eps || 1e-08;
+	var eps = opt.eps || 1e-04;
 	var maxIterations = opt.maxIter || 10000;
 	
 	
 	// ------
 
 	// Misc. checks
+	if (!(Q instanceof Matrix_) || !Q.isSquare()) {
+		throw new Error('first input must be a square matrix');
+	}
+	if (!(p instanceof Matrix_) || !p.isVector()) {
+		throw new Error('second input must be a vector');
+	}
+	if (!(b instanceof Matrix_) || !b.isVector()) {
+		throw new Error('third input must be a vector');
+	}
+	if (!(l instanceof Matrix_) || !l.isVector()) {
+		throw new Error('fifth input must be a vector');
+	}
+	if (!(u instanceof Matrix_) || !u.isVector()) {
+		throw new Error('sixth input must be a vector');
+	}
+	
+	if (Q.nbRows !== p.nbRows) {
+		throw new Error('first and second inputs number of rows do not match: ' + Q.nbRows + '-' + a.nbRows);
+	}
+	if (Q.nbRows !== b.nbRows) {
+		throw new Error('first and third inputs number of rows do not match: ' + Q.nbRows + '-' + b.nbRows);
+	}
+	if (Q.nbRows !== l.nbRows) {
+		throw new Error('first and fifth inputs number of rows do not match: ' + Q.nbRows + '-' + l.nbRows);
+	}
+	if (Q.nbRows !== u.nbRows) {
+		throw new Error('first and sixth inputs number of rows do not match: ' + Q.nbRows + '-' + u.nbRows);
+	}
 
-
+	
 	// ------
 	
 	// Initializations
-	var n = ub.nbRows;
+	var n = Q.nbRows;
+
+	
+	// ------
+	
+	// Implementation of the algorithm GSMO of the first reference,
+	// with some implementation details provided in the second reference.
+	
+	// Compute a feasible initial point x.
+	//
+	// This is done below by projecting the "centroid" vector
+	// r/n * (1/b_1,...,1/b_n) on the constraints set, which is an O(n)
+	// operation.
+	var centroid = Matrix_.fill(n, 1, 
+								function(i,j) { 
+									return r/n* 1/b.data[i-1];
+								});
+	var p_centroid = qksolveBS_(Matrix_.ones(n, 1), centroid, b, r, l, u);
+	var x = p_centroid[0];
+	
+	// Compute the gradient of the function f at the point x, using formula
+	// grad(f)(x) = Q*x + p.
+	//
+	// This step is the most expansive code portion, since matrix-vector
+	// multiplication is O(n^2).
+	var grad_f_x = Matrix_.xpy(Matrix_.xy(Q, x), p);
+	
+	// Main loop of the GSMO algorithm, which convergence is guaranteed
+	// by theorem 1 of the first reference and by theorem 1 of the
+	// third reference.
+	var iter = 0;
+	while (true) {
+		// Check the number of iterations
+		if (maxIterations !== -1 && iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+
+		// Update the number of iterations
+		++iter;
+		
+		// Choose (i,j) a pair of indices such that (i,j) = (i_up,i_low) is 
+		// the most violating pair on the sets I_up and I_low, c.f. formulas
+		// 5.1a and 5.1b of the second reference:
+		// - i_low is the indice such that F_i_low = max {F_i, i belonging to I_low}
+		// - i_up is the indice such that F_i_up = min {F_i, i belonging to I_up}
+		//
+		// with:
+		// - I_low = I_0 u I_3 u I_4
+		// - I_up = I_0 u I_1 u I_2
+		// - I_0 = {i, l(i) < x(i) < u(i)}
+		// - I_1 = {i, b(i) > 0, x(i) = l(i)}
+		// - I_2 = {i, b(i) < 0, x(i) = u(i)}, empty here as b > 0
+		// - I_3 = {i, b(i) > 0, x(i) = u(i)}
+		// - I_4 = {i, b(i) < 0, x(i) = l(i)}, empty here as b > 0
+		//
+		// This choise corresponds to the method 2 described at the point 5 
+		// of the section 5 of the second reference, with no optimisation 
+		// to compute (i,j) first on set I_0 and only then on the sets I_up and I_low.
+		//
+		// To be noted that the first reference does not describe this particular 
+		// choice in details, because the GSMO algorithm described is more generic.
+		var i_low = -1;
+		var F_i_low = -Infinity;
+		var i_up = -1;
+		var F_i_up = Infinity;
+		for (var i = 0; i < n; ++i) {
+			// Compute F_i, c.f. formula 1 of the first reference.
+			F_i = grad_f_x.data[i] / b.data[i];
+			
+			// If i belongs to I_0, both i_low and i_up can potentially be updated.
+			if (l.data[i] < x.data[i] && x.data[i] < u.data[i]) {
+				if (F_i > F_i_low) {
+					F_i_low = F_i;
+					i_low = i;
+				}
+				if (F_i < F_i_up) {
+					F_i_up = F_i;
+					i_up = i;
+				}
+			}
+			// If i belongs to I_1, only i_up can potentially be updated.
+			else if (x.data[i] == l.data[i]) {
+				if (F_i < F_i_up) {
+					F_i_up = F_i;
+					i_up = i;
+				}		
+			}
+			// If i belongs to I_3, only i_low can potentially be updated.
+			else if (x.data[i] == u.data[i]) {
+				if (F_i > F_i_low) {
+					F_i_low = F_i;
+					i_low = i;
+				}		
+			}
+		}
+		
+		// Stopping condition: check the formula 6 of the first reference:
+		// min {F_i, i belonging to I_up} >= max {F_i, i belonging to I_low} - eps,
+		// which is equivalent by definition to checking F_i_low >= F_i_up - eps.
+		if (F_i_low - F_i_up <= eps) {
+			break;
+		}
+		
+		// Minimization of the function f on the rectangle [l(i), u(i)] x [l(j), u(j)] 
+		// while varying only the coordinates (i,j) of the point x, with
+		// i = i_up and j = i_low per choice of the (i,j) indices above.
+		// 
+		// From the section 3 of the first reference, this problem is equivalent 
+		// to minimizing a function phi(t) = phi(0) + phi'(0)*t + phi''(0)*t^2/2
+		// with:
+		// - phi(0) irrelevant for the analysis
+		// - phi'(0) = F_i - F_j
+		// - phi''(0) = Q(i,i)/b(i)^2 + Q(j,j)/b(j)^2 -2*Q(i,j)/(b(i)*b(j))
+		// - t_min <= t <= t_max, with t_min and t_max determined such that
+		// l(i) <= x(i) + t/b(i) <= u(i) and l(j) <= x(j) - t/b(j) <= u(j),
+		// that is:
+		// - t_min = max( (l(i) - x(i))*b(i) , (x(j) - u(j))*b(j) )
+		// - t_max = min( (u(i) - x(i))*b(i) , (x(j) - l(j))*b(j) )
+		//
+		// As the matrix Q is supposed to be positive semi-definite, there are 
+		// only two possibilities:
+		// - phi''(0) > 0, in which case phi is a second order polynomial with a strictly
+		// positive leading coefficient. The unconstrained minimum of phi is then reached 
+		// at t^* = -phi'(0)/phi''(0), and the contrained minimum of phi is then reached at
+		// max(t_min, min(t^*, t_max)).
+		//
+		// - phi''(0) = 0, in which case phi is a linear function. Since phi'(0) <> 0 
+		// per selection of the pair (i,j) = (i_low,i_up), phi is not constant. The
+		// minimum of phi is then reached at t^* = t_min if phi'(0) > 0, or at t^* = t_max
+		// if phi'(0) < 0.
+		var i = i_up;
+		var j = i_low;
+		
+		// Compute t_min
+		var t_min_l_i = (l.data[i] - x.data[i])*b.data[i];
+		var t_min_u_j = (x.data[j] - u.data[j])*b.data[j];
+		var t_min = t_min_l_i >= t_min_u_j ? t_min_l_i : t_min_u_j;
+
+		// Compute t_max
+		var t_max_u_i = (u.data[i] - x.data[i])*b.data[i];
+		var t_max_l_j = (x.data[j] - l.data[j])*b.data[j];
+		var t_max = t_max_u_i <= t_max_l_j ? t_max_u_i : t_max_l_j;
+		
+		// Compute t^*
+		var dphi_0 = F_i_up - F_i_low;
+		var ddphi_0 = Q.data[i*Q.nbColumns + i]/(b.data[i] * b.data[i]) + Q.data[j*Q.nbColumns + j]/(b.data[j] * b.data[j]) - 2*Q.data[i * Q.nbColumns + j]/(b.data[i] * b.data[j]);
+		var t_star;
+		if (ddphi_0 > 0) { // phi''(0) > 0
+			t_star = -dphi_0/ddphi_0;
+			if (t_star > t_max) {
+				t_star = t_max;
+			}
+			else if (t_star < t_min) {
+				t_star = t_min;
+			}
+		}
+		else { // phi''(0) = 0, as phi''(0) < 0 would imply Q is not positive semi-definite
+			if (dphi_0 > 0) {
+				t_star = t_min;
+			}
+			else {
+				t_star = t_max;
+			}
+		}
+		
+		// Once t^* minimizing phi on [t_min,t_max] has been computed,
+		// the point x can be updated using the parametric values of its (i,j) coordinates,
+		// c.f. section 3 of the first reference:
+		// - x(i)_new = x(i)_old + t^*/b(i) 
+		// - x(j)_new  = x(j)_old - t^*/b(j)
+		//
+		// Nevertheless, to avoid loss of numerical precision when either x(i) or x(j) reaches one
+		// of its boundaries, a specific logic is implemented below to make sure both x(i) and x(j)
+		// stay feasible.
+		var old_x_i = x.data[i];
+		var old_x_j = x.data[j];
+		var delta_x_i = t_star/b.data[i];
+		var delta_x_j = -t_star/b.data[j];		
+		x.data[i] += delta_x_i;
+		x.data[j] += delta_x_j;
+		
+		// Specific process in case of boundaries crossing.
+		//
+		// Note that there is no if/else below because it might happen that t_min == t_max
+		// and/or that t_min_l_i == t_min_u_j and/or ...
+		if (t_star == t_min) {
+			if (t_min == t_min_l_i) {
+				x.data[i] = l.data[i];
+				delta_x_i = x.data[i] - old_x_i;
+				// No numerical update for x(j), because if it has not reached a boundary, it is strictly within [l(j), u(j)]
+			}
+			if (t_min == t_min_u_j) {
+				x.data[j] = u.data[j];
+				delta_x_j = x.data[j] - old_x_j;
+				// No numerical update for x(i), because if it has not reached a boundary, it is strictly within [l(i), u(i)]
+			}
+		}
+		if (t_star == t_max) {
+			if (t_max == t_max_u_i) {
+				x.data[i] = u.data[i];
+				delta_x_i = x.data[i] - old_x_i;
+				// No numerical update for x(j), etc.
+			}
+			if (t_max == t_max_l_j) {
+				x.data[j] = l.data[j];
+				delta_x_j = x.data[j] - old_x_j;
+				// No numerical update for x(i), etc.
+			}		
+		}		
+		
+		// Compute the gradient of the function f at the updated point x.
+		//
+		// To be noted that since the updated point x is different from the previous point x
+		// by only its (i,j) coordinates, this gradient can be computed using the formula:
+		// grad_f_x_new = Q*x_new + p 
+		//              = Q*(x_old + (0...t^*/b(i)...0...-t^*/b(j)...0)^t) + p
+		//              = Q*x_old + p + Q*(0...t^*/b(i)...0...-t^*/b(j)...0)^t
+		//              = grad_f_x_old + (Q(1,i)*t^*/b(i) - Q(1,j)*t^*/b(j), ..., Q(n,i)*t^*/b(i) - Q(n,j)*t^*/b(j))
+		for (var k = 0; k < n; ++k) {
+			grad_f_x.data[k] = grad_f_x.data[k] + Q.data[k*Q.nbColumns + i]*delta_x_i + Q.data[k*Q.nbColumns + j]*delta_x_j;
+		}
+	}
+	
+	// Compute the optimal function value f(x^*).
+	//
+	// This step is also the most expansive code portion, since matrix-vector
+	// multiplication is O(n^2).
+	var fctVal = 1/2 * Matrix_.vectorDotProduct(x, Matrix_.xy(Q, x)) + Matrix_.vectorDotProduct(p, x);
+	
+	// Return the computed solution.
+	return [x, fctVal];
 }
 
 /**
@@ -5145,7 +5409,6 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	//
 	// The convergence is guaranteed by the theorem 1 of the first reference
 	// in case the primal linear program admit a finite optimal solution.
-	//
 	//
 	// To be noted that the formulation used below is slightly different from
 	// the formulation in formula 17 of the first reference (equality constraints only).

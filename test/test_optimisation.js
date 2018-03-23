@@ -4,9 +4,271 @@ QUnit.module('Optimisation internal module', {
     // 
   }
 });
+	
+
+QUnit.test('Quadratic programming solver (single linear constraint and finite bound constraints) - Sequential Minimization Optimization algorithm', function(assert) {    
+	// Functions to generate random feasible instances of the quadratic problem
+	function generateRandomDimension(min, max) { // used for n
+		return Math.floor(Math.random()*(max-min+1) + min);
+	}
+	
+	function generateRandomValue(minVal, maxVal) { // used for r		
+		return Math.random() * (maxVal - minVal) + minVal;
+	}
+	
+	function generateRandomBounds(n, b) { // used for l and u and r
+		var minVal = -10;
+		var maxVal = 10;
+		
+		var l = PortfolioAllocation.Matrix.zeros(n, 1);
+		var u = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		var sum_b_lb = 0;
+		for (var i = 0; i < n; ++i) {
+			var lb = generateRandomValue(minVal, maxVal);
+			l.data[i] = lb;
+			sum_b_lb += b.data[i] * lb;
+		}
+		var r = sum_b_lb + (1 - generateRandomValue(0, 1)); // feasibility criterion: sum b_i * l_i <= r (because b_i > 0)
+		
+		do {
+			var sum_b_ub = 0;
+			for (var i = 0; i < n; ++i) {
+				var ub = generateRandomValue(l.data[i], 2*maxVal); // ensure l <= u
+				u.data[i] = ub;
+				sum_b_ub += b.data[i] * ub;
+			}
+		} while (sum_b_ub < r) // feasibility criterion: sum b_i * u_i >= r (because b_i > 0)
+
+		return [l, u, r];
+	}
+	
+	function generateRandomStriclyPositiveVector(n) { // used for b
+		var minVal = 0;
+		var maxVal = 10;
+		
+		var v = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		for (var i = 0; i < n; ++i) {
+			v.data[i] = maxVal - generateRandomValue(minVal, maxVal); // ]minVal, maxVal]
+		}
+		
+		return v;
+	}
+
+	function generateRandomSemiDefinitePositiveMatrix(n) { // used for Q
+		var minVal = 0;
+		var maxVal = 10;
+		
+		// Generate a random orthogonal matrix Q
+		var A = PortfolioAllocation.Matrix.fill(n, n, 
+												function(i,j) { 
+													return generateRandomValue(minVal, maxVal);
+												});
+		var qr = PortfolioAllocation.Matrix.qrDecomposition(A);
+		var Q = qr[0];
+		
+		// Generate a random diagonal matrix with strictly positive elements
+		var D = PortfolioAllocation.Matrix.zeros(n, 1);
+		for (var i = 0; i < n; ++i) {
+			D.data[i] = maxVal - generateRandomValue(minVal, maxVal); // ]minVal, maxVal]
+		}
+		
+		// Replace a random number of them (potentially 0, at maximum n-1) by null elements
+		if (n >= 2) {
+			var nbNullElements = generateRandomDimension(0, n-1);
+			for (var i = 0; i < nbNullElements; ++i) { // the position of the elements replaced is not random
+				D.data[i] = 0;
+			}
+		}
+		
+		// Generate a random (symetric) positive definite positive matrix using the formula
+		// Q^t*D*Q
+		return PortfolioAllocation.Matrix.txy(Q, PortfolioAllocation.Matrix.elementwiseProduct(Q, D));
+	}
+	
+	function generateRandomVector(n) { // used for p
+		var minVal = -10;
+		var maxVal = 10;
+		
+		var v = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		for (var i = 0; i < n; ++i) {
+			v.data[i] = generateRandomValue(minVal, maxVal);
+		}
+		
+		return v;
+	}
+	
+	// Test non-supported problems: 
+	// - b_i <= 0
+	// - TODO: Non SDP Q matrix
+	{
+		var n = generateRandomDimension(1, 50);
+		var Q = generateRandomSemiDefinitePositiveMatrix(n);
+		var p = generateRandomVector(n);
+		var b = generateRandomStriclyPositiveVector(n);
+		var bounds = generateRandomBounds(n, b);
+		var l = bounds[0];
+		var u = bounds[1];
+		var r = bounds[2];
+		
+		var m = generateRandomDimension(1, n); // coordinate of b/d to alter
+		var b_old = b.data[m-1];
+		
+		// Test b_i = 0
+		b.data[m-1] = 0;
+		assert.throws(function() { PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u) },
+							       new Error('negative element detected in b'),
+								  "Unsupported problem - Null b element");
+
+		// Test b_i < 0
+		b.data[m-1] = Math.random() - 1;
+		assert.throws(function() { PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u) },
+							       new Error('negative element detected in b'),
+								  "Unsupported problem - Strictly negative b element");		
+	}
+	
+	// Test infeasible problems:
+	// - u_i < l_i
+	// - sum b_i * l_i > r
+	// - sum b_i * u_i < r
+	{
+		var n = generateRandomDimension(1, 50);
+		var Q = generateRandomSemiDefinitePositiveMatrix(n);
+		var p = generateRandomVector(n);
+		var b = generateRandomStriclyPositiveVector(n);
+		var bounds = generateRandomBounds(n, b);
+		var l = bounds[0];
+		var u = bounds[1];
+		var r = bounds[2];
+		
+		var m = generateRandomDimension(1, n); // coordinate of l/u to alter
+		var l_old = l.data[m-1];
+		var u_old = u.data[m-1];
+		
+		// Test u_i < l_i
+		l.data[m-1] = u_old;
+		u.data[m-1] = l_old;
+		assert.throws(function() { PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u) },
+							       new Error('infeasible problem detected'),
+								  "Infeasible problem - Lower bounds strictly greater than upper bounds");
+								  
+		// Restore l and u
+		l.data[m-1] = l_old;
+		u.data[m-1] = u_old;
+		
+		// Test infeasible lower bounds condition - sum b_i * l_i > r
+		l.data[m-1] = (-(PortfolioAllocation.Matrix.vectorDotProduct(b, l) - b.data[m-1]*l.data[m-1]) + r + (1 - Math.random()))/b.data[m-1];
+		assert.throws(function() { PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u) },
+							       new Error('infeasible problem detected'),
+								  "Infeasible problem - Lower bounds incompatible with b and r");
+		
+		// Restore l
+		l.data[m-1] = l_old;	
+		
+		// Test infeasible upper bounds condition - sum b_i * u_i < r
+		u.data[m-1] = (-(PortfolioAllocation.Matrix.vectorDotProduct(b, u) - b.data[m-1]*u.data[m-1]) + r - (1 - Math.random()))/b.data[m-1];
+		assert.throws(function() { PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u) },
+							       new Error('infeasible problem detected'),
+								  "Infeasible problem - Upper bounds incompatible with b and r");
+	}
+
+	// Test feasible random problems with positive definite matrices and semi positive definite matrices 
+	// Reference: Convergence of a Generalized SMO Algorithm for SVM Classifier Design
+	{
+		var nbTests = 100;
+		for (var k = 0; k < nbTests; ++k) {
+			var n = generateRandomDimension(1, 50);
+			var Q = generateRandomSemiDefinitePositiveMatrix(n);
+			var p = generateRandomVector(n);
+			var b = generateRandomStriclyPositiveVector(n);
+			var bounds = generateRandomBounds(n, b);
+			var l = bounds[0];
+			var u = bounds[1];
+			var r = bounds[2];
+			
+			var sol = PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u);
+			var x = sol[0];
+			var f_x = sol[1];
+			
+			// Check that f_x corresponds to the value of the function f at point x
+			var expected_f_x = 1/2 * PortfolioAllocation.Matrix.vectorDotProduct(x, PortfolioAllocation.Matrix.xy(Q, x)) 
+							   + PortfolioAllocation.Matrix.vectorDotProduct(p, x);
+			assert.equal(Math.abs(f_x - expected_f_x) <= Math.abs(expected_f_x) * 1e-16, true, 'Feasible problem ' + (k+1) + ' - 1/2');
+			
+			// Check the KKT conditions, which are necessary and sufficient since the problem is convex,
+			// c.f. formulas 1a, 1b and 1c of the reference:
+			// - if x(i) == l(i), F_i >= beta
+			// - if l(i) < x(i) < u(i), F_i = beta
+			// - if x(i) == u(i), F_i <= beta
+
+			// 1: Compute the vector F
+			var F = PortfolioAllocation.Matrix.xpy(PortfolioAllocation.Matrix.xy(Q, x), p);
+			for (var i = 0; i < n; ++i) {
+				F.data[i] /= b.data[i];
+			}
+			
+			// 2: Try to numerically determine beta by searching for a free variable
+			var beta = null;
+			for (var i = 0; i < n; ++i) {
+				if (l.data[i] < x.data[i] && x.data[i] < u.data[i]) {
+					beta = F.data[i];
+					break;
+				}
+			}
+			// 2bis: If the above search failed, default to numerically determine beta by selecting
+			// beta as max {F_i, i such that x(i) == u(i)}.
+			if (beta == null) {
+				beta = -Infinity;
+				for (var i = 0; i < n; ++i) {
+					if (x.data[i] == u.data[i]) {
+						beta = Math.max(beta, F.data[i]);
+					}
+				}
+			}
+			// 2ter: If the above search failed, default to numerically determine beta by selecting
+			// beta as min {F_i, i such that x(i) == l(i)}.
+			if (beta == null) {
+				beta = Infinity;
+				for (var i = 0; i < n; ++i) {
+					if (x.data[i] == l.data[i]) {
+						beta = Math.min(beta, F.data[i]);
+					}
+				}
+			}
+
+			// Check the KKT conditions on the vector F
+			var eps_beta = 1e-4;
+			var kkt_conditions_ok = true;
+			for (var i = 0; i < n; ++i) {
+				if (x.data[i] == l.data[i]) {
+					if (F.data[i] < beta) {
+						kkt_conditions_ok = false;
+						break;
+					}
+				}
+				else if (x.data[i] == u.data[i]) {
+					if (F.data[i] > beta) {
+						kkt_conditions_ok = false;
+						break;
+					}
+				}
+				else if (l.data[i] < x.data[i] && x.data[i] < u.data[i]) {
+					// Specific comparison is needed here due to numerical precision on beta
+					if (Math.abs(F.data[i] - beta) > eps_beta) {
+						kkt_conditions_ok = false;
+						break;
+					}
+				}
+			}
+			assert.equal(kkt_conditions_ok, true, 'Feasible problem ' + (k+1) + ' - 2/2');
+		}
+	}	
+});
 
 
-QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searching algorithm', function(assert) {    
+QUnit.test('Continuous quadratic knapsack problem solver - Breakpoint searching algorithm', function(assert) {    
 	// Functions to generate random feasible instances of the continuous quadratic knapsack problem
 	function generateRandomDimension(min, max) { // used for n
 		return Math.floor(Math.random()*(max-min+1) + min);
@@ -16,28 +278,31 @@ QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searchin
 		return Math.random() * (maxVal - minVal) + minVal;
 	}
 	
-	function generateRandomBounds(n, b, r) { // used for l and u
+	function generateRandomBounds(n, b) { // used for l and u and r
 		var minVal = -10;
 		var maxVal = 10;
 		
 		var l = PortfolioAllocation.Matrix.zeros(n, 1);
 		var u = PortfolioAllocation.Matrix.zeros(n, 1);
 		
+		var sum_b_lb = 0;
+		for (var i = 0; i < n; ++i) {
+			var lb = generateRandomValue(minVal, maxVal);
+			l.data[i] = lb;
+			sum_b_lb += b.data[i] * lb;
+		}
+		var r = sum_b_lb + (1 - generateRandomValue(0, 1)); // feasibility criterion: sum b_i * l_i <= r (because b_i > 0)
+		 
 		do {
+			var sum_b_ub = 0;
 			for (var i = 0; i < n; ++i) {
-				var lb = generateRandomValue(minVal, maxVal);
-				l.data[i] = lb;
+				var ub = generateRandomValue(l.data[i], 2*maxVal); // ensure l <= u
+				u.data[i] = ub;
+				sum_b_ub += b.data[i] * ub;
 			}
-		} while (PortfolioAllocation.Matrix.vectorDotProduct(b, l) > r) // feasibility criterion: sum b_i * l_i <= r (because b_i > 0)
-		
-		do {
-			for (var i = 0; i < n; ++i) {
-				var ub = generateRandomValue(l.data[i], maxVal); // ensure l <= u
-				u.data[i] = ub; 
-			}
-		} while (PortfolioAllocation.Matrix.vectorDotProduct(b, u) < r) // feasibility criterion: sum b_i * u_i >= r (because b_i > 0)
+		} while (sum_b_ub < r) // feasibility criterion: sum b_i * u_i >= r (because b_i > 0)
 
-		return [l, u];
+		return [l, u, r];
 	}
 	
 	function generateRandomStriclyPositiveVector(n) { // used for d and b
@@ -70,14 +335,14 @@ QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searchin
 	// - b_i <= 0
 	// - d_i <= 0
 	{
-		var n = generateRandomDimension(1, 100);
+		var n = generateRandomDimension(1, 50);
 		var d = generateRandomStriclyPositiveVector(n);
 		var a = generateRandomVector(n);
 		var b = generateRandomStriclyPositiveVector(n);
-		var r = generateRandomValue(-10, 10);
-		var bounds = generateRandomBounds(n, b, r);
+		var bounds = generateRandomBounds(n, b);
 		var l = bounds[0];
 		var u = bounds[1];
+		var r = bounds[2];
 		
 		var m = generateRandomDimension(1, n); // coordinate of b/d to alter
 		var b_old = b.data[m-1];
@@ -116,14 +381,14 @@ QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searchin
 	// - sum b_i * l_i > r
 	// - sum b_i * u_i < r
 	{
-		var n = generateRandomDimension(1, 100);
+		var n = generateRandomDimension(1, 50);
 		var d = generateRandomStriclyPositiveVector(n);
 		var a = generateRandomVector(n);
 		var b = generateRandomStriclyPositiveVector(n);
-		var r = generateRandomValue(-10, 10);
-		var bounds = generateRandomBounds(n, b, r);
+		var bounds = generateRandomBounds(n, b);
 		var l = bounds[0];
 		var u = bounds[1];
+		var r = bounds[2];
 		
 		var m = generateRandomDimension(1, n); // coordinate of l/u to alter
 		var l_old = l.data[m-1];
@@ -159,16 +424,16 @@ QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searchin
 	// Test feasible random problems
 	// Reference: Krzysztof C. Kiwiel, Breakpoint searching algorithms for the continuous quadratic knapsack problem
 	{
-		var nbTests = 10;
+		var nbTests = 100;
 		for (var k = 0; k < nbTests; ++k) {
-			var n = generateRandomDimension(1, 100);
+			var n = generateRandomDimension(1, 50);
 			var d = generateRandomStriclyPositiveVector(n);
 			var a = generateRandomVector(n);
 			var b = generateRandomStriclyPositiveVector(n);
-			var r = generateRandomValue(-10, 10);
-			var bounds = generateRandomBounds(n, b, r);
+			var bounds = generateRandomBounds(n, b);
 			var l = bounds[0];
 			var u = bounds[1];
+			var r = bounds[2];
 			
 			var sol = PortfolioAllocation.qksolveBS_(d, a, b, r, l, u, { outputLagrangeMultiplier:true });
 			var x = sol[0];
@@ -189,7 +454,7 @@ QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searchin
 			
 			// Check that the point x corresponds to the point x^* in which the function f attain its minimum,
 			// which reduces to checking that <b/x> = r, since the previous check ensured that it exists t such that x = x(t).
-			assert.equal(Math.abs(PortfolioAllocation.Matrix.vectorDotProduct(b, x) - r) <= Math.abs(r) * 1e-12, true, 'Feasible problem ' + (k+1) + ' - 3/3');
+			assert.equal(Math.abs(PortfolioAllocation.Matrix.vectorDotProduct(b, x) - r) <= Math.abs(r) * 1e-10, true, 'Feasible problem ' + (k+1) + ' - 3/3');
 		}
 	}
 	
@@ -335,8 +600,6 @@ QUnit.test('Quadratic knapsack problem (continuous) solver - Breakpoint searchin
 		assert.equal(Math.abs(sol[1] - expectedMinVal) <= Math.abs(expectedMinVal) * 1e-16, true, 'Feasible #7 - 2/3');
 		assert.equal(Math.abs(sol[2] - expectedLagrangeMultiplier) <= Math.abs(expectedLagrangeMultiplier) * 1e-14, true, 'Feasible #7 - 3/3');
 	}
-
-	// TODO: Test with random data
 });
 
 QUnit.test('Linear programming solver - Primal Dual Hybrid Gradient', function(assert) {    
