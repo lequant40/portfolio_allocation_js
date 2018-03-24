@@ -117,6 +117,25 @@ QUnit.test('Equal risk contributions portfolio', function(assert) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'ERC - Values #3 ' + i);  
 		}
 	}
+	
+	// Reference: Xi Bai, Katya Scheinberg, Reha Tutuncu, Least-squares approach to risk parity in portfolio selection
+	//
+	// To be noted that this test also test the option of providing the portfolio volatility in output.
+	{
+		var covMar = [[94.868,33.750,12.325,-1.178,8.778],
+					[33.750,445.642,98.955,-7.901,84.954],
+					[12.325,98.955,117.265,0.503,45.184],
+					[-1.178,-7.901,0.503,5.460,1.057],
+					[8.778,84.954,45.184,1.057,34.126]];
+		
+		var weights = PortfolioAllocation.equalRiskContributionWeights(covMar, {outputPortfolioVolatility: true}); 
+		var expectedWeights =  [0.125, 0.047, 0.083, 0.613, 0.132];
+		var expectedVolatility = 3.0406150258182514;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[0][i] - expectedWeights[i]) <= 1e-3, true, 'ERC - Values #4 ' + i);
+		}
+		assert.equal(Math.abs(weights[1] - expectedVolatility) <= 1e-3, true, 'ERC - Values #4, volatility');
+	}
 });
 
 
@@ -257,9 +276,9 @@ QUnit.test('Most diversified portfolio', function(assert) {
 
 		// Compare MDP weights to values provided p. 11 of the reference
 		var expectedWeights = [25.7, 25.7, 48.6];
-		assert.equal(Math.round(weights[0]*1000)/10, expectedWeights[0], true, 'MDP - Values #4 0');
-		assert.equal(Math.round(weights[1]*1000)/10, expectedWeights[1], true, 'MDP - Values #4 1');
-		assert.equal(Math.round(weights[2]*1000)/10,  expectedWeights[2], true, 'MDP - Values #4 2');
+		assert.equal(Math.abs(Math.round(weights[0]*1000)/10 - expectedWeights[0]) <= 1e-2, true, 'MDP - Values #4 0');
+		assert.equal(Math.abs(Math.round(weights[1]*1000)/10 - expectedWeights[1]) <= 1e-2, true, 'MDP - Values #4 1');
+		assert.equal(Math.abs(Math.round(weights[2]*1000)/10- expectedWeights[2]) <= 1e-2, true, 'MDP - Values #4 2');
 	}
 	
 	
@@ -523,7 +542,6 @@ QUnit.test('Cluster risk parity portfolio', function(assert) {
 
 QUnit.test('Global minimum variance portfolio', function(assert) {    
 	// Reference: Portfolio Optimization versus Risk-Budgeting Allocation, Thierry Roncalli, WG RISK ESSEC, January 18, 2012
-	// Examples using static data
 	{
 		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0396, 0.0398], [0.0398, 0.0400]]); 
 		var expectedWeights =  [1, 0];
@@ -558,7 +576,6 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 	}
 
 	// Reference: Understanding the Impact of Weights Constraints in Portfolio Theory, Thierry Roncalli
-	// Example using static data
 	{
 		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0225,0.0030,0.0150,0.0225], [0.0030,0.0400,0.0350,0.0240], [0.0150,0.0350,0.0625,0.0600], [0.0225,0.0240,0.0600,0.0900]]); 
 		var expectedWeights =  [0.6548672566371683, 0.34513274336283173, 0, 0];
@@ -568,12 +585,30 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 	}
 	
 	// Reference: Private communication with TrendXplorer
-	// Example using static data
 	{
-		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.03401428,0.0333167,-0.00614739,0.00926415,-0.0064081],[0.0333167,0.06323421,-0.00855552,0.02245369,-0.00480642],[-0.00614739,-0.00855552,0.01444902,-0.00432445,0.00690744],[0.00926415,0.02245369,-0.00432445,0.02622712,0.0016983],[-0.0064081,-0.00480642,0.00690744,0.00169834,0.0116492]]); 
+		var covMat = [[0.03401428,0.0333167,-0.00614739,0.00926415,-0.0064081],
+					  [0.0333167,0.06323421,-0.00855552,0.02245369,-0.00480642],
+					  [-0.00614739,-0.00855552,0.01444902,-0.00432445,0.00690744],
+					  [0.00926415,0.02245369,-0.00432445,0.02622712,0.0016983],
+					  [-0.0064081,-0.00480642,0.00690744,0.00169834,0.0116492]];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
 		var expectedWeights =  [0.22146166011081053, 0, 0.3167829128512612, 0.13743827218475788, 0.32431715485317053];
 		for (var i = 0; i < expectedWeights.length; ++i) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #6 ' + i);
+		}
+	}
+	
+	// Reference: Xi Bai, Katya Scheinberg, Reha Tutuncu, Least-squares approach to risk parity in portfolio selection
+	{
+	var covMat = [[94.868,33.750,12.325,-1.178,8.778],
+				  [33.750,445.642,98.955,-7.901,84.954],
+				  [12.325,98.955,117.265,0.503,45.184],
+				  [-1.178,-7.901,0.503,5.460,1.057],
+				  [8.778,84.954,45.184,1.057,34.126]];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
+		var expectedWeights =  [0.050, 0.006, 0, 0.862, 0.082];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'GMV - Values #7 ' + i);
 		}
 	}
 
@@ -664,9 +699,8 @@ QUnit.test('Equal risk bounding portfolio', function(assert) {
 	}
 
 	// Static example with 20 assets, to show the tractability of the ERB algorithm with this number of assets
-	// This takes around 5 minutes on a 2012 computer
-	/*
-{
+	// This takes around 30 seconds on a 2012 computer
+/*	{
 	// Data
 	var sigma = [[1.0000,0.3010,-0.2531,0.0497,-0.1286,0.0689,-0.0366,-0.0950,0.0502,-0.0342,0.0074,0.0107,-0.0971,0.2335,0.0807,-0.0024,-0.1245,0.0835,0.1783,-0.0989],
 				[0.3010,1.0000,0.1298,0.0349,-0.0470,-0.1580,0.0884,-0.0551,0.0455,-0.0042,-0.1111,-0.0481,0.2739,-0.1916,-0.0774,0.0735,0.0239,0.0936,0.0030,-0.2237],
@@ -692,7 +726,7 @@ QUnit.test('Equal risk bounding portfolio', function(assert) {
 				
 	// Compute ERB weights
 	var weights = PortfolioAllocation.equalRiskBoundingWeights(sigma);				
-}
+	}
 */
 });
 
