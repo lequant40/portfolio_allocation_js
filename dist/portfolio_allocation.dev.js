@@ -6310,7 +6310,7 @@ self.equalRiskContributionWeights = function (sigma, opt) {
 	//
 	// Generate equal risk budgets: rb_i = 1/nbAssets, i=1..nbAssets
 	var sigma = new Matrix_(sigma);
-	var nbAssets = sigma.nbRows;	
+	var nbAssets = sigma.nbRows;
 	var rb = Matrix_.fill(nbAssets, 1, function (i,j) { return 1/nbAssets; });
 
 	// Compute the associated risk budgeting weights
@@ -6399,6 +6399,8 @@ self.equalWeights = function (nbAssets, opt) {
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i, i=1..n; defaults to a n by 1 matrix made of zeros.
+* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with u_i <= 1, i=1..n; defaults to a n by 1 matrix made of ones.
 * @return {Array.<number>} the weights corresponding to the global minimum variance portfolio, array of n real numbers.
 *
 * @example
@@ -6408,10 +6410,12 @@ self.equalWeights = function (nbAssets, opt) {
 self.globalMinimumVarianceWeights = function (sigma, opt) {
 	// Decode options
 	if (opt === undefined) {
-		opt = {};
+		opt = { constraints: {} };
 	}
 	var eps = opt.eps || 1e-04;
 	var maxIterations = opt.maxIter || 10000;
+	var lowerBounds = opt.constraints.minWeights;
+	var upperBounds = opt.constraints.maxWeights;
 	
 	// Convert sigma to matrix format
 	var sigma = new Matrix_(sigma);
@@ -6420,7 +6424,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	// Check that diagonal entries of sigma are strictly positive
 	// Check that sigma is symmetric and positive definite
 	// Check that sigma and rb are rows compatible
-
+	// Check lower/upper bounds are finite, between 0 and 1
 
 	// ------
 	
@@ -6446,10 +6450,16 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	var r = 1;
 	
 		// Build the bound constraints:
-		// - No short sales
-		// - Absence of leverage
+		// - By default, no short sales
+		// - By default, absence of leverage
 	var l = zeros;
+	if (lowerBounds) {
+		l = new Matrix_(lowerBounds);
+	}
 	var u = ones;
+	if (upperBounds) {
+		u = new Matrix_(upperBounds);
+	}
 	
 		// Solve the quadratic program
 	var sol = qpsolveGSMO_(Q, p, b, r, l, u, {eps: eps, maxIter: maxIterations});
@@ -6570,7 +6580,7 @@ self.gridSearchWeights = function (nbAssets, fct, opt) {
 *
 * @param {Array.<Array.<number>>} assetsReturns an array of n arrays of T real numbers representing the returns of n assets over T periods of time.
 * @param {object} opt optional parameters for the algorithm.
-* @param {boolean} opt.contraints.partialInvestment parameter set to true in case the full investment constraint of the portfolio must be replaced
+* @param {boolean} opt.constraints.partialInvestment parameter set to true in case the full investment constraint of the portfolio must be replaced
 * by a partial investment constraint; defaults to false.
 * @return {Array.<number>} the weights corresponding to a minimax portfolio, array of real numbers of length n.
 *
@@ -6583,11 +6593,11 @@ self.minimaxWeights = function (assetsReturns, opt) {
 
 	// Decode options
 	if (opt === undefined) {
-		opt = { contraints: {} };
+		opt = { constraints: {} };
 	}
 	var partialInvestmentContraint = false;
-	if (opt.contraints.partialInvestment !== undefined) {
-		partialInvestmentContraint = opt.contraints.partialInvestment;
+	if (opt.constraints.partialInvestment !== undefined) {
+		partialInvestmentContraint = opt.constraints.partialInvestment;
 	}
 	
 	// Initializations
@@ -6965,8 +6975,8 @@ self.minVarWeights = function (sigma, opt) {
 *
 * @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
 * @param {object} opt optional parameters for the algorithm.
-* @param {number} opt.contraints.minAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
-* @param {number} opt.contraints.maxAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets.
+* @param {number} opt.constraints.minAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
+* @param {number} opt.constraints.maxAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets.
 * @return {Array.<number>} the weights corresponding to a random portfolio, array of real numbers of length nbAssets.
 *
 * @example
@@ -6978,10 +6988,10 @@ self.randomWeights = function (nbAssets, opt) {
 
 	// Decode options
 	if (opt === undefined) {
-		opt = { contraints: {} };
+		opt = { constraints: {} };
 	}
-	var nbMinAssets = opt.contraints.minAssets || 1;
-	var nbMaxAssets = opt.contraints.maxAssets || nbAssets;
+	var nbMinAssets = opt.constraints.minAssets || 1;
+	var nbMaxAssets = opt.constraints.maxAssets || nbAssets;
 	
 	// 1 - Generate the number of assets to include in the portfolio (uniform generation)
 	var nbSelectedAssets = Math.floor(Math.random() * (nbMaxAssets - nbMinAssets +1)) + nbMinAssets;

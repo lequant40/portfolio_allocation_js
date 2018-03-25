@@ -591,6 +591,7 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 					  [-0.00614739,-0.00855552,0.01444902,-0.00432445,0.00690744],
 					  [0.00926415,0.02245369,-0.00432445,0.02622712,0.0016983],
 					  [-0.0064081,-0.00480642,0.00690744,0.00169834,0.0116492]];
+		
 		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
 		var expectedWeights =  [0.22146166011081053, 0, 0.3167829128512612, 0.13743827218475788, 0.32431715485317053];
 		for (var i = 0; i < expectedWeights.length; ++i) {
@@ -600,18 +601,36 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 	
 	// Reference: Xi Bai, Katya Scheinberg, Reha Tutuncu, Least-squares approach to risk parity in portfolio selection
 	{
-	var covMat = [[94.868,33.750,12.325,-1.178,8.778],
-				  [33.750,445.642,98.955,-7.901,84.954],
-				  [12.325,98.955,117.265,0.503,45.184],
-				  [-1.178,-7.901,0.503,5.460,1.057],
-				  [8.778,84.954,45.184,1.057,34.126]];
+		var covMat = [[94.868,33.750,12.325,-1.178,8.778],
+					  [33.750,445.642,98.955,-7.901,84.954],
+					  [12.325,98.955,117.265,0.503,45.184],
+					  [-1.178,-7.901,0.503,5.460,1.057],
+					  [8.778,84.954,45.184,1.057,34.126]];
+			
 		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
 		var expectedWeights =  [0.050, 0.006, 0, 0.862, 0.082];
 		for (var i = 0; i < expectedWeights.length; ++i) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'GMV - Values #7 ' + i);
 		}
 	}
-
+	
+	// Reference: Xi Bai, Katya Scheinberg, Reha Tutuncu, Least-squares approach to risk parity in portfolio selection
+	// Constraints on assets weights
+	{
+		var covMat = [[94.868,33.750,12.325,-1.178,8.778],
+					  [33.750,445.642,98.955,-7.901,84.954],
+					  [12.325,98.955,117.265,0.503,45.184],
+					  [-1.178,-7.901,0.503,5.460,1.057],
+					  [8.778,84.954,45.184,1.057,34.126]];
+			
+		var minWeights = [0.05,0.05,0.05,0.05,0.05];
+		var maxWeights = [0.35,0.35,0.35,0.35,0.35];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, { constraints: {minWeights: minWeights, maxWeights: maxWeights} }); 
+		var expectedWeights =  [0.200,0.050,0.050,0.350,0.350];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'GMV - Values #8, constrained ' + i);
+		}
+	}
 });
 
 
@@ -698,9 +717,10 @@ QUnit.test('Equal risk bounding portfolio', function(assert) {
 		}
 	}
 
+/*
 	// Static example with 20 assets, to show the tractability of the ERB algorithm with this number of assets
 	// This takes around 30 seconds on a 2012 computer
-/*	{
+	{
 	// Data
 	var sigma = [[1.0000,0.3010,-0.2531,0.0497,-0.1286,0.0689,-0.0366,-0.0950,0.0502,-0.0342,0.0074,0.0107,-0.0971,0.2335,0.0807,-0.0024,-0.1245,0.0835,0.1783,-0.0989],
 				[0.3010,1.0000,0.1298,0.0349,-0.0470,-0.1580,0.0884,-0.0551,0.0455,-0.0042,-0.1111,-0.0481,0.2739,-0.1916,-0.0774,0.0735,0.0239,0.0936,0.0030,-0.2237],
@@ -791,7 +811,7 @@ QUnit.test('Random weights portfolio', function(assert) {
 			var minAssets = Math.floor(Math.random()*(maxAssets - 1 + 1) + 1);
 			
 			// Generate a random portfolio for this number of assets and these cardinality constraints
-			var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { contraints: { minAssets: minAssets, maxAssets: maxAssets } });
+			var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minAssets: minAssets, maxAssets: maxAssets } });
 			
 			// Check that the number of non-zero weights is between minAssets and maxAssets
 			var nbNonZeroAssets = 0;
@@ -841,7 +861,7 @@ QUnit.test('Minimax portfolio', function(assert) {
 		[0.049,  0.067, -0.039,  0.051,  0.049,  0.037,  0.055,  0.025,  0.052,  0.02,   0.045,  0.04]];
 		
 		// Compute the associated minimax portfolio weights
-		var minimaxWeights = PortfolioAllocation.minimaxWeights(assetsReturns, {contraints: {partialInvestment: true}});
+		var minimaxWeights = PortfolioAllocation.minimaxWeights(assetsReturns, {constraints: {partialInvestment: true}});
 		
 		// Compare minimax weights to expected weights
 		var expectedWeights = [0, 0, 0, 0, 0, 0];
