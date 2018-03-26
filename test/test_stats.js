@@ -11,12 +11,84 @@ QUnit.test('Median computation', function(assert) {
   // Test with static data
   {
 	  assert.equal(PortfolioAllocation.median_([2,4,1]), 2, 'Median computation #1');
-	  assert.equal(PortfolioAllocation.median_([2,4,1,3]), 2.5, 'Median computation #2');
+	  assert.equal(PortfolioAllocation.median_([2,4,1,3]), 2, 'Median computation #2');
   }  
   
   //TODO: use random data
 });
 
+
+QUnit.test('Smallest k element computation', function(assert) {    
+	function generateRandomDimension(min, max) { // used for n
+		return Math.floor(Math.random()*(max-min+1) + min);
+	}
+	
+	function generateRandomValue(minVal, maxVal) { // used for each array element		
+		return Math.random() * (maxVal - minVal) + minVal;
+	}
+	
+	function generateRandomArray(n) { // used for arr
+		var minVal = -10;
+		var maxVal = 10;
+		
+		var arr = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		
+		for (var i = 0; i < n; ++i) {
+			arr[i] = generateRandomValue(minVal, maxVal);
+		}
+		
+		return arr;
+	}
+	
+  // Test with random data
+  {
+	var nbTests = 100;
+	for (var j = 0; j < nbTests; ++j) {
+	  // Generate a random array of a random size between 1 and 1000
+	  var n = generateRandomDimension(1, 1000);
+	  var arr = generateRandomArray(n);
+		
+	  // Sort (ascending) a copy of the array, to be used for the expected values
+	  var copy_arr = arr.slice().sort(function(a, b) { return a - b; });
+	  
+	  // Generate a random integer k between 1 and the size of the array
+	  var k = generateRandomDimension(1, n);
+	  
+	  // Compute the k-th smallest element of the array arr using the function
+	  // SELECT
+	  var k_smallest_elem = PortfolioAllocation.select_(arr, k);
+	  
+	  // Test that the k-th smallest element of the array arr, computed
+	  // from the function SELECT, is the same as arr[k-1].
+	  assert.equal(k_smallest_elem, arr[k-1], 'Smallest k element computation #1 ' + (j+1));
+
+	  // Test that the k-th smallest element of the array arr, computed
+	  // from the function SELECT, is the same as the k-th element of 
+	  // the sorted array copy_arr.
+	  assert.equal(k_smallest_elem, copy_arr[k-1], 'Smallest k element computation #2 ' + (j+1));
+	  
+	  // Test that smallest k elements of arr are x[i], i=0..k-1
+	  var correct_order_left_k = true;
+	  for (var i = 0; i < k; ++i) {
+		if (arr[i] > k_smallest_elem) {
+			correct_order_left_k = false;
+			break;
+		}
+	  }
+	  assert.equal(correct_order_left_k, true, 'Smallest k element computation #3 ' + (j+1));
+	  
+	  // Test that largest n-k elements of arr are x[i], i=k+1..n-1
+	  var correct_order_right_k = true;
+	  for (var i = k; i < n; ++i) {
+		if (arr[i] < k_smallest_elem) {
+			correct_order_right_k = false;
+			break;
+		}
+	  }
+	  assert.equal(correct_order_right_k, true, 'Smallest k element computation #4 ' + (j+1));
+    }
+  }  
+});
 
 QUnit.test('Hypothenuse computation', function(assert) {    
   // Tests with static data

@@ -88,7 +88,7 @@ function Matrix_(input) {
 	if (input instanceof Array && input[0] instanceof Array) { // Standard matrix
 		return fromDoubleArray(input);
 	}
-	else if (input instanceof Array) { // Simplified constructor for a column matrix (i.e., a vector)
+	else if (input instanceof Array || input instanceof Float64Array) { // Simplified constructor for a column matrix (i.e., a vector)
 		return fromArray(input);
 	}
 	else if (input instanceof Matrix_) { // Equivalent to a "clone" operation on the Matrix
@@ -3776,9 +3776,10 @@ function binomial_(n, k) {
 
 /* Start Wrapper private methods - Unit tests usage only */
 self.median_ = median_;
-self.hypot_ = function(x, y) { return hypot_(x, y); }
-self.rank_ = function(x, order) { return rank_(x, order); }
-self.ftca_ = function(correlationMatrix, threshold) { return ftca_(correlationMatrix, threshold); }
+self.select_ = select_;
+self.hypot_ = hypot_;
+self.rank_ = rank_;
+self.ftca_ = ftca_;
 /* End Wrapper private methods - Unit tests usage only */
 
 
@@ -3790,11 +3791,11 @@ self.ftca_ = function(correlationMatrix, threshold) { return ftca_(correlationMa
 * @description This function returns the median of a serie of values [x_1,...,x_n], 
 * which is defined as:
 * - When n is odd, the (n+1)/2-th smallest element of the p values x_1,...,x_n
-* - When n is even, the mean of the n/2-th and n/2 + 1-th smallest elements of the p values x_1,...,x_n
+* - When n is even, the n/2-th smallest element of the p values x_1,...,x_n
 *
-* The algorithm used internally is a O(pimplemented uses a full sort of the values.
+* The algorithm used internally is based on the O(n) SELECT algorithm of the reference.
 *
-* @see <a href="https://en.wikipedia.org/wiki/Median">Median</a>
+* @see <a href="https://www.sciencedirect.com/science/article/pii/S0304397505004081">Krzysztof C. Kiwiel, On Floyd and Rivest's SELECT algorithm, Theoretical Computer Science, Volume 347, Issues 1–2, 2005, Pages 214-238</a>
 * 
 * @param {Array.<number>} x an array of real numbers.
 * @return {number} the median of the values of the array x.
@@ -3811,20 +3812,196 @@ function median_(x) {
 	var n = x.length;
 	var xx = x.slice(); // to avoid altering the array x
 	
-	// Sort the array in ascending order.
-	xx.sort(function(a, b) {
-		return a - b;
-	});
-	
-	// Depending on the parity of n, use the appropriate formula to compute the median.
-	if (n % 2 === 0) { // n is even
-		return (xx[n/2 - 1] + xx[n/2]) / 2;
-	}
-	else { // n is odd
-		return xx[(n+1)/2 - 1];
-	}
+	// Compute the smallest |-n/2-| element of the array, which corresponds to the median
+	return select_(xx, Math.ceil(n/2));
 }
 
+
+/**
+* @function select_
+*
+* @summary Compute the smallest k element of a serie of values.
+*
+* @description This function permutes a serie of values x = [x_1,...,x_n] so that:
+* - The smallest k elements of x are x[i], i=0..k-1 (in an arbitrary order)
+* - The k-th smallest element of x is x[k-1]
+* - The n-k-th largest elements of x are x[i], i=k..n-1 (in an arbitrary order)
+*
+* The algorithm used internally is the O(n) algorithm of the reference.
+*
+* This code is a port to JavaScript by Roman Rubsamen of the Fortran 77 code
+* written by K.C. Kiwiel, version of the 8 March 2006, kiwiel@ibspan.waw.pl.
+*
+* The Fortran 77 version was a Fortran code for the Algol 68 procedure from
+* the second reference, including some modifications suggested in the third 
+* reference.
+*
+* @see <a href="https://www.sciencedirect.com/science/article/pii/S0304397505004081">Krzysztof C. Kiwiel, On Floyd and Rivest's SELECT algorithm, Theoretical Computer Science, Volume 347, Issues 1–2, 2005, Pages 214-238</a>
+* @see <a href="https://dl.acm.org/citation.cfm?doid=360680.360694">R.W. Floyd and R.L. Rivest: "Algorithm 489: The Algorithm SELECT---for Finding the $i$th Smallest of $n$ Elements", Comm. ACM 18, 3 (1975) 173</a>
+* @see <a href="https://dl.acm.org/citation.cfm?id=355704">T. Brown: "Remark on Algorithm 489", ACM Trans. Math. Software 3, 2 (1976), 301-304.</a>
+* 
+* @param {Array.<number>} x an array of real numbers.
+* @param {number} k a strictly positive natural integer specifying which k-th smallest element of x is to be selected.
+* @return {number} the k-th smallest element of x.
+*
+* @example
+* select_([2,4,1], 2);
+* // 2
+*/
+function select_(x, k) {
+	// ------
+	
+	// Initialisations.
+	var n = x.length;
+
+	var cutoff = 600;
+	var cs = 0.5; // Brown's version: cs = 0.5
+	var csd = 0.5; // Brown's version: cs = 0.1
+
+	// The arrays stack_1 and stack_2 of nstack elements permits up to
+	// nstack levels of recursion.
+    // For standard parameters cs <= 1 and cutoff >= 600,
+    // nstack = 5 suffices for n up to 2**31-1 (maximum integer*4).	
+	var nstack = 10;
+	var stack_1 = typeof UInt32Array === 'function' ? new UInt32Array(nstack) : new Array(nstack);
+	var stack_2 = typeof UInt32Array === 'function' ? new UInt32Array(nstack) : new Array(nstack);
+	var jstack = 0; // number of elements in the stacks stack_1 and stack_2
+	
+	var l = 0;
+    var r = n - 1; // -1 because Fortran convention is to start the arrays at index 1
+    var k = k - 1; // same as above
+	
+	
+	// ------
+	
+	// entry to SELECT( x, n, l, r, k)
+	// SELECT will rearrange the values of the array segment x[l:r] so
+	// that x(k) (for some given k; 0 <= k <= r-1) will contain the
+	// (k-l+1)-th smallest value, l <= i <= k will imply x(i) <= x(k),
+	// and k <= i <= r will imply x(k) <= x(i).
+	while (true) {
+		// Note: Rules of FORTRAN 77 rounding of real numbers to integers can
+		// be found here -> https://gcc.gnu.org/onlinedocs/gfortran/INT.html
+		
+		// The additional test below prevents stack overflow.
+		if (r - l > cutoff &&  jstack < nstack) {
+			// Use SELECT recursively on a sample of size s to get an
+			// estimate for the (k-l+1)-th smallest element into x(k),
+			// biased slightly so that the (k-l+1)-th element is
+			var m = r - l + 1;
+			var i = k - l + 1;
+			var dm = m;
+			
+			var z = Math.log(dm);
+			var s = Math.floor(cs * Math.exp(2*z/3) + 0.5); // from the code, s is a positive integer
+			var sign = i >= dm/2 ? 1 : - 1 // emulates sign(1,i-dm/2)
+			var sd = csd * Math.sqrt(z*s*(1-s/dm)) * sign + 0.5; // sd is supposed to be an integer, and can be positive or negative, so, emulates FORTRAN rounding
+			if (Math.abs(sd) < 1) {
+				sd = 0;
+			}
+			else if (sd >= 1) {
+				sd = Math.floor(sd);
+			}
+			else {
+				sd = Math.ceil(sd);
+			}
+			// Brown's modification: sd = csd*Math.sqrt(z*s*(1-s/dm))*(2*i/dm-1)+0.5;
+			if (i == m/2) {
+				sd = 0;
+			}
+			
+			// Push the current l and r on the stack.
+			stack_1[jstack] = l;
+			stack_2[jstack] = r;
+			jstack++;
+			
+			// Find new l and r for the next recursion.
+			var comp = k - i*(s/dm) + sd;
+			if (l < comp) {
+				l = Math.floor(comp + 0.5); // l is a positive integer
+			}
+			if (r > comp + s) {
+				r = Math.floor(comp + s + 0.5); // r is a positive integer
+			}
+			// call SELECT( x, n, l, r, k)
+		}
+		else {
+			if (l >= r) {
+				// Exit if the stack is empty.
+				if (jstack == 0) {
+					return x[k];
+				}
+				
+				// Pop l and r from the stack.
+				jstack--;
+				l = stack_1[jstack];
+				r = stack_2[jstack];
+				
+				// Continue as if after a return from a recursive call.
+			}
+			
+			// Partition x[l:r] about the pivot v := x(k).
+			var v = x[k];
+			
+			// Initialize pointers for partitioning.
+			i = l;
+			j = r;
+			
+			// Swap x(l) and x(k).
+			x[k] = x[l];
+			x[l] = v;
+			
+			if (v < x[r]) {
+				// Swap x(l) and x(r).
+				x[l] = x[r];
+				x[r] = v;
+			}
+			
+			while (i < j) {
+	            //Swap x(i) and x(j).
+				var tmp = x[j];
+	            x[j] = x[i];
+	            x[i] = tmp;
+				
+				i++;
+				j--;
+				
+				// Scan up to find element >= v.
+	            while (x[i] < v) {
+					i++;
+				}
+				
+				// Scan down to find element <= v.
+				while (x[j] > v) {
+					j--;
+				}
+			}
+			
+			if (x[l] == v) {
+				// Swap x(l) and x(j).
+				x[l] = x[j];
+				x[j] = v;
+			} 
+			else {
+				j++;
+				
+				// Swap x(j) and x(r).
+				var tmp = x[j];
+				x[j] = x[r];
+				x[r] = tmp;
+			}
+			
+			// Now adjust l, r so that they surround the subset containing
+			// the (k-l+1)-th smallest element.
+			if (j <= k) {
+				l = j + 1;
+			}
+			if (k <= j) {
+				r = j - 1;
+			}
+		}
+	}
+}
  
   /**
 * @function nextUp_
@@ -3834,7 +4011,8 @@ function median_(x) {
 * @description This function computes the next double-precision number
 * larger than a number x.
 *
-* This function has been copied/pasted from https://gist.github.com/Yaffle/4654250
+* This function has been copied/pasted from https://gist.github.com/Yaffle/4654250,
+* with no adaptation.
 *
 * @param {number} x a real number.
 * @return {number} the next double-precision number larger than x, a real number.
@@ -3877,7 +4055,8 @@ function nextUp_(x) {
 	}
 	return y === 0 ? -0 : y;
 }
-	
+
+
  /**
 * @function hypot_
 *
@@ -4715,10 +4894,15 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 
 		while (T.length != 0) {
 			// Step 1: Breakpoint selection
-			var t_hat = median_(T);
+			// 
+			// This step uses the SELECT algorithm of Floyd and Rivest to compute the median,
+			// with added benefit for steps 4 and 5 below that this algorithm partition the array T 
+			// with the elements lower than the median at the left of the median position and the 
+			// elements greater than the median at the right of the median position.
+			var median_indice = Math.ceil(T.length/2);
+			var t_hat = select_(T, median_indice);
 
 			// Step 2: Computing g(t^)
-			//console.log(I)
 			var g_t_hat = g(t_hat);
 
 			// Step 3: Optimality check
@@ -4732,11 +4916,12 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 				t_l = t_hat;
 
 				// Update T, with T = {t in T : t^ < t}.
+				//
+				// Thanks to the SELECT algorithm used to compute the median
+				// of T, updating T simply means extracting the elements T.length/2..T.length
 				var j = 0;
-				for (var i = 0, k = T.length; i < k; ++i) {
-					if (t_hat < T[i]) { // T[i] is kept
-						T[j++] = T[i];
-					}
+				for (var i = median_indice; i < T.length; ++i) {
+					T[j++] = T[i];
 				}
 				T = resizeArray(T, j);
 			}
@@ -4746,13 +4931,11 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 				t_u = t_hat;
 				
 				// Update T, with T = {t in T : t < t^}.
-				var j = 0;
-				for (var i = 0, k = T.length; i < k; ++i) {
-					if (T[i] < t_hat) { // T[i] is kept
-						T[j++] = T[i];
-					}
-				}
-				T = resizeArray(T, j);
+				//
+				// Thanks to the SELECT algorithm used to compute the median
+				// of T, updating T simply means extracting the elements 0..T.length/2
+				T = resizeArray(T, median_indice - 1);
+
 			}
 			
 			// Step 6: 
@@ -5589,7 +5772,7 @@ function simplexSparseEuclidianProjection_(x, k) {
 	
 	// Compute the projection on the standard simplex of the k elements of x 
 	// belonging to the computed support 
-	var xx_k = new Array(k);
+	var xx_k = typeof Float64Array === 'function' ? new Float64Array(k) : new Array(k);
 	for (var i = 0; i < k;  ++i) {
 		xx_k[i] = x[xx_idx[i]];
 	}	

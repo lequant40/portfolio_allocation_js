@@ -4,6 +4,13 @@
 - Added a feasible/bounded linear program solver: primal dual hybrid gradient algorithm
 - New portfolio allocation methods: Random Portfolio, Minimax Portfolio
 - Updated portfolio allocation helper method to round portfolio weights 
+- Added a quadratic program solver: generalized sequential minimization optimization
+- Added a continuous quadratic knapsack problem solver using a breakpoint searching algorithm
+- Updated GMV and MDP portfolios to use the quadratic program solver
+- Updated GMV to manage assets weights constraints
+- Added a version of the select algorithm from Floyd and Rivest
+- Added a median finding algorithm, using the select algorithm from Floyd and Rivest
+- Optimized the ERC and ERB portfolio allocation algorithms, going from ~5 minutes to find the ERB portfolio for 20 assets to ~30 seconds
 
 ### 0.0.4 - 01/12/2017
 - Misc. Matrix/Vector operations additions/refactor
