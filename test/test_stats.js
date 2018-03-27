@@ -40,7 +40,7 @@ QUnit.test('Smallest k element computation', function(assert) {
 		return arr;
 	}
 	
-  // Test with random data
+  // Test with random data, no indices requested in output
   {
 	var nbTests = 100;
 	for (var j = 0; j < nbTests; ++j) {
@@ -87,7 +87,38 @@ QUnit.test('Smallest k element computation', function(assert) {
 	  }
 	  assert.equal(correct_order_right_k, true, 'Smallest k element computation #4 ' + (j+1));
     }
-  }  
+  }
+  
+  // Test with random data, indices requested in output
+  {
+	var nbTests = 100;
+	for (var j = 0; j < nbTests; ++j) {
+	  // Generate a random array of a random size between 1 and 1000
+	  var n = generateRandomDimension(1, 1000);
+	  var arr = generateRandomArray(n);
+	  var arr_copy = arr.slice();
+	    
+	  // Generate a random integer k between 1 and the size of the array
+	  var k = generateRandomDimension(1, n);
+	  
+	  // Compute the k-th smallest element of the array arr using the function
+	  // SELECT
+	  var k_smallest_elem_and_indexes = PortfolioAllocation.select_(arr, k, true);
+	  var k_smallest_elem = k_smallest_elem_and_indexes[0];
+	  var indexes = k_smallest_elem_and_indexes[1];
+	  
+	  // Test that the indexes provided in output of SELECT 
+	  // corresponds to the original array elements
+	  var correct_indexes = true;
+	  for (var i = 0; i < n; ++i) {
+		if (arr[i] != arr_copy[indexes[i]]) {
+			correct_indexes = false;
+			break;
+		}
+	  }
+	  assert.equal(correct_indexes, true, 'Smallest k element computation #5 ' + (j+1));
+    }
+  }
 });
 
 QUnit.test('Hypothenuse computation', function(assert) {    

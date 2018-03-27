@@ -3830,7 +3830,8 @@ function median_(x) {
 * The algorithm used internally is the O(n) algorithm of the reference.
 *
 * This code is a port to JavaScript by Roman Rubsamen of the Fortran 77 code
-* written by K.C. Kiwiel, version of the 8 March 2006, kiwiel@ibspan.waw.pl.
+* written by K.C. Kiwiel, version of the 8 March 2006, kiwiel@ibspan.waw.pl.,
+* except for the indices computation part which is new.
 *
 * The Fortran 77 version was a Fortran code for the Algol 68 procedure from
 * the second reference, including some modifications suggested in the third 
@@ -3842,18 +3843,35 @@ function median_(x) {
 * 
 * @param {Array.<number>} x an array of real numbers.
 * @param {number} k a strictly positive natural integer specifying which k-th smallest element of x is to be selected.
-* @return {number} the k-th smallest element of x.
+* @param {boolean} outputIndexes an optional boolean set to true to return the original indexes of the elements of the permuted array x; defaults to false.
+* @return {number|Array.<Object>} if outputIndexes is not set to true, the k-th smallest element of x; otherwise, an array arr containing two elements:
+* - arr[0]: the k-th smallest element of x
+* - arr[1]: an array of n positive integers corresponding to the original indexes of the elements of the permuted array x,
+* i.e., x[i]_new == x[arr[1][i]]_old, i=0..n-1
 *
 * @example
 * select_([2,4,1], 2);
 * // 2
+* // [2,4,1] is permuted into [1,2,4]
+*
+* select_([2,4,1], 2, true);
+* // [2, [2,0,1]]
+* // [2,4,1] is permuted into [1,2,4]
 */
-function select_(x, k) {
+function select_(x, k, outputIndexes) {
 	// ------
 	
 	// Initialisations.
 	var n = x.length;
 
+	var indexes = null;
+	if (outputIndexes === true) {
+		indexes = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			indexes[i] = i;
+		}
+	}
+	
 	var cutoff = 600;
 	var cs = 0.5; // Brown's version: cs = 0.5
 	var csd = 0.5; // Brown's version: cs = 0.1
@@ -3896,7 +3914,7 @@ function select_(x, k) {
 			var s = Math.floor(cs * Math.exp(2*z/3) + 0.5); // from the code, s is a positive integer
 			var sign = i >= dm/2 ? 1 : - 1 // emulates sign(1,i-dm/2)
 			var sd = csd * Math.sqrt(z*s*(1-s/dm)) * sign + 0.5; // sd is supposed to be an integer, and can be positive or negative, so, emulates FORTRAN rounding
-			if (Math.abs(sd) < 1) {
+			if (-1 < sd && sd < 1) {
 				sd = 0;
 			}
 			else if (sd >= 1) {
@@ -3929,7 +3947,12 @@ function select_(x, k) {
 			if (l >= r) {
 				// Exit if the stack is empty.
 				if (jstack == 0) {
-					return x[k];
+					if (outputIndexes === true) {
+						return [x[k], indexes];
+					}
+					else {
+						return x[k];
+					}
 				}
 				
 				// Pop l and r from the stack.
@@ -3950,11 +3973,21 @@ function select_(x, k) {
 			// Swap x(l) and x(k).
 			x[k] = x[l];
 			x[l] = v;
+			if (outputIndexes === true) {
+				var tmp = indexes[k];
+				indexes[k] = indexes[l];
+				indexes[l] = tmp;
+			}
 			
 			if (v < x[r]) {
 				// Swap x(l) and x(r).
 				x[l] = x[r];
 				x[r] = v;
+				if (outputIndexes === true) {
+					var tmp = indexes[l];
+					indexes[l] = indexes[r];
+					indexes[r] = tmp;
+				}
 			}
 			
 			while (i < j) {
@@ -3962,6 +3995,11 @@ function select_(x, k) {
 				var tmp = x[j];
 	            x[j] = x[i];
 	            x[i] = tmp;
+				if (outputIndexes === true) {
+					var tmp = indexes[i];
+					indexes[i] = indexes[j];
+					indexes[j] = tmp;
+				}
 				
 				i++;
 				j--;
@@ -3981,6 +4019,11 @@ function select_(x, k) {
 				// Swap x(l) and x(j).
 				x[l] = x[j];
 				x[j] = v;
+				if (outputIndexes === true) {
+					var tmp = indexes[l];
+					indexes[l] = indexes[j];
+					indexes[j] = tmp;
+				}
 			} 
 			else {
 				j++;
@@ -3989,6 +4032,11 @@ function select_(x, k) {
 				var tmp = x[j];
 				x[j] = x[r];
 				x[r] = tmp;
+				if (outputIndexes === true) {
+					var tmp = indexes[j];
+					indexes[j] = indexes[r];
+					indexes[r] = tmp;
+				}
 			}
 			
 			// Now adjust l, r so that they surround the subset containing
@@ -5741,52 +5789,56 @@ self.simplexSparseEuclidianProjection_ = simplexSparseEuclidianProjection_;
 *
 * @summary Returns a closest point on the standard simplex subject to a sparsity constraint.
 *
-* @description This function computes a closest point (relative to the euclidian distance) with at most k non-zero elements
-* on the standard simplex of R^n to a point x = (x_1,...,x_n) in R^n, using the O(n ln(n)) algorithm 1 
-* of the reference.
+* @description This function computes a closest point (relative to the euclidian distance) 
+* with at most k non-zero elements on the standard simplex of R^n to a point x = (x_1,...,x_n) in R^n, 
+* using an O(n) implementation of the algorithm 1 of the reference.
 *
-* In other words, this function computes an at most k-sparse euclidian projection of a point x in R^n onto the standard simplex of R^n.
+* In other words, this function computes an at most k-sparse euclidian projection of 
+* a point x in R^n onto the standard simplex of R^n.
 *
-* @see <a href=""></a>
+* @see <a href="https://arxiv.org/abs/1206.1529">Anastasios Kyrillidis, Stephen Becker, Volkan Cevher and, Christoph Koch, Sparse projections onto the simplex, arXiv:1206.1529 [cs.LG]</a>
 *
-* @param {Array.<number>} x a point belonging to R^n, array of n real numbers.
-* @param {number} k , natural integer strictly greater than one.
-* @return {Array.<number>} the computed closest point to x, array of n real numbers.
+* @param {Array.<number>} x, a point belonging to R^n, array of n real numbers.
+* @param {number} k, a natural integer strictly greater than one corresponding to the maximum desired sparsity
+* (i.e., non-zero elements) of the projected point.
+* @return {Array.<number>} the computed closest point to x with at most k non-zero elements, array of n real numbers.
 *
 * @example
-* simplexSparseEuclidianProjection_([X]);
-* //[X]
+* simplexSparseEuclidianProjection_([0.5, 0.1, 0.2], 1);
+* //[[1,0,0]]
 */
 function simplexSparseEuclidianProjection_(x, k) {
 	// Initializations
 	var n = x.length;
 	
-	// Compute the support of the projection
+	// Short circuit in case there is no sparsity
+	if (k === n) {
+		return simplexEuclidianProjection_(x);
+	}
+	
+	// Otherwise, compute the support of the projection, i.e., the k largest elements of x.
 	//
-	// The array xx_idx will contains the indices of the elements of x in descending order
-	var xx_idx = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
-	for (var i = 0; i < n;  ++i) {
-		xx_idx[i] = i;
-	}
-	xx_idx.sort(function(a, b) { return x[b] - x[a]; });
+	// Per property of the SELECT algorithm of Floyd and Rivest applied to the array x(x) below,
+	// this array is permuted so that its largest k elements are at the right of the computed
+	// n-k+1-th smallest element.
+	var xx = x.slice(); // x is copied to avoid altering its content
+	var element_plus_indexes = select_(xx, n-k+1, true);
+	var xx_k = xx.slice(n-k); // extract the k largest elements of x(x)
 	
-	// Compute the projection on the standard simplex of the k elements of x 
-	// belonging to the computed support 
-	var xx_k = typeof Float64Array === 'function' ? new Float64Array(k) : new Array(k);
-	for (var i = 0; i < k;  ++i) {
-		xx_k[i] = x[xx_idx[i]];
-	}	
+	// Compute the projection on the standard simplex of the k largest elements of x.
 	var proj_xx_k = simplexEuclidianProjection_(xx_k);
-	
-	// Compute the final weights vector by reconciliating the disjoints supports
+
+	// Compute the final projection by reconciliating the support of the
+	// projection above and its complementary set.
 	var y = new Array(n);
-	for (var i = 0; i < k;  ++i) {
-		y[xx_idx[i]] = proj_xx_k[i];
-	}
-	for (var i = k; i < n;  ++i) {
+	var xx_idx = element_plus_indexes[1];
+	for (var i = 0; i < n-k;  ++i) {
 		y[xx_idx[i]] = 0;
 	}
-
+	for (var i = n-k; i < n;  ++i) {
+		y[xx_idx[i]] = proj_xx_k[i-n+k];
+	}
+	
 	// Return the computed projection
 	return y;
 }
