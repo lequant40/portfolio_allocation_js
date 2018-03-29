@@ -6037,7 +6037,7 @@ function simplexRandomSampler_(n) {
 * statisfying sum m_i = r with r a strictly positive natural integer, so that the computed proximal point xr is one of the closest points to x 
 * on this grid with respect to any norm in a large class, c.f. the first reference.
 *
-* @see <a href="https://link.springer.com/article/10.1007/s10898-013-0126-2">M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258</a>
+* @see <a href="https://doi.org/10.1007/s10898-013-0126-2">M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258</a>
 * @see <a href="https://arxiv.org/abs/1501.00014">Rama Cont, Massoud Heidari, Optimal rounding under integer constraints</a>
 * 
 * @param {Array.<number>} x a point belonging to the standard simplex of R^n, array of n real numbers.
@@ -6369,7 +6369,7 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 * This approach is expected to produce a solution within a reasonable amount of time for small n (e.g. n <= 20),
 * but due to the combinatorial nature of the problem, the computation for greater values of n will not be tractable.
 *
-* @see <a href="https://link.springer.com/article/10.1007/s10898-016-0477-6">Cesarone, F. & Tardella F., Equal Risk Bounding is better than Risk Parity for portfolio selection, J Glob Optim (2017) 68: 439</a>
+* @see <a href="https://doi.org/10.1007/s10898-016-0477-6">Cesarone, F. & Tardella F., Equal Risk Bounding is better than Risk Parity for portfolio selection, J Glob Optim (2017) 68: 439</a>
 * 
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
@@ -6470,7 +6470,7 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 *
 * This portfolio maximizes the Sharpe ratio if the assets mean returns are proportional to their volatilities and all pair-wise correlations are equal.
 * 
-* @see <a href="https://ssrn.com/abstract=1949003">Carvalho, Raul Leote de and Xiao, Lu and Moulin, Pierre, Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description (September 13, 2011). The Journal of Portfolio Management, vol. 38, no. 3, Spring 2012.</a>
+* @see <a href="https://doi.org/10.3905/jpm.2012.38.3.056 ">Carvalho, Raul Leote de and Xiao, Lu and Moulin, Pierre, Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description (September 13, 2011). The Journal of Portfolio Management, vol. 38, no. 3, Spring 2012.</a>
 * 
 * @param {Matrix_|<Array.<number>} sigma the variance vector (sigma_i),i=1..n of the n assets in the considered universe, an n by 1 matrix (i.e., vector) or an array of n real numbers statisfying sigma[i-1] = sigma_i.
 * @param {object} opt optional parameters for the algorithm, unused.
@@ -6520,9 +6520,9 @@ self.equalRiskBudgetWeights = function (sigma, opt) {
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 *
 * To be noted that the algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
-* if the covariance matrix of the assets is definite positive.
+* if the covariance matrix of the assets is semi-definite positive.
 *
-* @see <a href="http://www.iijournals.com/doi/abs/10.3905/jpm.2010.36.4.060">Maillard, S., Roncalli, T., Teiletche, J.: The properties of equally weighted risk contribution portfolios. J. Portf. Manag. 36, 60–70 (2010)</a>
+* @see <a href="https://doi.org/10.3905/jpm.2010.36.4.060">Maillard, S., Roncalli, T., Teiletche, J.: The properties of equally weighted risk contribution portfolios. J. Portf. Manag. 36, 60–70 (2010)</a>
 * @see <a href="https://arxiv.org/abs/1311.4057">Théophile Griveau-Billion, Jean-Charles Richard, Thierry Roncalli; A Fast Algorithm for Computing High-dimensional Risk Parity Portfolios. eprint arXiv:1311.4057</a>
 * 
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
@@ -6573,7 +6573,7 @@ self.equalRiskContributionWeights = function (sigma, opt) {
 *
 * This portfolio is unique.
 *
-* @see <a href="https://academic.oup.com/rfs/article-abstract/22/5/1915/1592901/Optimal-Versus-Naive-Diversification-How">Victor DeMiguel, Lorenzo Garlappi, Raman Uppal; Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?. Rev Financ Stud 2009; 22 (5): 1915-1953. doi: 10.1093/rfs/hhm075</a>
+* @see <a href="https://doi.org/10.1093/rfs/hhm075">Victor DeMiguel, Lorenzo Garlappi, Raman Uppal; Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?. Rev Financ Stud 2009; 22 (5): 1915-1953. doi: 10.1093/rfs/hhm075</a>
 * 
 * @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
 * @param {object} opt the optional parameters for the algorithm, unused.
@@ -6588,8 +6588,7 @@ self.equalWeights = function (nbAssets, opt) {
 	// Check that nbAssets is a strictly positive natural integer
 
 	// Allocate the weights vector: all the weights are equal to 1/nbAssets
-	var weights = Matrix_.ones(nbAssets, 1);
-	weights = weights.normalize(weights);
+	var weights = Matrix_.fill(nbAssets, 1, function(i,j) { return 1/nbAssets; });
 
 	// Return the computed weights
 	return weights.toArray();
@@ -7206,7 +7205,7 @@ self.minVarWeights = function (sigma, opt) {
 * among all the feasible portfolios.
 *
 * @see <a href="https://arxiv.org/abs/1008.3718">William T. Shaw, Monte Carlo Portfolio Optimization for General Investor Risk-Return Objectives and Arbitrary Return Distributions: a Solution for Long-only Portfolios</a>
-* @see <a href="https://ssrn.com/abstract=881735">Burns, Patrick, Random Portfolios for Evaluating Trading Strategies (January 13, 2006)</a>
+* @see <a href="https://doi.org/10.1007/3-540-36626-1_11">Burns P. (2007) Random Portfolios for Performance Measurement. In: Kontoghiorghes E.J., Gatu C. (eds) Optimisation, Econometric and Financial Analysis. Advances in Computational Management Science, vol 9. Springer, Berlin, Heidelberg</a>
 *
 * @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
 * @param {object} opt optional parameters for the algorithm.
@@ -7299,7 +7298,7 @@ self.randomWeights = function (nbAssets, opt) {
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 * 
 * To be noted that the algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
-* if the covariance matrix of the assets is definite positive.
+* if the covariance matrix of the assets is semi-definite positive.
 *
 * @see <a href="https://ssrn.com/abstract=2009778">Bruder, Benjamin and Roncalli, Thierry, Managing Risk Exposures Using the Risk Budgeting Approach (January 20, 2012).</a>
 * @see <a href="https://arxiv.org/abs/1311.4057">Théophile Griveau-Billion, Jean-Charles Richard, Thierry Roncalli; A Fast Algorithm for Computing High-dimensional Risk Parity Portfolios. eprint arXiv:1311.4057</a>
@@ -7350,8 +7349,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 	// ------
 	
 	// Initial point for the algorithm is an equal weight vector
-	var x = Matrix_.ones(nbAssets, 1);
-	x = x.normalize(x);
+	var x = Matrix_.fill(nbAssets, 1, function(i,j) { return 1/nbAssets; });
 	
 	// Preparational computations
 	var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
@@ -7458,7 +7456,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 *
 * To be noted that typical values of k are 10 (rounding to 10%), 20 (rounding to 5%) and 100 (rounding to 1%).
 *
-* @see <a href="https://link.springer.com/article/10.1007/s10898-013-0126-2">.M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258.</a>
+* @see <a href="https://doi.org/10.1007/s10898-013-0126-2">.M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258.</a>
 * 
 * @param {Array.<number>} originalWeights the weights w_1,...,w_n associated to a fully invested and long-only portfolio of n assets, array of n real numbers.
 * @param {number} k the value to which the rounded weights will be a multiple of the inverse, natural integer greater than or equal to 1.
