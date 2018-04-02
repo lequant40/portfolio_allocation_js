@@ -1,4 +1,4 @@
-# PortfolioAllocation v0.0.4 ([Changelog](changelog.md))
+# PortfolioAllocation v0.0.5 ([Changelog](changelog.md))
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
@@ -23,33 +23,36 @@ Enjoy !
 - Equal weights (EW)  
   Analyzed by Victor DeMiguel and al. in their research paper [Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?](https://doi.org/10.1093/rfs/hhm075).
 
-- Equal risk budgets  
-  Also known as naive risk parity, it is analysed by Raul Leote de Carvalho and al. in the research paper [Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description](https://doi.org/10.3905/jpm.2012.38.3.056).
+- Equal risk budgets, a.k.a. naive risk parity  
+  Described by Raul Leote de Carvalho and al. in the research paper [Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description](https://doi.org/10.3905/jpm.2012.38.3.056).
 
 - Equal risk contributions (ERC) and risk budgeting (RB)  
   Extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers ([The properties of equally weighted risk contribution portfolios](https://doi.org/10.3905/jpm.2010.36.4.060), [Managing Risk Exposures Using the Risk Budgeting Approach](https://ssrn.com/abstract=2009778)...).
 
-- Most diversified portfolio (MDP)  
-  Introduced in the research paper [Toward Maximum Diversification](https://doi.org/10.3905/JPM.2008.35.1.40) by [Yves Choueifaty](http://www.tobam.fr/yves-choueifaty/) and al.
-
-- Minimum correlation algorithm (MCA) and proportional minimum variance algorithm (MVA)  
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA is meant to be an approximation of the MDP portfolio allocation algorithm and the MVA is meant to be an approximation of the GMV portfolio allocation algorithm.
+- Equal risk bounding (ERB)  
+  Described in the research paper [Equal Risk Bounding is better than Risk Parity for portfolio selection](https://doi.org/10.1007/s10898-016-0477-6) by Francesco Cesarone and Fabio Tardella, the ERB portfolio is best described as an ERC portfolio possibly not containing all the assets in the considered universe.
 
 - Cluster risk parity (CRP)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and [Michael Kapler](http://systematicinvestor.wordpress.com/), it combines the usage of a clustering algorithm (for instance, the Fast Threshold Clustering Algorithm - FTCA - of David Varadi) with the ERC portfolio allocation algorithm.
 
+- Most diversified portfolio (MDP)  
+  Introduced in the research paper [Toward Maximum Diversification](https://doi.org/10.3905/JPM.2008.35.1.40) by [Yves Choueifaty](http://www.tobam.fr/yves-choueifaty/) and al.
+
+- Minimum correlation algorithm (MCA)  
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA is meant to be an approximation of the MDP portfolio allocation algorithm.
+
 - Global minimum variance (GMV)  
   The leftmost portfolio on the Markowitz mean-variance efficient frontier, which possesses the smallest attainable variance among all the mean-variance efficient portfolios.
-  
-- Equal risk bounding (ERB)  
-  Described in the research paper [Equal Risk Bounding is better than Risk Parity for portfolio selection](https://doi.org/10.1007/s10898-016-0477-6) by Francesco Cesarone and Fabio Tardella, the ERB portfolio is best described as an ERC portfolio possibly not containing all the assets in the considered universe.
 
-- Random portfolio - ON-GOING  
-  Random portfolios have several usages in finance, for instance measuring performances of asset allocation strategies as described by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
- 
-- Minimax portfolio - ON-GOING  
+- Proportional minimum variance algorithm (MVA)  
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MVA is meant to be an approximation of the GMV portfolio allocation algorithm.
+
+- Minimax portfolio  
   Introduced by Martin Young in the research paper [A Minimax Portfolio Selection Rule with Linear Programming Solution](http://www.jstor.org/stable/2634472), this portfolio uses the minimum return as a measure of risk instead of the variance as in the Markowitz framework.
 
+- Random portfolio  
+  Random portfolios have several usages in finance, for instance measuring performances of asset allocation strategies as described by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
+ 
   
 ## Supported helper algorithms
 - Grid search of portfolio weights  

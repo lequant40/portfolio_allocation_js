@@ -88,7 +88,7 @@ function Matrix_(input) {
 	if (input instanceof Array && input[0] instanceof Array) { // Standard matrix
 		return fromDoubleArray(input);
 	}
-	else if (input instanceof Array || input instanceof Float64Array) { // Simplified constructor for a column matrix (i.e., a vector)
+	else if (input instanceof Array || (typeof Float64Array === 'function' && input instanceof Float64Array)) { // Simplified constructor for a column matrix (i.e., a vector)
 		return fromArray(input);
 	}
 	else if (input instanceof Matrix_) { // Equivalent to a "clone" operation on the Matrix

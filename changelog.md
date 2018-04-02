@@ -1,5 +1,7 @@
-### 0.0.5 - XX/YY/2018
-- Misc. Matrix/Vector operations additions/refactor
+### 0.0.6 - XX/YY/2018
+
+### 0.0.5 - 02/04/2018
+- Misc. Matrix/Vector operations additions/refactor (in particular, toDoubleArray method replaced by toRowArray)
 - Added two iterative linear system solvers (least square sense): Kaczmarz extended method and randomized Kaczmarz extended method
 - Added a feasible/bounded linear program solver: primal dual hybrid gradient algorithm
 - New portfolio allocation methods: Random Portfolio, Minimax Portfolio
