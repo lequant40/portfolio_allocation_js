@@ -6,7 +6,7 @@ PortfolioAllocation is a JavaScript library to allocate portfolios of fincancial
 
 PortfolioAllocation has been developed in JavaScript because I heavily use [Google Sheets](https://www.google.com/sheets/about/) to analyse trading strategies on my blog [Le Quant 40](http://www.lequant40.com/), as well as in my personal trading, and Google Sheets is easily extensible thanks to [Google Apps Script](https://developers.google.com/apps-script/), a JavaScript-based language.
 
-Enjoy !
+I hope you will enjoy !
 
 
 ## Features
@@ -51,7 +51,7 @@ Enjoy !
   Introduced by Martin Young in the research paper [A Minimax Portfolio Selection Rule with Linear Programming Solution](http://www.jstor.org/stable/2634472), this portfolio uses the minimum return as a measure of risk instead of the variance as in the Markowitz framework.
 
 - Random portfolio  
-  Random portfolios have several usages in finance, for instance measuring performances of asset allocation strategies as described by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
+  Random portfolios are typically used to benchmark performances of asset allocation strategies, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
  
   
 ## Supported helper algorithms
@@ -135,10 +135,11 @@ PortfolioAllocation.clusterRiskParityWeights([[0.1,0], [0,0.2]], {clusteringMode
 ### Fork the projet from [Github](https://github.com/)...
 
 
-### Instal the [Grunt](http://gruntjs.com/) dependencies
+### Instal the [Grunt](http://gruntjs.com/) dependencies and command line
 
 ```
 npm install
+npm install -g grunt-cli
 ```
 
 ### Develop...

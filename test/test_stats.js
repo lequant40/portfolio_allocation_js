@@ -7,6 +7,78 @@ QUnit.module('Statistics internal module', {
 
 
 
+QUnit.test('Bit set data structure', function(assert) {    
+  // Test with static data
+  {
+	  // Initialize the bit set
+	  var bs = new PortfolioAllocation.BitSet_();
+	  
+	  // Test to string
+	  assert.equal(bs.toString(), "", 'Bit set, static tests - initial base-2 string representation');
+
+	  // Test cardinality computation
+	  assert.equal(bs.nbSetBits(), 0, 'Bit set, static tests - initial cardinality');
+
+	  // Test isEmpty computation
+	  assert.equal(bs.isEmpty(), true, 'Bit set, static tests - initial isEmpty');
+	  
+	  // Test to array
+	  assert.deepEqual(bs.toArray(), [], 'Bit set, static tests - initial array representation');
+	  
+	  // Test setting one bit to 1
+	  assert.equal(bs.get(31), false, 'Bit set, static tests - set one bit to 1 1/2');
+	  bs.set(31)
+	  assert.equal(bs.get(31), true, 'Bit set, static tests - set one bit to 1 2/2');
+	  
+	  // Test to string
+	  assert.equal(bs.toString(), "10000000000000000000000000000000", 'Bit set, static tests - base-2 string representation with one bit set to 1');
+
+	  // Test cardinality computation
+	  assert.equal(bs.nbSetBits(), 1, 'Bit set, static tests - cardinality with one bit set to 1');
+
+	  // Test isEmpty computation
+	  assert.equal(bs.isEmpty(), false, 'Bit set, static tests - isEmpty with one bit set to 1');
+	  
+	  // Test to array
+	  assert.deepEqual(bs.toArray(), [31], 'Bit set, static tests - array representation with one bit set to 1');
+	  
+	  // Test unsetting one bit
+	  bs.unset(31)
+	  assert.equal(bs.get(31), false, 'Bit set, static tests - unset one bit to 1');
+	  
+	  // Test flipping one bit
+	  bs.flip(31)
+	  assert.equal(bs.get(31), true, 'Bit set, static tests - flip one bit to 1');
+	  
+	  // Test resize through get, string, cardinality, isEmpty and to array
+	  // Note: the bit set is on purpose creating an empty word in the "middle" of the bit set underlying array
+	  bs.set(94);
+	  assert.equal(bs.get(94), true, 'Bit set, static tests - set one bit to 1 to resize 1/5');
+	  assert.equal(bs.toString(), "100000000000000000000000000000000000000000000000000000000000000001000000000000000000000000000000", 'Bit set, static tests - set one bit to 1 to resize 2/5');
+	  assert.equal(bs.nbSetBits(), 2, 'Bit set, static tests - set one bit to 1 to resize 3/5');
+	  assert.equal(bs.isEmpty(), false, 'Bit set, static tests - set one bit to 1 to resize 4/5');
+	  assert.deepEqual(bs.toArray(), [31, 94], 'Bit set, static tests - set one bit to 1 to resize 5/5');
+	  
+	  // Test setting a range of bits to 1 through iteration
+	  bs.setRange(1,3);
+	  var bs_it = new bs.iterator();
+	  assert.deepEqual(bs_it.next(), 1, 'Bit set, static tests - iteration over two bits set to 1 1/6');
+	  assert.deepEqual(bs_it.next(), 2, 'Bit set, static tests - iteration over two bits set to 1 2/6');
+	  assert.deepEqual(bs_it.next(), 3, 'Bit set, static tests - iteration over two bits set to 1 3/6');
+	  assert.deepEqual(bs_it.next(), 31, 'Bit set, static tests - iteration over two bits set to 13 4/6');
+	  assert.deepEqual(bs_it.next(), 94, 'Bit set, static tests - iteration over two bits set to 1 5/6');
+	  assert.deepEqual(bs_it.next(), 0, 'Bit set, static tests - iteration over two bits set to 1 6/6');
+	  
+	  // Test clear through isEmpty
+	  bs.clear();
+	  assert.equal(bs.isEmpty(), true, 'Bit set, static tests - bit set cleared');
+	  
+  }  
+  
+  //TODO: use random data
+});
+
+
 QUnit.test('Median computation', function(assert) {    
   // Test with static data
   {
@@ -40,6 +112,24 @@ QUnit.test('Smallest k element computation', function(assert) {
 		return arr;
 	}
 	
+  // Test with static data, to make sure duplicate values are properly handled
+  {
+	  // Array with duplicate values
+	  var val = [0.5, 0.1, 0.2, 0.2, 0.3, 0.2, 0.3];
+	  var val_idx = [0, 1, 2, 3, 4, 5, 6];
+	  var expected_val_idx = [0, 4, 6, 5, 2, 1, 3];
+	  
+	  // Call the SELECT algorithm to partition the indexes of the above array.
+	  var compareIndexes = function (a, b) {
+		  return val[b] - val[a];
+	  };
+	  PortfolioAllocation.select_(val_idx, 3, compareIndexes);
+
+	  // In case of incorrect duplicate values management, the SELECT algorithm
+	  // will output [0, 6, 6, 5, 2, 1, 3]
+	  assert.deepEqual(val_idx, expected_val_idx, 'Smallest k element computation #0');
+  }
+  
   // Test with random data, no indices requested in output
   {
 	var nbTests = 100;
@@ -89,7 +179,7 @@ QUnit.test('Smallest k element computation', function(assert) {
     }
   }
   
-  // Test with random data, indices requested in output
+  // Test with random data, using a custom comparator to extract indexes
   {
 	var nbTests = 100;
 	for (var j = 0; j < nbTests; ++j) {
@@ -97,26 +187,40 @@ QUnit.test('Smallest k element computation', function(assert) {
 	  var n = generateRandomDimension(1, 1000);
 	  var arr = generateRandomArray(n);
 	  var arr_copy = arr.slice();
-	    
+	  
+	  // Generate the associated indexes
+	  var arr_idx = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n);
+	  for (var i = 0; i < n; ++i) {
+		arr_idx[i] = i;
+	  }
+	   
 	  // Generate a random integer k between 1 and the size of the array
 	  var k = generateRandomDimension(1, n);
 	  
+	  // Compute the index of the k-th smallest element of the array arr using the function
+	  // SELECT and a custom comparator
+      var compareIndexes = function (a, b) {
+		  return arr[a] - arr[b];
+	  };
+	  var k_smallest_elem_index = PortfolioAllocation.select_(arr_idx, k, compareIndexes);
+	  
 	  // Compute the k-th smallest element of the array arr using the function
 	  // SELECT
-	  var k_smallest_elem_and_indexes = PortfolioAllocation.select_(arr, k, true);
-	  var k_smallest_elem = k_smallest_elem_and_indexes[0];
-	  var indexes = k_smallest_elem_and_indexes[1];
+	  var k_smallest_elem = PortfolioAllocation.select_(arr, k);
+	  
+	  // Test that the k-th smallest element index provided in output is correct
+	  assert.equal(k_smallest_elem == arr_copy[k_smallest_elem_index], true, 'Smallest k element computation #5 ' + (j+1));
 	  
 	  // Test that the indexes provided in output of SELECT 
 	  // corresponds to the original array elements
 	  var correct_indexes = true;
 	  for (var i = 0; i < n; ++i) {
-		if (arr[i] != arr_copy[indexes[i]]) {
+		if (arr[i] != arr_copy[arr_idx[i]]) {
 			correct_indexes = false;
 			break;
 		}
 	  }
-	  assert.equal(correct_indexes, true, 'Smallest k element computation #5 ' + (j+1));
+	  assert.equal(correct_indexes, true, 'Smallest k element computation #6 ' + (j+1));
     }
   }
 });

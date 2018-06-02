@@ -50,10 +50,11 @@ QUnit.test('Matrix basic manipulations', function(assert) {
       // Ensure the matrix is equal to itself
       assert.equal(PortfolioAllocation.Matrix.areEqual(nsMat,nsMat), true, 'Matrix equal to itself');
       
-      // Check the values with getValueAt
+      // Check the values with getValue(At)
       for (var i = 0; i < nsMat.nbRows; ++i) {
     	for (var j = 0; j < nsMat.nbColumns; ++j) {
     	  assert.equal(nsMat.getValueAt(i+1,j+1), this.nsMatValues[i][j], 'Matrix values');
+		  assert.equal(nsMat.getValue(i+1,j+1), this.nsMatValues[i][j], 'Matrix values');
     	}
       }
   }
@@ -61,13 +62,17 @@ QUnit.test('Matrix basic manipulations', function(assert) {
   // Test equality using the non square matrix
   {
       // Create a new matrix equal to the previous one and replace 
-      // the values of the matrix with new values with setValueAt
+      // the values of the matrix with new values with setValue(At)
       var nsMat2 = new PortfolioAllocation.Matrix(this.nsMatValues);
       for (var i = 1; i <= nsMat.nbRows; ++i) {
     	for (var j = 1; j <= nsMat.nbColumns; ++j) {
-    	  var newVal = nsMat2.getValueAt(i,j) + Math.random();
+    	  var newVal = nsMat.getValueAt(i,j) + Math.random();
     	  nsMat2.setValueAt(i,j, newVal);
-    	  assert.equal(nsMat2.getValueAt(i,j), newVal, 'Matrix values #2');
+    	  assert.equal(nsMat2.getValueAt(i,j), newVal, 'Matrix values #2 - 1/2');
+		  
+    	  var newVal2 = nsMat.getValueAt(i,j) + Math.random();
+    	  nsMat2.setValue(i,j, newVal2);
+    	  assert.equal(nsMat2.getValueAt(i,j), newVal2, 'Matrix values #2 - 2/2');
     	}
       }
     
