@@ -132,7 +132,7 @@ PortfolioAllocation.clusterRiskParityWeights([[0.1,0], [0,0.2]], {clusteringMode
 
 ## How to contribute ?
 
-### Fork the projet from [Github](https://github.com/)...
+### Fork the project from [Github](https://github.com/)...
 
 
 ### Instal the [Grunt](http://gruntjs.com/) dependencies and command line
