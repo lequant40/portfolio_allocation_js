@@ -41,6 +41,9 @@ I hope you will enjoy !
 - Minimum correlation algorithm (MCA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA is meant to be an approximation of the MDP portfolio allocation algorithm.
 
+- Mean variance optimisation (MVO), through the critical line algorithm (ON-GOING)
+  Based on the modern portfolio theory introduced by Harry M. Markowitz in numerous articles and books [Portfolio Selection: Efficient Diversification of Investments](https://www.jstor.org/stable/j.ctt1bh4c8h), the portfolios obtained through mean-variance optimisation are the most desirable portfolios in the sense that for a given level of return, they are the least volatile portfolios and that for a given level of volatility, they are the highest yielding portfolios (i.e., they are efficient).
+
 - Global minimum variance (GMV)  
   The leftmost portfolio on the Markowitz mean-variance efficient frontier, which possesses the smallest attainable variance among all the mean-variance efficient portfolios.
 

@@ -887,25 +887,25 @@ QUnit.test('Mean variance portfolio', function(assert) {
 	{
 		// Lower bounds > Upper bounds
 		assert.throws(function() { 
-			PortfolioAllocation.efficientFrontier_([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.6, 0.3], maxWeights: [0.2, 1]} }) },
+			PortfolioAllocation.efficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.6, 0.3], maxWeights: [0.2, 1]} }) },
 			new Error('infeasible problem detected'),
 			"Mean variance portfolio - Efficient frontier, lower bounds greater than upper bounds");
 			
 		//  Sum lower bounds > 1
 		assert.throws(function() { 
-			PortfolioAllocation.efficientFrontier_([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.6, 0.5], maxWeights: [0.7, 0.5]} }) },
+			PortfolioAllocation.efficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.6, 0.5], maxWeights: [0.7, 0.5]} }) },
 			new Error('infeasible problem detected'),
 			"Mean variance portfolio - Efficient frontier, sum of lower bounds greater than one");
 		
 		//  Sum upper bounds < 1
 		assert.throws(function() { 
-			PortfolioAllocation.efficientFrontier_([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.4], maxWeights: [0.4, 0.5]} }) },
+			PortfolioAllocation.efficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.4], maxWeights: [0.4, 0.5]} }) },
 			new Error('infeasible problem detected'),
 			"Mean variance portfolio - Efficient frontier, sum of upper bounds lower than one");
 		
 		// Identical returns
 		assert.throws(function() { 
-			PortfolioAllocation.efficientFrontier_([0.1, 0.1], [[1,0],[0,1]]) },
+			PortfolioAllocation.efficientFrontier([0.1, 0.1], [[1,0],[0,1]]) },
 			new Error('unsupported problem detected'),
 			"Mean variance portfolio - Efficient frontier, identical returns");
 	}
@@ -914,11 +914,11 @@ QUnit.test('Mean variance portfolio', function(assert) {
 	// Test limit cases for determining the critical line algorithm starting portfolio:
 	{
 		// Lower bounds binding (sum lb_i == 1)
-		var efficientFrontier = PortfolioAllocation.efficientFrontier_([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.6]} });
+		var efficientFrontier = PortfolioAllocation.efficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.6]} });
 		assert.deepEqual(efficientFrontier, [[[0.4, 0.6], 0]], 'Mean variance portfolio - Efficient frontier, lower bounds binding');
 		
 		// Upper bounds binding (sum ub_i == 1)
-		var efficientFrontier = PortfolioAllocation.efficientFrontier_([0.1, 0.2], [[1,0],[0,1]], { constraints: {maxWeights: [0.6, 0.4]} });
+		var efficientFrontier = PortfolioAllocation.efficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {maxWeights: [0.6, 0.4]} });
 		assert.deepEqual(efficientFrontier, [[[0.6, 0.4], 0]], 'Mean variance portfolio - Efficient frontier, upper bounds binding');
 	}
 
@@ -937,7 +937,7 @@ QUnit.test('Mean variance portfolio', function(assert) {
 					[2.31,	39.886,	237.16]];
 		var returns = [2.8000, 6.3000, 10.8000];
 		
-		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		var efficientFrontier = PortfolioAllocation.efficientFrontier(returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
 		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #0');
 	}
 	
@@ -954,7 +954,7 @@ QUnit.test('Mean variance portfolio', function(assert) {
 					  [0.0145, 0.0104, 0.0289]];
 		var returns = [0.062, 0.146, 0.128];
 		
-		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat);
+		var efficientFrontier = PortfolioAllocation.efficientFrontier(returns, covMat);
 		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #1');
 	}
 	
@@ -971,7 +971,7 @@ QUnit.test('Mean variance portfolio', function(assert) {
 					  [0.0002, 0.001, 0.01]];
 		var returns = [0.05, 0.08, 0.12];
 		
-		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat);
+		var efficientFrontier = PortfolioAllocation.efficientFrontier(returns, covMat);
 		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #2');
 	}
 	
@@ -988,7 +988,7 @@ QUnit.test('Mean variance portfolio', function(assert) {
 					  [0.0002, 0.001, 0.01]];
 		var returns = [0.05, 0.08, 0.12];
 		
-		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat, { constraints: {maxWeights: [0.7, 0.7, 0.7]} });
+		var efficientFrontier = PortfolioAllocation.efficientFrontier(returns, covMat, { constraints: {maxWeights: [0.7, 0.7, 0.7]} });
 		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #3');
 	}
 	
@@ -1018,10 +1018,9 @@ QUnit.test('Mean variance portfolio', function(assert) {
 					[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]];
 		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
 
-		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat);
+		var efficientFrontier = PortfolioAllocation.efficientFrontier(returns, covMat);
 		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #4');
 	}
-
 });
 
 QUnit.test('Rounded weights portfolio', function(assert) {    

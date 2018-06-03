@@ -7144,7 +7144,8 @@ self.equalWeights = function (nbAssets, opt) {
 * global minimum variance portfolio of n assets.
 *
 * This portfolio is Markowitz-efficient (i.e., it lies on the Markowitz efficient frontier) and is the portfolio
-* with the lowest variance among all the feasible portfolios.
+* with the lowest variance among all the feasible portfolios, provided the covariance matrix of the assets
+* is definite positive.
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 * 
@@ -7163,8 +7164,8 @@ self.equalWeights = function (nbAssets, opt) {
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
-* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to a n by 1 matrix made of zeros.
-* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to a n by 1 matrix made of ones.
+* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array.<number>} the weights corresponding to the global minimum variance portfolio, array of n real numbers.
 *
 * @example
@@ -7320,33 +7321,37 @@ self.gridSearchWeights = function (nbAssets, fct, opt) {
 
  
 /* Start Wrapper private methods - Unit tests usage only */
-self.efficientFrontier_ = efficientFrontier_;
 /* End Wrapper private methods - Unit tests usage only */
 
 
 /**
-* @function efficientFrontier_
+* @function efficientFrontier
 *
-* @summary Compute the corner portfolios belonging to the mean variance efficient frontier.
+* @summary Compute all the corner portfolios belonging to the mean-variance efficient frontier.
 *
-* @description X
+* @description This function returns the weights w_i1,...,w_in as well as the risk aversion parameters lambda_i,
+* i = 1..m, associated to the m fully invested and long-only corner portfolios belonging to the mean-variance
+* efficient frontier, using the Markowitz critical line algorithm.
 *
 * @see Harry M. Markowitz, Mean-Variance Analysis in Portfolio Choice and Capital Markets, Revised issue (2000), McGraw-Hill Professional;
 * @see <a href="https://doi.org/10.1007/978-0-387-77439-8_12">Niedermayer A., Niedermayer D. (2010) Applying Markowitz’s Critical Line Algorithm. In: Guerard J.B. (eds) Handbook of Portfolio Construction. Springer, Boston, MA</a>
 *
-* @param {Array.<Array.<number>>} assetsReturns an array of n arrays of T real numbers representing the returns of n assets over T periods of time.
+* @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
+* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt optional parameters for the algorithm.
-* @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
-* by a partial investment constraint; defaults to true.
-* @param {boolean} opt.outputMinimumPortfolioReturn a boolean indicating whether the computed minimum portfolio return should be provided in output
-* (if set to true) or not (if set to false); defaults to false.
-* @return {Array.<number>} the weights corresponding to a minimax portfolio, array of real numbers of length n.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @return {Array<Array.<Object>} the list of all corner portfolios as well as their associated risk aversion parameter, an array made of arrays of two elements:
+* - The corner portfolio weights, an array of n real numbers
+* - The corner portfolio risk aversion parameter, a positive real number
 *
 * @example
-* [[Matrix_(x_11, x_n1), lambda1], [Matrix_(x_12, x_n2), lambda_2]...]
+* efficientFrontier([0.1, 0.2], [[1, 0.3], [0.3, 1]])
+* // [[[0, 1], 7], [[0.5, 0.5], 0]] 
 */
-function efficientFrontier_(mu, sigma, opt) {	
-	// Internal object managing the statuses of the variables
+self.efficientFrontier = function(mu, sigma, opt) {	
+	// Internal object managing the statuses of the asset and lambda variables
 	function variablesStatusManager_(nbAssets, nbEqualityConstraints) {
 		// Variables statuses constants
 		this.STATUS_UNDEF = -1;
@@ -7432,7 +7437,7 @@ function efficientFrontier_(mu, sigma, opt) {
 		}
 	}
 
-	// Internal function to compute the weights of the E-maximizing portfolio, 
+	// Internal function to compute the E-maximizing portfolio, 
 	// c.f. the method "STARTING-SOLUTION" of the second reference.
 	//
 	// This function replaces the simplex algorithm described in the
@@ -7440,7 +7445,7 @@ function efficientFrontier_(mu, sigma, opt) {
 	// - The only equality constraint on the assets is that their weights
 	// sum to one
 	//
-	// - The only inequality constraints on the assets are lower bounds
+	// - The only inequality constraints on the assets are positive lower bounds
 	// and upper bounds on their weights
 	//
 	// - There is a unique optimal solution to the E-maximizing portfolio linear 
@@ -7608,7 +7613,7 @@ function efficientFrontier_(mu, sigma, opt) {
 	if (opt.constraints  === undefined) {
 		opt.constraints = {};
 	}
-	var maxIterations = opt.maxIter || 10000;
+	var maxIterations = opt.maxIter || 1000;
 	var lowerBounds = opt.constraints.minWeights;
 	var upperBounds = opt.constraints.maxWeights;
 	
@@ -7620,15 +7625,16 @@ function efficientFrontier_(mu, sigma, opt) {
 	// ------
 	
 	// Initializations
-	var nbAssets = sigma.nbColumns;
-
 	var eps = 1e-8; // the numerical tolerance for testing nullity
 	
+	var nbAssets = sigma.nbColumns; // the number of assets in the universe
+	
 	// The only equality constraint supported by the algorithm below
-	// is that the weights of the assets must sum to one.
+	// is that the weights of the assets must sum to one, but variables
+	// below are kept generic.
 	var A = Matrix_.ones(1, nbAssets); // the matrix holding the equality constraints
-	var b = Matrix_.ones(1, 1); // the vector holding the right member of the equality constraints
 	var nbEqualityConstraints = A.nbRows; // the number of equality constraints 
+	var b = Matrix_.ones(1, 1); // the vector holding the right member of the equality constraints
 	
 	var lb = lowerBounds ? new Matrix_(lowerBounds) : Matrix_.zeros(nbAssets, 1);
 	var ub = upperBounds ? new Matrix_(upperBounds) : Matrix_.ones(nbAssets, 1);
@@ -7691,7 +7697,8 @@ function efficientFrontier_(mu, sigma, opt) {
 	for (var i = 1; i <= assetsOutIdx.length; ++i) {
 		var out_idx_i = assetsOutIdx[i-1];
 		
-		alpha.setValue(out_idx_i, 1, currentCornerPortfolioWeights.getValue(out_idx_i, 1));
+		alpha.setValue(out_idx_i, 1, 
+					   currentCornerPortfolioWeights.getValue(out_idx_i, 1));
 	}
 	var beta = Matrix_.zeros(nbAssets + nbEqualityConstraints, 1);
 
@@ -7699,8 +7706,11 @@ function efficientFrontier_(mu, sigma, opt) {
 	// Construct the matrix M, with M = [[Sigma A^t], [A 0]],
 	// c.f. formula 13.8 of the first reference.
 	//
-	// TODO: In order to limit the memory usage, this matrix is 
-	// defined as a functional matrix.
+	// Note: the memory used for allocating matrix M is suboptimal,
+	// as the matrices Sigma and A are already allocated.
+	//
+	// This "problem" could be solved through defining M as a matrix
+	// defined through a function.
 	var M = Matrix_.fill(nbAssets + nbEqualityConstraints, nbAssets + nbEqualityConstraints, 
 								function(i,j) { 
 									if (i <= nbAssets && j <= nbAssets) {
@@ -7744,9 +7754,13 @@ function efficientFrontier_(mu, sigma, opt) {
 			var var_in_idx_j = assetsInIdx[j-1];
 			
 			var Ai_j_k = Ai.getValue(j, k);
-			Mi.setValue(nbAssets + k, var_in_idx_j, Ai_j_k);		
-			Mi.setValue(var_in_idx_j, nbAssets + k, Ai_j_k);
-			Mi.setValue(nbAssets + j, nbAssets + k, T.getValue(j, k)); 
+			Mi.setValue(nbAssets + k, var_in_idx_j, 
+						Ai_j_k);		
+			Mi.setValue(var_in_idx_j, nbAssets + k, 
+						Ai_j_k);
+			
+			Mi.setValue(nbAssets + j, nbAssets + k, 
+						T.getValue(j, k)); 
 		}
 	}
 
@@ -7759,7 +7773,6 @@ function efficientFrontier_(mu, sigma, opt) {
 	// b_bar(in) = [0 b]^t - M(in, out) * X(out)
 	
 	// Construct the b_bar vector for the assets variables IN
-	// TODO: Replace with functional matrix zero_b
 	var b_bar = Matrix_.zeros(nbAssets + nbEqualityConstraints, 1);
 	for (var i = 1; i <= assetsInIdx.length; ++i) {
 		var in_idx_i = assetsInIdx[i-1];
@@ -7773,11 +7786,13 @@ function efficientFrontier_(mu, sigma, opt) {
 			
 			b_bar_in_idx_i -= M.getValue(in_idx_i, out_idx_j) * currentCornerPortfolioWeights.getValue(out_idx_j, 1);
 		}
-		b_bar.setValue(in_idx_i, 1, b_bar_in_idx_i);
+		b_bar.setValue(in_idx_i, 1, 
+					   b_bar_in_idx_i);
 	}
 	
-	// Construct the b_bar vector for the lambda variables IN, which have been
-	// added to the IN set at the previous step.
+	// Construct the b_bar vector for the lambda variables IN (with indexes from
+	// nbAssets + 1 to nbAssets + nbEqualityConstraints), which have been
+	// added to the IN set just before the b_bar vector computation step.
 	for (var i = nbAssets + 1; i <= nbAssets + nbEqualityConstraints; ++i) {
 		var in_idx_i = i;
 		
@@ -7790,7 +7805,8 @@ function efficientFrontier_(mu, sigma, opt) {
 			
 			b_bar_in_idx_i -= M.getValue(in_idx_i, out_idx_j) * currentCornerPortfolioWeights.getValue(out_idx_j, 1);
 		}
-		b_bar.setValue(in_idx_i, 1, b_bar_in_idx_i);
+		b_bar.setValue(in_idx_i, 1, 
+					   b_bar_in_idx_i);
 	}	
 	
 	
@@ -7905,7 +7921,8 @@ function efficientFrontier_(mu, sigma, opt) {
 						
 						xi_in_idx_i += Mi.getValue(in_idx_i, in_idx_j) * M.getValue(in_idx_j, idx_in);
 					}	
-					xi.setValue(in_idx_i, 1, xi_in_idx_i);
+					xi.setValue(in_idx_i, 1, 
+								xi_in_idx_i);
 				}
 				
 				// Compute the scalar xi_j
@@ -7929,10 +7946,13 @@ function efficientFrontier_(mu, sigma, opt) {
 						Mi.setValue(in_idx_i, in_idx_j, 
 									Mi.getValue(in_idx_i, in_idx_j) + xi.getValue(in_idx_i, 1) * xi.getValue(in_idx_j, 1) / xi_j);
 					}
-					Mi.setValue(in_idx_i, idx_in, -xi.getValue(in_idx_i, 1) / xi_j);
-					Mi.setValue(idx_in, in_idx_i, -xi.getValue(in_idx_i, 1) / xi_j);
+					Mi.setValue(in_idx_i, idx_in, 
+								-xi.getValue(in_idx_i, 1) / xi_j);
+					Mi.setValue(idx_in, in_idx_i, 
+								-xi.getValue(in_idx_i, 1) / xi_j);
 				}
-				Mi.setValue(idx_in, idx_in, 1 / xi_j);
+				Mi.setValue(idx_in, idx_in, 
+							1 / xi_j);
 				
 				
 				// Update the b_bar vector, c.f. formulas 13.21 and 13.22 of the 
@@ -7961,7 +7981,8 @@ function efficientFrontier_(mu, sigma, opt) {
 					
 					b_bar_in_idx_i -= M.getValue(idx_in, out_idx_i) * currentCornerPortfolioWeights.getValue(out_idx_i, 1);
 				}
-				b_bar.setValue(idx_in, 1, b_bar_in_idx_i);
+				b_bar.setValue(idx_in, 1, 
+							   b_bar_in_idx_i);
 				
 			}
 		}
@@ -7994,15 +8015,17 @@ function efficientFrontier_(mu, sigma, opt) {
 				var in_idx_j = variablesInIdx[j-1];
 				
 				var Mi_in_idx_i_in_idx_j = Mi.getValue(in_idx_i, in_idx_j);
+				
 				alpha_in_idx_i += Mi_in_idx_i_in_idx_j * b_bar.getValue(in_idx_j, 1);
 			
-				// TODO: Replace with functional matrix mu_zero
 				if (in_idx_j <= nbAssets) {
 					beta_in_idx_i += Mi_in_idx_i_in_idx_j * mu.getValue(in_idx_j, 1);
 				}
 			}
-			alpha.setValue(in_idx_i, 1, alpha_in_idx_i);
-			beta.setValue(in_idx_i, 1, beta_in_idx_i);
+			alpha.setValue(in_idx_i, 1, 
+						   alpha_in_idx_i);
+			beta.setValue(in_idx_i, 1, 
+						  beta_in_idx_i);
 			
 			
 			// For assets variables IN, proceed with the formula 13.17
@@ -8098,7 +8121,8 @@ function efficientFrontier_(mu, sigma, opt) {
 			
 			// In case the variable IN is an asset variable, update the current corner portfolio
 			if (variablesStatusManager.isAsset(in_idx_i)) {
-				currentCornerPortfolioWeights.setValue(in_idx_i, 1, alpha.getValue(in_idx_i, 1) + lambda_e * beta.getValue(in_idx_i, 1));
+				currentCornerPortfolioWeights.setValue(in_idx_i, 1, 
+													   alpha.getValue(in_idx_i, 1) + lambda_e * beta.getValue(in_idx_i, 1));
 			}
 		}
 		
@@ -8118,13 +8142,13 @@ function efficientFrontier_(mu, sigma, opt) {
 	// corner portfolios.
 	var finalCornerPortfoliosWeights = new Array(cornerPortfoliosWeights.length);
 	
-	// The E-maximizing portfolio is always included on the efficient frontier
+	// First, the E-maximizing portfolio is always included on the efficient frontier
 	var idx = 0;
 	var cornerPortfolio = cornerPortfoliosWeights[idx][0];
 	var lambda = cornerPortfoliosWeights[idx][1];
 	finalCornerPortfoliosWeights[idx] = [cornerPortfolio.toArray(), lambda]; 
 	
-	// For each computed corner portfolio:
+	// Then, for each computed corner portfolio:
 	// - If it is numerically identical to the last corner portfolio included in the
 	// output efficient frontier, replace this last portfolio with it
 	//
