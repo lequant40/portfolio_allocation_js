@@ -41,11 +41,11 @@ I hope you will enjoy !
 - Minimum correlation algorithm (MCA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA is meant to be an approximation of the MDP portfolio allocation algorithm.
 
-- Mean variance optimisation (MVO), through the critical line algorithm (ON-GOING)
-  Based on the modern portfolio theory introduced by Harry M. Markowitz in numerous articles and books [Portfolio Selection: Efficient Diversification of Investments](https://www.jstor.org/stable/j.ctt1bh4c8h), the portfolios obtained through mean-variance optimisation are the most desirable portfolios in the sense that for a given level of return, they are the least volatile portfolios and that for a given level of volatility, they are the highest yielding portfolios (i.e., they are efficient).
+- Mean-variance optimisation (MVO) (ON-GOING, to be released with v0.0.6)  
+  Based on the modern portfolio theory introduced by Harry M. Markowitz in numerous articles and books [Portfolio Selection: Efficient Diversification of Investments](https://www.jstor.org/stable/j.ctt1bh4c8h), the portfolios obtained through mean-variance optimization are mean-variance efficient portfolios in the sense that for a given level of return, they have the lowest attainable volatility and that for a given level of volatility, they have the highest attainable return.
 
 - Global minimum variance (GMV)  
-  The leftmost portfolio on the Markowitz mean-variance efficient frontier, which possesses the smallest attainable variance among all the mean-variance efficient portfolios.
+  The leftmost portfolio on the mean-variance efficient frontier, which possesses the smallest attainable variance among all the mean-variance efficient portfolios.
 
 - Proportional minimum variance algorithm (MVA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MVA is meant to be an approximation of the GMV portfolio allocation algorithm.
@@ -58,12 +58,14 @@ I hope you will enjoy !
  
   
 ## Supported helper algorithms
-- Grid search of portfolio weights  
-  This family of algorithms allows to determine numerically the weights of a portfolio minimizing a "desirability" criterion.
+- Portfolio numerical optimization through grid search algorithms  
+  Grid search algorithms allow to determine numerically the weights of the optimal portfolio(s) minimizing a given objective function.
   
-- Rounding of portfolio weights   
+- Rational rounding of portfolio weights  
   The rounding algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al. allows to compute the closest rational weights to a portfolio (real) weights.
 
+- Mean-variance efficient frontier computation, through the Markowitz critical line algorithm (ON-GOING, to be released with v0.0.6)  
+  Any mean-variance efficient portfolio is a convex combination of two adjacent corner portfolios, so that the mean-variance efficient frontier is entirely described by its corner portfolios, which can be efficiently computed by a specialized algorithm developped by Harry M. Markowitz.
 
 ## Usage
 

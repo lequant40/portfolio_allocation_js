@@ -2,6 +2,7 @@
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights
 - Misc. matrix operations refactor
 - Added the computation of the Markowitz efficient frontier, through the critical line algorithm
+- Added the computation of mean-variance efficient portfolios with a given return or volatility target, through the critical line algorithm
 
 ### 0.0.5 - 02/04/2018
 - Misc. Matrix/Vector operations additions/refactor (in particular, toDoubleArray method replaced by toRowArray)
