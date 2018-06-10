@@ -1,4 +1,4 @@
-### 0.0.6 - XX/YY/2018
+### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights
 - Misc. matrix operations refactor
 - Added the computation of the Markowitz efficient frontier, through the critical line algorithm

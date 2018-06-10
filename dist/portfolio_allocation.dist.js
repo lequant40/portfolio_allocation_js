@@ -3821,6 +3821,7 @@ function binomial_(n, k) {
 
 
 /**
+// TODO: Proper comments
 https://en.wikipedia.org/wiki/Bit_array
 BitSet.js is an infinite Bit-Array (aka bit vector, bit string, bit set) implementation in JavaScript. 
 	https://github.com/infusion/BitSet.js
@@ -3828,7 +3829,7 @@ BitSet.js is an infinite Bit-Array (aka bit vector, bit string, bit set) impleme
 	 a word is an unsigned integer
 */
 function BitSet_() {
-    // Catches incorrect usage of var b = BitSet_() instead of var b = new BitSet_().
+    // Catches incorrect usage of var b = BitSet_() instead of var b = new BitSet_()
 	if (!(this instanceof BitSet_)) {
       return new BitSet_();
     }
@@ -7350,7 +7351,9 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 		// provided in decreasing return/variance values on the efficient frontier.
 		while (idx_min - idx_max != 1) { 
 			// Compute properties on the middle point
-			var idx_middle = Math.floor((idx_min + idx_max)/2);
+			//var idx_middle = Math.floor((idx_min + idx_max)/2);
+			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // avoid overflow
+
 			var weights_middle = efficientFrontier[idx_middle][0];
 			var fctVal_middle = targetFct(weights_middle);
 			
@@ -7540,6 +7543,10 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * // [[0, 1]], [0.5, 0.5]] 
 */
 self.meanVarianceEfficientFrontier = function(mu, sigma, opt) {
+	// Convert mu and sigma to matrix format
+	var mu = new Matrix_(mu);
+	var sigma = new Matrix_(sigma);
+
 	// Compute the efficient frontier
 	var efficientFrontier = efficientFrontier_(mu, sigma, opt);
 	
@@ -7569,8 +7576,8 @@ self.meanVarianceEfficientFrontier = function(mu, sigma, opt) {
 * @see Harry M. Markowitz, Mean-Variance Analysis in Portfolio Choice and Capital Markets, Revised issue (2000), McGraw-Hill Professional;
 * @see <a href="https://doi.org/10.1007/978-0-387-77439-8_12">Niedermayer A., Niedermayer D. (2010) Applying Markowitz’s Critical Line Algorithm. In: Guerard J.B. (eds) Handbook of Portfolio Construction. Springer, Boston, MA</a>
 *
-* @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
-* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {Matrix_} mu the returns of the n assets in the considered universe, a n by 1 matrix.
+* @param {Matrix_} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square n by n matrix.
 * @param {object} opt optional parameters for the algorithm.
 * @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
@@ -7580,7 +7587,7 @@ self.meanVarianceEfficientFrontier = function(mu, sigma, opt) {
 * - The corner portfolio risk aversion parameter, a positive real number
 *
 * @example
-* efficientFrontier_([0.1, 0.2], [[1, 0.3], [0.3, 1]])
+* efficientFrontier_(new Matrix_([0.1, 0.2]), new Matrix_([[1, 0.3], [0.3, 1]]))
 * // [[new Matrix_([0, 1]), 7], [new Matrix_([0.5, 0.5]), 0]] 
 */
 function efficientFrontier_(mu, sigma, opt) {	
@@ -7599,48 +7606,48 @@ function efficientFrontier_(mu, sigma, opt) {
 		this.nbAssets = nbAssets;
 		this.nbEqualityConstraints = nbEqualityConstraints;
 		
-		this.in = new BitSet_();
-		this.in.resize(nbAssets + nbEqualityConstraints);
-		this.out = new BitSet_();
-		this.out.resize(nbAssets + nbEqualityConstraints);
-		this.low = new BitSet_();
-		this.low.resize(nbAssets + nbEqualityConstraints);
-		this.up = new BitSet_();
-		this.up.resize(nbAssets + nbEqualityConstraints);
+		this.varIn = new BitSet_();
+		this.varIn.resize(nbAssets + nbEqualityConstraints);
+		this.varOut = new BitSet_();
+		this.varOut.resize(nbAssets + nbEqualityConstraints);
+		this.varLow = new BitSet_();
+		this.varLow.resize(nbAssets + nbEqualityConstraints);
+		this.varUp = new BitSet_();
+		this.varUp.resize(nbAssets + nbEqualityConstraints);
 			
 		// Public functions to set the status of variales
 		this.setIn = function(idx) {
-			this.in.set(idx);
-			this.out.unset(idx);
-			this.low.unset(idx);
-			this.up.unset(idx);
+			this.varIn.set(idx);
+			this.varOut.unset(idx);
+			this.varLow.unset(idx);
+			this.varUp.unset(idx);
 		}
 		this.setOnLowerBound = function(idx) {
-			this.low.set(idx);
-			this.out.set(idx);
-			this.in.unset(idx);
-			this.up.unset(idx);
+			this.varLow.set(idx);
+			this.varOut.set(idx);
+			this.varIn.unset(idx);
+			this.varUp.unset(idx);
 		}
 		this.setOnUpperBound = function(idx) {
-			this.up.set(idx);
-			this.out.set(idx);
-			this.in.unset(idx);
-			this.low.unset(idx);
+			this.varUp.set(idx);
+			this.varOut.set(idx);
+			this.varIn.unset(idx);
+			this.varLow.unset(idx);
 		}
 		this.setLambdasIn = function() {
 			for (var i = this.nbAssets + 1; i <= this.nbAssets + this.nbEqualityConstraints; ++i) {
-				this.in.set(i);
-				this.out.unset(i);
-				this.low.unset(i);
-				this.up.unset(i);
+				this.varIn.set(i);
+				this.varOut.unset(i);
+				this.varLow.unset(i);
+				this.varUp.unset(i);
 			}
 		}
 		this.setAssetsOnLowerBounds = function() {
 			for (var i = 1; i <= this.nbAssets; ++i) {
-				this.low.set(i);
-				this.out.set(i);
-				this.in.unset(i);
-				this.up.unset(i);
+				this.varLow.set(i);
+				this.varOut.set(i);
+				this.varIn.unset(i);
+				this.varUp.unset(i);
 			}
 		}
 		
@@ -7652,24 +7659,24 @@ function efficientFrontier_(mu, sigma, opt) {
 			return (idx >= this.nbAssets + 1) && (idx <= this.nbAssets + this.nbEqualityConstraints);
 		}
 		this.isIn = function(idx) {
-			return this.in.get(idx);
+			return this.varIn.get(idx);
 		}
 		this.isOnLowerBound = function(idx) {
-			return this.low.get(idx);
+			return this.varLow.get(idx);
 		}
 		this.isOnUpperBound = function(idx) {
-			return this.up.get(idx);
+			return this.varUp.get(idx);
 		}
 		this.isOut = function(idx) {
-			return this.out.get(idx);
+			return this.varOut.get(idx);
 		}
 		
 		// Public functions to iterate over the different sets.
 		this.getInIndexes = function() {
-			return this.in.toArray();
+			return this.varIn.toArray();
 		}
 		this.getOutIndexes = function() {
-			return this.out.toArray();
+			return this.varOut.toArray();
 		}
 	}
 
@@ -7852,10 +7859,6 @@ function efficientFrontier_(mu, sigma, opt) {
 	var maxIterations = opt.maxIter || 1000;
 	var lowerBounds = opt.constraints.minWeights;
 	var upperBounds = opt.constraints.maxWeights;
-	
-	// Convert mu and sigma to matrix format
-	var mu = new Matrix_(mu);
-	var sigma = new Matrix_(sigma);
 	
 
 	// ------

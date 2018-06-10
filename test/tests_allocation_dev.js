@@ -21,10 +21,10 @@ QUnit.test('Mean variance portfolio - internal efficient frontier computation', 
 										[[0.451915610952186, 0.348084389047814, 0.2], 7.55192170004087],
 										[[0.5, 0.2999999999999999, 0.2], 0]];
 		
-		var covMat = [[1, 2.96, 2.31],
-					[2.96, 54.76, 39.886],
-					[2.31,	39.886,	237.16]];
-		var returns = [2.8000, 6.3000, 10.8000];
+		var covMat = new PortfolioAllocation.Matrix([[1, 2.96, 2.31],
+													[2.96, 54.76, 39.886],
+													[2.31,	39.886,	237.16]]);
+		var returns = new PortfolioAllocation.Matrix([2.8000, 6.3000, 10.8000]);
 		
 		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
 		assert.deepEqual(efficientFrontierToArray(efficientFrontier), expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #0');
@@ -38,10 +38,10 @@ QUnit.test('Mean variance portfolio - internal efficient frontier computation', 
 										[[0.8414051841746248, 0, 0.15859481582537516], 0.03332764893133244], 
 										[[0.9931034482758623, 0, 0.006896551724137813], 0]];
 				
-		var covMat = [[0.0146, 0.0187, 0.0145],
-					 [0.0187, 0.0854, 0.0104],
-					  [0.0145, 0.0104, 0.0289]];
-		var returns = [0.062, 0.146, 0.128];
+		var covMat = new PortfolioAllocation.Matrix([[0.0146, 0.0187, 0.0145],
+													 [0.0187, 0.0854, 0.0104],
+													  [0.0145, 0.0104, 0.0289]]);
+		var returns = new PortfolioAllocation.Matrix([0.062, 0.146, 0.128]);
 		
 		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat);
 		assert.deepEqual(efficientFrontierToArray(efficientFrontier), expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #1');
@@ -55,10 +55,10 @@ QUnit.test('Mean variance portfolio - internal efficient frontier computation', 
 										[[0.9754098360655736, 0, 0.024590163934426246], 0.0006557377049180337], 
 										[[0.9799999999999999, 0, 0.02000000000000001], 0]];
 		
-		var covMat = [[0.0004, 0.0004, 0.0002],
-					 [0.0004, 0.0025,0.001],
-					  [0.0002, 0.001, 0.01]];
-		var returns = [0.05, 0.08, 0.12];
+		var covMat = new PortfolioAllocation.Matrix([[0.0004, 0.0004, 0.0002],
+													 [0.0004, 0.0025,0.001],
+													  [0.0002, 0.001, 0.01]]);
+		var returns = new PortfolioAllocation.Matrix([0.05, 0.08, 0.12]);
 		
 		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat);
 		assert.deepEqual(efficientFrontierToArray(efficientFrontier), expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #2');
@@ -72,10 +72,10 @@ QUnit.test('Mean variance portfolio - internal efficient frontier computation', 
 										[[0.7, 0.18310626702997274, 0.11689373297002724], 0.015934604904632152], 
 										[[0.7, 0.2438095238095238, 0.05619047619047619], 0]];
 		
-		var covMat = [[0.0004, 0.0004, 0.0002],
-					 [0.0004, 0.0025,0.001],
-					  [0.0002, 0.001, 0.01]];
-		var returns = [0.05, 0.08, 0.12];
+		var covMat = new PortfolioAllocation.Matrix([[0.0004, 0.0004, 0.0002],
+													 [0.0004, 0.0025,0.001],
+													  [0.0002, 0.001, 0.01]]);
+		var returns = new PortfolioAllocation.Matrix([0.05, 0.08, 0.12]);
 		
 		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat, { constraints: {maxWeights: [0.7, 0.7, 0.7]} });
 		assert.deepEqual(efficientFrontierToArray(efficientFrontier), expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #3');
@@ -95,17 +95,17 @@ QUnit.test('Mean variance portfolio - internal efficient frontier computation', 
 										[[0.06834400480527462, 0.041387026820649334, 0.015215259551836627, 0.18813443107045838, 0.03416248599274816, 0.20231943214747125, 0, 0.0339293235595669, 0.03363264959172938, 0.38287538646026537], 0.030971168861678777],
 										[[0.03696858147921504, 0.02690083780081047, 0.0949424305647986, 0.1257759521946726, 0.0767460810325476, 0.21935567131616898, 0.029987096882220312, 0.035963284621386274, 0.06134983772972688, 0.29201022637845325], 0]];
 										
-		var covMat = [[0.40755159,0.03175842,0.05183923,0.05663904,0.0330226,0.00827775,0.02165938,0.01332419,0.0343476,0.02249903],
-					[0.03175842,0.9063047,0.03136385,0.02687256,0.01917172,0.00934384,0.02495043,0.00761036,0.02874874,0.01336866],
-					[0.05183923,0.03136385,0.19490901,0.04408485,0.03006772,0.01322738,0.03525971,0.0115493,0.0427563,0.02057303],
-					[0.05663904,0.02687256,0.04408485,0.19528471,0.02777345,0.00526665,0.01375808,0.00780878,0.02914176,0.01640377],
-					[0.0330226,0.01917172,0.03006772,0.02777345,0.34059105,0.00777055,0.02067844,0.00736409,0.02542657,0.01284075],
-					[0.00827775,0.00934384,0.01322738,0.00526665,0.00777055,0.15983874,0.02105575,0.00518686,0.01723737,0.00723779],
-					[0.02165938,0.02495043,0.03525971,0.01375808,0.02067844,0.02105575,0.68056711,0.01377882,0.04627027,0.01926088],
-					[0.01332419,0.00761036,0.0115493,0.00780878,0.00736409,0.00518686,0.01377882,0.95526918,0.0106553,0.00760955],
-					[0.0343476,0.02874874,0.0427563,0.02914176,0.02542657,0.01723737,0.04627027,0.0106553,0.31681584,0.01854318],
-					[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]];
-		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
+		var covMat = new PortfolioAllocation.Matrix([[0.40755159,0.03175842,0.05183923,0.05663904,0.0330226,0.00827775,0.02165938,0.01332419,0.0343476,0.02249903],
+													[0.03175842,0.9063047,0.03136385,0.02687256,0.01917172,0.00934384,0.02495043,0.00761036,0.02874874,0.01336866],
+													[0.05183923,0.03136385,0.19490901,0.04408485,0.03006772,0.01322738,0.03525971,0.0115493,0.0427563,0.02057303],
+													[0.05663904,0.02687256,0.04408485,0.19528471,0.02777345,0.00526665,0.01375808,0.00780878,0.02914176,0.01640377],
+													[0.0330226,0.01917172,0.03006772,0.02777345,0.34059105,0.00777055,0.02067844,0.00736409,0.02542657,0.01284075],
+													[0.00827775,0.00934384,0.01322738,0.00526665,0.00777055,0.15983874,0.02105575,0.00518686,0.01723737,0.00723779],
+													[0.02165938,0.02495043,0.03525971,0.01375808,0.02067844,0.02105575,0.68056711,0.01377882,0.04627027,0.01926088],
+													[0.01332419,0.00761036,0.0115493,0.00780878,0.00736409,0.00518686,0.01377882,0.95526918,0.0106553,0.00760955],
+													[0.0343476,0.02874874,0.0427563,0.02914176,0.02542657,0.01723737,0.04627027,0.0106553,0.31681584,0.01854318],
+													[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]]);
+		var returns = new PortfolioAllocation.Matrix([1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08]);
 
 		var efficientFrontier = PortfolioAllocation.efficientFrontier_(returns, covMat);
 		assert.deepEqual(efficientFrontierToArray(efficientFrontier), expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #4');
@@ -121,7 +121,7 @@ QUnit.test('Mean variance portfolio - internal target return weights portfolio',
 	// Test using random data
 	{
 		// Problem data
-		var covMat = [[0.0146, 0.0187, 0.0145],
+		var covMat =[[0.0146, 0.0187, 0.0145],
 					[0.0187, 0.0854, 0.0104],
 					[0.0145, 0.0104, 0.0289]];
 		var returns = [0.062, 0.146, 0.128];
