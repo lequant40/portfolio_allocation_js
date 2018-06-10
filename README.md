@@ -1,4 +1,4 @@
-# PortfolioAllocation v0.0.5 ([Changelog](changelog.md))
+# PortfolioAllocation v0.0.6 ([Changelog](changelog.md))
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
@@ -41,7 +41,7 @@ I hope you will enjoy !
 - Minimum correlation algorithm (MCA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA is meant to be an approximation of the MDP portfolio allocation algorithm.
 
-- Mean-variance optimisation (MVO) (ON-GOING, to be released with v0.0.6)  
+- Mean-variance optimisation (MVO)  
   Based on the modern portfolio theory introduced by Harry M. Markowitz in numerous articles and books [Portfolio Selection: Efficient Diversification of Investments](https://www.jstor.org/stable/j.ctt1bh4c8h), the portfolios obtained through mean-variance optimization are mean-variance efficient portfolios in the sense that for a given level of return, they have the lowest attainable volatility and that for a given level of volatility, they have the highest attainable return.
 
 - Global minimum variance (GMV)  
@@ -64,7 +64,7 @@ I hope you will enjoy !
 - Rational rounding of portfolio weights  
   The rounding algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al. allows to compute the closest rational weights to a portfolio (real) weights.
 
-- Mean-variance efficient frontier computation, through the Markowitz critical line algorithm (ON-GOING, to be released with v0.0.6)  
+- Mean-variance efficient frontier computation, through the Markowitz critical line algorithm  
   Any mean-variance efficient portfolio is a convex combination of two adjacent corner portfolios, so that the mean-variance efficient frontier is entirely described by its corner portfolios, which can be efficiently computed by a specialized algorithm developped by Harry M. Markowitz.
 
 ## Usage
