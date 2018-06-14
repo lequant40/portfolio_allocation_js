@@ -1,3 +1,7 @@
+### 0.0.7 - XX/YY/2018
+- Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities.
+- Introduced the meanVarianceCornerPortfolios to compute the corner portfolios with their returns and volatilities.
+
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights
 - Misc. matrix operations refactor

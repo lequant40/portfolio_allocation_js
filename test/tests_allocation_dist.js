@@ -881,93 +881,65 @@ QUnit.test('Minimax portfolio', function(assert) {
 });
 
 
-QUnit.test('Mean variance portfolio - efficient frontier computation', function(assert) {    
-	// Test using static data
-	// Test infeasible/unsupported cases for determining the critical line algorithm starting portfolio:
-	{
-		// Lower bounds > Upper bounds
-		assert.throws(function() { 
-			PortfolioAllocation.meanVarianceEfficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.6, 0.3], maxWeights: [0.2, 1]} }) },
-			new Error('infeasible problem detected'),
-			"Mean variance portfolio - Efficient frontier, lower bounds greater than upper bounds");
-			
-		//  Sum lower bounds > 1
-		assert.throws(function() { 
-			PortfolioAllocation.meanVarianceEfficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.6, 0.5], maxWeights: [0.7, 0.5]} }) },
-			new Error('infeasible problem detected'),
-			"Mean variance portfolio - Efficient frontier, sum of lower bounds greater than one");
-		
-		//  Sum upper bounds < 1
-		assert.throws(function() { 
-			PortfolioAllocation.meanVarianceEfficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.4], maxWeights: [0.4, 0.5]} }) },
-			new Error('infeasible problem detected'),
-			"Mean variance portfolio - Efficient frontier, sum of upper bounds lower than one");
-		
-		// Identical returns
-		assert.throws(function() { 
-			PortfolioAllocation.meanVarianceEfficientFrontier([0.1, 0.1], [[1,0],[0,1]]) },
-			new Error('unsupported problem detected'),
-			"Mean variance portfolio - Efficient frontier, identical returns");
-	}
-	
+QUnit.test('Mean variance portfolio - corner portfolios computation', function(assert) {    
 	// Test using static data
 	// Test limit cases for determining the critical line algorithm starting portfolio:
 	{
 		// Lower bounds binding (sum lb_i == 1)
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.6]} });
-		assert.deepEqual(efficientFrontier, [[0.4, 0.6]], 'Mean variance portfolio - Efficient frontier, lower bounds binding');
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.6]} });
+		assert.deepEqual(cornerPortfolios, [[[0.4, 0.6],  0.16, 0.7211102550927979]], 'Mean variance portfolio - Corner portfolios, lower bounds binding');
 		
 		// Upper bounds binding (sum ub_i == 1)
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier([0.1, 0.2], [[1,0],[0,1]], { constraints: {maxWeights: [0.6, 0.4]} });
-		assert.deepEqual(efficientFrontier, [[0.6, 0.4]], 'Mean variance portfolio - Efficient frontier, upper bounds binding');
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios([0.1, 0.2], [[1,0],[0,1]], { constraints: {maxWeights: [0.6, 0.4]} });
+		assert.deepEqual(cornerPortfolios, [[[0.6, 0.4],  0.14, 0.7211102550927979]], 'Mean variance portfolio - Corner portfolios, upper bounds binding');
 	}
 
 	// Test using static data
 	// Reference: https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm
 	// Note: this test also allows checking that numerically equal corner portfolios are filtered out by the algorithm
 	{
-		var expectedEfficientFrontier = [[0.2, 0.30000000000000004, 0.5], 
-										[0.2, 0.5, 0.30000000000000004], 
-										[0.22180737780348653, 0.5, 0.27819262219651353],
-										[0.451915610952186, 0.348084389047814, 0.2],
-										[0.5, 0.2999999999999999, 0.2]];
+		var expectedCornerPortfolios = [[[0.2, 0.30000000000000004, 0.5], 7.8500000000000005, 8.777323054325846], 
+										[[0.2, 0.5, 0.30000000000000004], 6.950000000000001, 6.92166165021088], 
+										[[0.22180737780348653, 0.5, 0.27819262219651353], 6.775540977572108, 6.6431091200292105],
+										[[0.451915610952186, 0.348084389047814, 0.2], 5.618295361667349, 4.81952189552386],
+										[[0.5, 0.2999999999999999, 0.2], 5.449999999999999, 4.560824486866382]].reverse();
 		
 		var covMat = [[1, 2.96, 2.31],
 					[2.96, 54.76, 39.886],
 					[2.31,	39.886,	237.16]];
 		var returns = [2.8000, 6.3000, 10.8000];
 		
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier(returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #0');
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios(returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #1');
 	}
 	
 	// Test using static data
 	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII "The computing procedure"
 	{
-		var expectedEfficientFrontier = [[0, 1, 0], 
-										[0, 0.22496808316614988, 0.7750319168338501], 
-										[0.8414051841746248, 0, 0.15859481582537516], 
-										[0.9931034482758623, 0, 0.006896551724137813]];
+		var expectedCornerPortfolios = [[[0, 1, 0], 0.146, 0.29223278392404917], 
+										[[0, 0.22496808316614988, 0.7750319168338501], 0.1320494254969907, 0.15908574925905583], 
+										[[0.8414051841746248, 0, 0.15859481582537516], 0.07246725784447476, 0.12220061216349064], 
+										[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482]].reverse();
 		
 		var covMat = [[0.0146, 0.0187, 0.0145],
 					 [0.0187, 0.0854, 0.0104],
 					  [0.0145, 0.0104, 0.0289]];
 		var returns = [0.062, 0.146, 0.128];
 		
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier(returns, covMat);
-		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #1');
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios(returns, covMat);
+		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #2');
 	}
 	
 	// Test using static data
 	// Reference: Portfolio Selection, H. Markowitz example, chapter II "Illustrative portfolio analyses"
 	{
-		var expectedEfficientFrontier = [[0, 0, 0, 0, 100, 0, 0, 0, 0, 0], 
-										[0, 0, 0, 0, 96, 0, 0, 4, 0, 0], 
-										[0, 0, 0, 8, 92, 0, 0, 0, 0, 0], 
-										[0, 0, 0, 42, 58, 0, 0, 0, 0, 0], // In Markowitz book, this is actually [0, 0, 0, 41, 59, 0, 0, 0, 0, 0], but this seems a wrong rounding 
-										[0, 0, 0, 25, 32, 0, 43, 0, 0, 0],
-										[0, 0, 16, 3, 12, 0, 69, 0, 0, 0],
-										[0, 0, 0, 0, 0, 0, 0, 0, 0, 100]];
+		var expectedCornerPortfolios = [[[0, 0, 0, 0, 100, 0, 0, 0, 0, 0], 0.1981111111, 0.35761725182099363], 
+										[[0, 0, 0, 0, 96, 0, 0, 4, 0, 0], 0.19776400166660185, 0.35451400571130365], 
+										[[0, 0, 0, 8, 92, 0, 0, 0, 0, 0], 0.19602068236429498, 0.3403126771859089], 
+										[[0, 0, 0, 42, 58, 0, 0, 0, 0, 0], 0.18785503614831273, 0.29187554881080124], // In Markowitz book, this is actually [0, 0, 0, 41, 59, 0, 0, 0, 0, 0], but this seems a wrong rounding 
+										[[0, 0, 0, 25, 32, 0, 43, 0, 0, 0], 0.16161551062944268, 0.2069944757322166],
+										[[0, 0, 16, 3, 12, 0, 69, 0, 0, 0], 0.14035962162442164, 0.16472622029650955],
+										[[0, 0, 0, 0, 0, 0, 0, 0, 0, 100], 0, 0]].reverse();
 	
 		var covMat = [[0.05338816358,0.02149069753,0.02865533642,0.04896485802,0.01624895062,0.03223945062,0.02425553395,0.03999812963,0.0361509784, 0],
 					[0.02149069753,0.01468446914,0.01878391358,0.02441658642,0.008041938272,0.01002193827,0.01448993827,0.02536259259,0.02083593827, 0],
@@ -981,15 +953,23 @@ QUnit.test('Mean variance portfolio - efficient frontier computation', function(
 					[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
 
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier(returns, covMat);
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios(returns, covMat);
 		
-		for (var i = 0; i < expectedEfficientFrontier.length; ++i) {
-			var expectedWeights = expectedEfficientFrontier[i];
-			var computedWeights = efficientFrontier[i];
+		for (var i = 0; i < expectedCornerPortfolios.length; ++i) {
+			var expectedWeights = expectedCornerPortfolios[i][0];
+			var expectedReturn = expectedCornerPortfolios[i][1];
+			var expectedVolatility = expectedCornerPortfolios[i][2];
+			
+			var computedWeights = cornerPortfolios[i][0];
 			var roundedComputedWeights = PortfolioAllocation.roundedWeights(computedWeights, 100);
+			var computedReturn = cornerPortfolios[i][1];
+			var computedVolatility = cornerPortfolios[i][2];
+			
+			assert.equal(Math.abs(computedReturn - expectedReturn) <= 1e-14, true, 'Mean variance portfolio - Corner portfolios #3, #' + i + ", return");
+			assert.equal(Math.abs(computedVolatility - expectedVolatility) <= 1e-14, true, 'Mean variance portfolio - Corner portfolios #3, #' + i + ", volatility");
 			
 			for (var j = 0; j < expectedWeights.length; ++j) {
-				assert.equal(expectedWeights[j]/100, roundedComputedWeights[j], 'Mean variance portfolio - Efficient frontier #1 bis, #' + i + ",  " + j + "/" + expectedWeights.length);
+				assert.equal(expectedWeights[j]/100, roundedComputedWeights[j], 'Mean variance portfolio - Corner portfolios #3, #' + i + ",  " + j + "/" + expectedWeights.length);
 			}
 		}
 	}
@@ -997,50 +977,50 @@ QUnit.test('Mean variance portfolio - efficient frontier computation', function(
 	// Test using static data
 	// Reference: A Simple Spreadsheet-Based Exposition of the Markowitz Critical Line Method for Portfolio Selection, Clarence C. Kwan
 	{
-		var expectedEfficientFrontier = [[0, 0, 1], 
-										[0, 0.6485013623978204, 0.3514986376021796], 
-										[0.9754098360655736, 0, 0.024590163934426246], 
-										[0.9799999999999999, 0, 0.02000000000000001]];
+		var expectedCornerPortfolios = [[[0, 0, 1], 0.12, 0.1], 
+										[[0, 0.6485013623978204, 0.3514986376021796], 0.0940599455040872, 0.05237167799176803], 
+										[[0.9754098360655736, 0, 0.024590163934426246], 0.051721311475409835, 0.019905041975576163], 
+										[[0.9799999999999999, 0, 0.02000000000000001], 0.051399999999999994, 0.019899748742132396]].reverse();
 		
 		var covMat = [[0.0004, 0.0004, 0.0002],
 					 [0.0004, 0.0025,0.001],
 					  [0.0002, 0.001, 0.01]];
 		var returns = [0.05, 0.08, 0.12];
 		
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier(returns, covMat);
-		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #2');
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios(returns, covMat);
+		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #4');
 	}
 	
 	// Test using static data (upper bounds)
 	// Reference: A Simple Spreadsheet-Based Exposition of the Markowitz Critical Line Method for Portfolio Selection, Clarence C. Kwan
 	{
-		var expectedEfficientFrontier = [[0, 0.30000000000000004, 0.7], 
-										[0, 0.6485013623978203, 0.3514986376021798], 
-										[0.7, 0.18310626702997274, 0.11689373297002724], 
-										[0.7, 0.2438095238095238, 0.05619047619047619]];
+		var expectedCornerPortfolios = [[[0, 0.30000000000000004, 0.7], 0.108, 0.07446475676452585], 
+										[[0, 0.6485013623978203, 0.3514986376021798], 0.0940599455040872, 0.05237167799176804], 
+										[[0.7, 0.18310626702997274, 0.11689373297002724], 0.06367574931880109, 0.02438316869432441], 
+										[[0.7, 0.2438095238095238, 0.05619047619047619], 0.061247619047619044, 0.02357642082775965]].reverse();
 		
 		var covMat = [[0.0004, 0.0004, 0.0002],
 					 [0.0004, 0.0025,0.001],
 					  [0.0002, 0.001, 0.01]];
 		var returns = [0.05, 0.08, 0.12];
 		
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier(returns, covMat, { constraints: {maxWeights: [0.7, 0.7, 0.7]} });
-		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #3');
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios(returns, covMat, { constraints: {maxWeights: [0.7, 0.7, 0.7]} });
+		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #5');
 	}
 	
 	// Test using static data
 	// Reference: An Open-Source Implementation of the Critical-Line Algorithm for Portfolio Optimization, David H. Bailey and Marcos Lopez de Prado
 	{
-		var expectedEfficientFrontier = [[0, 1, 0, 0, 0, 0, 0, 0, 0, 0], 
-										[0.6493694070931811, 0.3506305929068189, 0, 0, 0, 0, 0, 0, 0, 0], 
-										[0.4339841341086239, 0.23124750065448754, 0, 0.334768365236889, 0, 0, 0, 0, 0, 0],
-										[0.12688785385570883, 0.07234334721032556, 0, 0.28125374926334057, 0, 0, 0, 0, 0, 0.5195150496706249],
-										[0.12320100405906734, 0.07044407130753655, 0, 0.2789935668090118, 0, 0, 0, 0.006435564362887149, 0, 0.5209257934614971],
-										[0.0869215492990579, 0.050451042268558385, 0, 0.22359401742288823, 0, 0.17383161507156486, 0, 0.03017301555135618, 0, 0.4350287603865743],
-										[0.0846709411996219, 0.049253858741118525, 0, 0.21963390336360733, 0, 0.18003923464176064, 0, 0.03102980185535347, 0.006485702415438152, 0.42888655778310003],
-										[0.07378925302280315, 0.043828660769718863, 0, 0.19897560805881487, 0.026158159857441972, 0.19815187227970524, 0, 0.03341958639919798, 0.027902966026643668, 0.3977738935856743],
-										[0.06834400480527462, 0.041387026820649334, 0.015215259551836627, 0.18813443107045838, 0.03416248599274816, 0.20231943214747125, 0, 0.0339293235595669, 0.03363264959172938, 0.38287538646026537],
-										[0.03696858147921504, 0.02690083780081047, 0.0949424305647986, 0.1257759521946726, 0.0767460810325476, 0.21935567131616898, 0.029987096882220312, 0.035963284621386274, 0.06134983772972688, 0.29201022637845325]];
+		var expectedCornerPortfolios = [[[0, 1, 0, 0, 0, 0, 0, 0, 0, 0], 1.19, 0.9520003676469878], 
+										[[0.6493694070931811, 0.3506305929068189, 0, 0, 0, 0, 0, 0, 0, 0], 1.1802594588936024, 0.5456568742682376], 
+										[[0.4339841341086239, 0.23124750065448754, 0, 0.334768365236889, 0, 0, 0, 0, 0, 0], 1.1600564524217891, 0.4172556503733193],
+										[[0.12688785385570883, 0.07234334721032556, 0, 0.28125374926334057, 0, 0, 0, 0, 0, 0.5195150496706249], 1.1112622642799619, 0.2667196142113227],
+										[[0.12320100405906734, 0.07044407130753655, 0, 0.2789935668090118, 0, 0, 0, 0.006435564362887149, 0, 0.5209257934614971], 1.1083602383747904, 0.26501699530147116],
+										[[0.0869215492990579, 0.050451042268558385, 0, 0.22359401742288823, 0, 0.17383161507156486, 0, 0.03017301555135618, 0, 0.4350287603865743], 1.0224838894431951, 0.2296800735960956],
+										[[0.0846709411996219, 0.049253858741118525, 0, 0.21963390336360733, 0, 0.18003923464176064, 0, 0.03102980185535347, 0.006485702415438152, 0.42888655778310003], 1.0153059205224644, 0.22798274842085042],
+										[[0.07378925302280315, 0.043828660769718863, 0, 0.19897560805881487, 0.026158159857441972, 0.19815187227970524, 0, 0.03341958639919798, 0.027902966026643668, 0.3977738935856743], 0.9727204340349849, 0.21955488008267854],
+										[[0.06834400480527462, 0.041387026820649334, 0.015215259551836627, 0.18813443107045838, 0.03416248599274816, 0.20231943214747125, 0, 0.0339293235595669, 0.03363264959172938, 0.38287538646026537], 0.9499368157550272, 0.21602457168689138],
+										[[0.03696858147921504, 0.02690083780081047, 0.0949424305647986, 0.1257759521946726, 0.0767460810325476, 0.21935567131616898, 0.029987096882220312, 0.035963284621386274, 0.06134983772972688, 0.29201022637845325], 0.8032153598765337, 0.20523761981386526]].reverse();
 										
 		var covMat = [[0.40755159,0.03175842,0.05183923,0.05663904,0.0330226,0.00827775,0.02165938,0.01332419,0.0343476,0.02249903],
 					[0.03175842,0.9063047,0.03136385,0.02687256,0.01917172,0.00934384,0.02495043,0.00761036,0.02874874,0.01336866],
@@ -1054,8 +1034,8 @@ QUnit.test('Mean variance portfolio - efficient frontier computation', function(
 					[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]];
 		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
 
-		var efficientFrontier = PortfolioAllocation.meanVarianceEfficientFrontier(returns, covMat);
-		assert.deepEqual(efficientFrontier, expectedEfficientFrontier, 'Mean variance portfolio - Efficient frontier #4');
+		var cornerPortfolios = PortfolioAllocation.meanVarianceCornerPortfolios(returns, covMat);
+		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #6');
 	}
 });
 
@@ -1153,7 +1133,7 @@ QUnit.test('Mean variance portfolio - target volatility weights portfolio', func
 		var returns = [0.062, 0.146, 0.128];
 		
 		
-		var nbSamples = 100;
+		var nbSamples = 10;
 		for (var k = 0; k < nbSamples; ++k) {
 			var maxVolatility = Math.sqrt(covMat[1][1]);
 			var unreachableMaxVolatility = generateRandomValue(maxVolatility - 1e-6, 2 * maxVolatility); // > maxVolatility
