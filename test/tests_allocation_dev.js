@@ -3,12 +3,12 @@ QUnit.module('Assets allocation module');
 	
 QUnit.test('Mean variance portfolio - internal corner portfolios computation', function(assert) {    
 	// Used for compatibility purposes with old JavaScript engines
-	function cornerPortfoliosToArray(efficientFrontier) {
-		for (var i = 0; i < efficientFrontier.length; ++i) {
-			efficientFrontier[i][0] = efficientFrontier[i][0].toArray();
+	function cornerPortfoliosToArray(cornerPortfolio) {
+		for (var i = 0; i < cornerPortfolio.length; ++i) {
+			cornerPortfolio[i][0] = cornerPortfolio[i][0].toArray();
 		}
 		
-		return efficientFrontier;
+		return cornerPortfolio;
 	}
 
 	// Test using static data
@@ -203,3 +203,4 @@ QUnit.test('Mean variance portfolio - internal target volatility weights portfol
 		assert.equal(Math.abs(portfolioVolatility - targetVolatility) <= 1e-8, true, 'Mean variance portfolio - internal target volatility weights portfolio #1');
 	}
 });	
+

@@ -7141,14 +7141,13 @@ self.equalWeights = function (nbAssets, opt) {
 *
 * @summary Compute the weights of the global minimum variance portfolio.
 *
-* @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only
-* global minimum variance portfolio of n assets.
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and 
+* long-only global minimum variance portfolio of n assets.
 *
-* This portfolio is Markowitz-efficient (i.e., it lies on the Markowitz efficient frontier) and is the portfolio
-* with the lowest variance among all the feasible portfolios, provided the covariance matrix of the assets
-* is definite positive.
+* This portfolio is mean-variance efficient and is the portfolio with the lowest
+* volatility among all the feasible portfolios.
 *
-* This portfolio is unique, provided the covariance matrix of the assets is definite positive.
+* This portfolio is unique when the covariance matrix of the assets is definite positive.
 * 
 * The algorithm used internally is a sequential minimization optimization algorithm,
 * which is similar to a cyclical coordinate descent algorithm updating 2 coordinates at each iteration, 
@@ -7340,96 +7339,25 @@ self.computeCornerPortfolios_ = computeCornerPortfolios_;
 * portfolio has the highest attainable return among all the portfolios satisfying the target 
 * volatility constraint).
 *
-* The algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
-*
-* To be noted that the portfolio volatility is defined as the standard deviation of the portfolio
-* variance.
+* The main algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
 *
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
 *
 * @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
 * @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
-* @param {object} opt optional parameters for the algorithm.
+* @param {object} opt optional and/or mandatory parameters for the algorithm.
 * @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
-* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
-* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
-* @return {Array<Array.<number>} the weights corresponding to the computed mean-variance efficient portfolio, array of n real numbers.
+* @param {number} opt.constraints.targetReturn the desired return of the portfolio, a real number; incompatible with opt.constraints.targetVolatility.
+* @param {number} opt.constraints.targetVolatility the desired volatility of the portfolio, a real number; incompatible with opt.constraints.targetReturn.
+* @param {number} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {number} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @return {Array<Array.<number>} the weights corresponding to the mean-variance efficient portfolio, array of n real numbers.
 *
 * @example
 * meanVarianceOptimizationWeights([0.1, 0.2], [[1, 0.3], [0.3, 1]], { constraints: {targetReturn: 0.15}})
 * // [0.5, 0.5] 
 */
-self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
-	// Internal function to compute the (at most) two corner portfolios enclosing the
-	// efficient portfolio with a given return/volatility.
-	function computeEnclosingCornerPortfolios_(targetFct, targetFctVal, cornerPortfolios) {
-		// The numerical accuracy for testing equality
-		var eps = 1e-8;
-		
-		// The efficient frontier portfolios are provided from highest return/variance
-		// to lowest return/variance, so that *_min below refers to properties of the portfolio
-		// with the lowest return/variance.
-		var idx_min = cornerPortfolios.length - 1;
-		var idx_max = 0
-
-		var weights_min = cornerPortfolios[idx_min][0];
-		var weights_max = cornerPortfolios[idx_max][0];
-
-		var fctVal_min = targetFct(weights_min);
-		var fctVal_max = targetFct(weights_max);
-
-		// If the target function value is not reachable within numerical accuracy, 
-		// return immediately.
-		if (targetFctVal - fctVal_max > eps || -eps > targetFctVal - fctVal_min) {
-			return [];
-		}
-		
-		// If the target function value has already been numerically reached on one of the
-		// two extremal corner portfolios, return immediately.
-		if (Math.abs(targetFctVal - fctVal_min) <= eps) {
-			return [[weights_min, fctVal_min]];
-		}
-		else if (Math.abs(targetFctVal - fctVal_max) <= eps) {
-			return [[weights_max, fctVal_max]];
-		}
-		
-		// Otherwise, determine the two adjacent corner portfolios enclosing the portfolio
-		// with a target function value numerically equals to the provided target function value,
-		// using a binary search algorithm.
-		//
-		// Using a binary search algorithm is possible because the corner portfolios are
-		// provided in decreasing return/variance values on the efficient frontier.
-		while (idx_min - idx_max != 1) { 
-			// Compute properties on the middle point
-			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // formula avoiding numerical overflow
-
-			var weights_middle = cornerPortfolios[idx_middle][0];
-			var fctVal_middle = targetFct(weights_middle);
-			
-			// Determine in which sub-interval ]idx_max, idx_middle[ or ]idx_middle, idx_min[
-			// lies the target function value.
-			if (fctVal_middle - targetFctVal > eps) {
-				idx_max = idx_middle;
-				fctVal_max = fctVal_middle;
-				weights_max = weights_middle;
-			}
-			else if (fctVal_middle - targetFctVal < -eps) {
-				idx_min = idx_middle;
-				fctVal_min = fctVal_middle;
-				weights_min = weights_middle;
-			}
-			else { // the target function value is exactly attained on the idx_middle-th corner portfolio
-				return [[weights_middle, fctVal_middle]];
-			}
-		}
-
-		
-		// Return the computed adjacent corner portfolios, as well as
-		// the associated function values.
-		return [[weights_min, fctVal_min], [weights_max, fctVal_max]];
-	}
-	
-	
+self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {	
 	// ------	
 
 	// Decode options
@@ -7456,110 +7384,459 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	
 	// ------
 	
-	var nbAssets = sigma.nbColumns; // the number of assets in the universe
+	// Compute the corner portfolios defining the efficient frontier
+	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
+	
+	
+	// Depending on the target function/value, proceed with a different algorithm
+	// to compute the requested efficient portfolio.
+	var efficientPortfolio;
+	if (targetReturn !== undefined) { // the target function is the portfolio return
+		// Compte the efficient portfolio with the target return
+		efficientPortfolio = computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfolios);
+		if (efficientPortfolio.length == 0) {
+			throw new Error('target return not reachable');
+		}
+	}
+	else { // the target function is the portfolio volatility (i.e., standard deviation)
+		// Compte the efficient portfolio with the target volatility
+		efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cornerPortfolios);
+		if (efficientPortfolio.length == 0) {
+			throw new Error('target volatility not reachable');
+		}
+	}
+
+	
+	// Return the computed portfolio weights
+	var weights = efficientPortfolio[0];
+	return weights.toArray();
+}
+
+
+/**
+* @function maximumSharpeRatioWeights
+*
+* @summary Compute the weights of the portfolio maximizing the Sharpe ratio.
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and 
+* long-only portfolio of n assets maximizing the Sharpe ratio, which is defined as the ratio of the 
+* portfolio excess return over a constant risk-free rate to the portfolio volatility.
+*
+* When it exists, this portfolio is mean-variance efficient and is unique.
+*
+* The main algorithm used internally is the Markowitz critical line algorithm, c.f. the second reference.
+*
+* @see <a href="https://doi.org/10.1111/j.1540-6261.1976.tb03217.x">Elton, E. J., Gruber, M. J. and Padberg, M. W. (1976), SIMPLE CRITERIA FOR OPTIMAL PORTFOLIO SELECTION. The Journal of Finance, 31: 1341-1357</a>
+* @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
+*
+* @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
+* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {number} rf the risk-free rate, a real number.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @return {Array<Array.<number>} the weights corresponding to the portfolio maximizing the Sharpe ratio, array of n real numbers.
+*
+* @example
+* maximumSharpeRatioWeights([0.1, 0.2], [[1, 0.3], [0.3, 1]], 0)
+* // TODO
+*/
+self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
+	// Internal function to compute the return of a portfolio
+	function computeReturn_(mu, weights) {
+		return Matrix_.vectorDotProduct(mu, weights);
+	}
+
+	// Internal function to compute the volatility of a portfolio
+	function computeVolatility_(sigma, weights) {
+		return Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights));
+	}
+	
+	// Internal function to compute the Sharpe ratio of a portfolio,
+	// as well as the intermediate values of return and volatility.
+	function computeSharpeRatio_(mu, sigma, rf, weights) {
+		// The numerical zero
+		var eps = 1e-8;
+		
+		// The numerator: <mu/w> - rf
+		var ret = computeReturn_(mu, weights);
+		var excessRet = ret - rf;
+		
+		// The denominator: Sqrt(<Sigma*w/w>)
+		var vol = computeVolatility_(sigma, weights);
+		
+		// In case the denominator is numerically null, which can occur with
+		// semi-positive definite covariance matrices, replace it with the
+		// value of the numerical zero.
+		if (Math.abs(vol) < eps) {
+			vol = eps;
+		}
+		
+		// Compute the Sharpe ratio
+		var sharpeRatio = excessRet/vol;
+		
+		// Return the computed Sharpe ratio and intermediate values
+		return [sharpeRatio, ret, vol];
+	}
+
+	// Internal function to compute the corner portfolio which maximizes the
+	// Sharpe ratio on the efficient frontier restricted to portfolios with:
+	// - A strictly positive volatility
+	// - A strictly positive excess return
+	//
+	// This function uses a binary search algorithm, which is justified because
+	// the Sharpe ratio is a strictly unimodular function on the above restricted
+	// efficient frontier, c.f. the reference.
+	function computeMaximumSharpeRatioCornerPortfolio_(mu, sigma, rf, cornerPortfolios) {
+		// The numerical zero
+		var eps = 1e-8;
+		
+		// The efficient frontier portfolios are provided from highest return/volatility
+		// to lowest return/volatility, so that *_min below refers to properties of the portfolio
+		// with the lowest return/volatility.
+		var idx_min = cornerPortfolios.length - 1;
+		var idx_max = 0;
+
+		var weights_min = cornerPortfolios[idx_min][0];
+		var weights_max = cornerPortfolios[idx_max][0];
+
+		var sharpeRatio_min = computeSharpeRatio_(mu, sigma, rf, weights_min);
+		var sharpeRatio_max = computeSharpeRatio_(mu, sigma, rf, weights_max);
+		
+		// In case there is only one corner portfolio on the efficient frontier,
+		// exit immediately.
+		if (idx_min == idx_max) {
+			return [idx_min, weights_min, sharpeRatio_min];
+		}
+		
+		// Otherwise, determine the corner portfolio with the maximum Sharpe ratio 
+		// using a binary search algorithm.
+		while (idx_min - idx_max != 1) { 
+			// Compute properties on the middle points
+			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // formula avoiding numerical overflow
+			var weights_middle = cornerPortfolios[idx_middle][0];
+			var sharpeRatio_middle = computeSharpeRatio_(mu, sigma, rf, weights_middle);
+
+			var idx_middle_p = idx_middle + 1; 
+			var weights_middle_p = cornerPortfolios[idx_middle_p][0];
+			var sharpeRatio_middle_p = computeSharpeRatio_(mu, sigma, rf, weights_middle_p);
+
+			// Determine in which sub-interval [idx_max, idx_middle+1] or [idx_middle+1, idx_min]
+			// lies the corner portfolio with the maximum Sharpe ratio.
+			if (sharpeRatio_middle[0] > sharpeRatio_middle_p[0]) {
+				idx_min = idx_middle;
+				weights_min = weights_middle;
+				sharpeRatio_min = sharpeRatio_middle;
+			}
+			else if (sharpeRatio_middle[0]	< sharpeRatio_middle_p[0]) {
+				idx_max = idx_middle;
+				weights_max = weights_middle;
+				sharpeRatio_max = sharpeRatio_middle;
+			}
+			else {
+				// In case the Sharpe ratio is equal on both corner portfolios, 
+				// it means its maximum is attained somewhere between these two portfolios, 
+				// due to its strict unimodality.
+				//
+				// The binary search procedure can then be prematurely stopped.
+				idx_min = idx_middle_p;
+				weights_min = weights_middle_p;
+				sharpeRatio_min = sharpeRatio_middle_p;
+				
+				idx_max = idx_middle;
+				weights_max = weights_middle;
+				sharpeRatio_max = sharpeRatio_middle;
+
+				break;
+			}
+		}
+
+		
+		// Return the computed corner portfolio
+		return [idx_min, weights_min, sharpeRatio_min];
+	}
+
+	// Internal function to compute the efficient portfolio which maximizes the
+	// Sharpe ratio on an efficient segment defined by two adjacent corner portfolios
+	// with:
+	// - A strictly positive volatility
+	// - A strictly positive excess return
+	//
+	// On such an efficient segment, the weights associated this portfolio are a 
+	// convex combination of the weights of the two adjacent corner portfolios,
+	// so that w = t*w_min + (1-t)*w_max, t in [0,1], with t to be determined,
+	// c.f. the second reference.
+	//
+	// With E(w) = <mu/w> the portfolio return and V(w) = <Sigma*w/w> the portfolio 
+	// volatility, the Sharpe ratio is defined as SR(w) = (E(w) - rf)/SQRT(V(w)).
+	//
+	// Because SR(w) > 0 on the efficient segment, maximizing SR(w) is equivalent
+	// to maximizing SR(w)^2, which is equal to (E(w) - rf)^2/V(w).
+	//
+	// By linearity of E(w) and bilinearity/symmetry of V(w), SR(w)^2 is also equal to
+	// a rational fraction in t:
+	//
+	// (E(w) - rf)^2/V(w)
+	// =
+	// ( E(t*w_min + (1-t)*w_max) - rf )^2 / ( V(t*w_min + (1-t)*w_max) )
+	// =
+	// ( t*(E(w_min) - E(w_max)) + E(w_max) - rf )^2 / ( t^2*(V(w_min) + V(w_max) - 2*<Sigma*w_min/w_max>) - 2*t*(V(w_max) - <Sigma*w_min/w_max>) + V(w_max) )
+	// = ( t^2*(E(w_min) - E(w_max))^2 + 2*(E(w_min) - E(w_max))*(E(w_max) - rf) + (E(w_max) - rf)^2 ) / ( t^2*(V(w_min) + V(w_max) - 2*<Sigma*w_min/w_max>) - 2*t*(V(w_max) - <Sigma*w_min/w_max>) + V(w_max) )
+	//
+	// So, maximizing SR(w) on the efficient segment is equivalent to maximizing
+	// SR(t)^2, t in [0,1].
+	//
+	// Since SR(t)^2 is a differentiable function on [0,1] and since [0,1] is a closed convex set,
+	// its maximum is either reached on its boundary (i.e., {0,1}) or on a critical interior point
+	// (i.e., a point belonging to ]0,1[ on which the derivative of SR(t)^2 vanishes).
+	//
+	// Evaluating SR(t) on each of these (at most) four points and selecting t
+	// as the value which maximizes SR(t) then allows to compute the weights 
+	// of the efficient portfolio which maximizes the Sharpe ratio on the efficient segment.
+	function computeLocalMaximumSharpeRatioEfficientPortfolio_(mu, sigma, rf, idx_min, weights_min, idx_max, weights_max) {
+		// Compute properties of the two adjacent corner portfolios
+		var sharpeRatio_min = computeSharpeRatio_(mu, sigma, rf, weights_min);
+		var sr_min = sharpeRatio_min[0];
+		var return_min = sharpeRatio_min[1];
+		var volatility_min = sharpeRatio_min[2];
+		var variance_min = volatility_min * volatility_min;
+		
+		var sharpeRatio_max = computeSharpeRatio_(mu, sigma, rf, weights_max);
+		var sr_max = sharpeRatio_max[0];
+		var return_max = sharpeRatio_max[1];
+		var volatility_max = sharpeRatio_max[2];
+		var variance_max = volatility_max * volatility_max;
+		
+		// Define the coefficients of the fractional function SR(t)^2 = ( at^2 + bt + c ) / ( dt^2 + et + f )
+		var return_min_m_max = return_min - return_max;
+		var return_max_m_rf = return_max - rf;
+		var a = return_min_m_max * return_min_m_max;
+		var b = 2 * return_min_m_max * return_max_m_rf;
+		var c = return_max_m_rf * return_max_m_rf;
+		
+		var variance_cross = Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights_min), weights_max); // <Sigma*w_min/w_max>
+		var d = variance_min + variance_max - 2 * variance_cross; // always >= 0, by semi-definite positivity of the covariance matrix
+		var e = -2 * (variance_max - variance_cross); // 
+		var f = variance_max; //always > 0
+		
+		// Define the coefficients of the second order polynomial aat^2 + bbt + cc equal to the
+		// numerator of the derivative d(SR(t)^2)/dt.
+		var aa = a*e - b*d;
+		var bb = 2*(a*f - c*d);
+		var cc = b*f - c*e;
+		
+		// Extract the roots t1 and t2 of the equation d(SR(t)^2)/dt = 0, using a stable numerical formula.
+		var bb_p = bb/2; // reduced discriminant
+		var sign_bb_p = (bb_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for bb_p == 0 this returns 1
+		var disc = bb_p*bb_p - aa*cc;
+		if (disc < 0) {
+			throw new Error('internal error, the covariance matrix might not be semi-definite positive');
+		}
+		var qq = -(bb_p + sign_bb_p * Math.sqrt(disc));
+		var t1 = qq/aa;
+		var t2 = cc/qq;
+		
+		// Compute and order the Sharpe ratios for all the efficient 
+		// portfolios with t corresponding to {0, 1, t1, t2}.
+		var candidateSharpeRatios = [[weights_min, sr_min], [weights_max, sr_max]]; // t = 0 and t = 1 portfolios are always present
+		
+		if (t1 > 0 && t1 < 1) { // t1 belongs to ]0,1[
+			var weights_t1 = Matrix_.fill(weights_min.nbRows, 1, 
+										function(i,j) { 
+											return t1*weights_min.getValue(i, 1) + (1-t1)*weights_max.getValue(i, 1); 
+										})
+			var sharpeRatio_t1 = computeSharpeRatio_(mu, sigma, rf, weights_t1);
+			var sr_t1 = sharpeRatio_t1[0];
+			
+			candidateSharpeRatios.push([weights_t1, sr_t1]);
+		}
+
+		if (t2 > 0 && t2 < 1) { // t2 belongs to ]0,1[
+			var weights_t2 = Matrix_.fill(weights_min.nbRows, 1, 
+										function(i,j) { 
+											return t2*weights_min.getValue(i, 1) + (1-t2)*weights_max.getValue(i, 1); 
+										})
+			var sharpeRatio_t2 = computeSharpeRatio_(mu, sigma, rf, weights_t2);
+			var sr_t2 = sharpeRatio_t2[0];
+
+			candidateSharpeRatios.push([weights_t2, sr_t2]);
+		}
+		
+		candidateSharpeRatios.sort(function(a, b) {
+			return b[1] - a[1];
+		});
+		
+		// Return the efficient portfolio which maximizes the Sharpe ratio
+		// on the efficient segment.
+		return candidateSharpeRatios[0]; 
+	}
+	
+	
+	// ------	
+
+	// Convert mu and sigma to matrix format
+	var mu = new Matrix_(mu);
+	var sigma = new Matrix_(sigma);
+	
+	
+	// ------
+	
+	// Initializations
+	var eps = 1e-8; // the numerical zero
+
 	
 	// Compute the corner portfolios defining the efficient frontier
 	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
 	
-	// Set the target function and function value
-	var targetFct;
-	var targetFctVal;
-	if (targetReturn !== undefined) { // the target function is the portfolio return
-		targetFct = function(weights) {
-			return Matrix_.vectorDotProduct(mu, weights);
-		};
-		targetFctVal = targetReturn;
-	}
-	else { // the target function is the portfolio volatility (i.e., standard deviation), convert it to variance
-		targetFct = function(weights) {
-			return Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights);
-		};
-		targetFctVal = targetVolatility*targetVolatility;
-	}
-
-	// Compute the (at most) two corner portfolios enclosing the efficient portfolio
-	// with a target function value equals to the desired target function value.
-	var efficientEnclosingPortfolios = computeEnclosingCornerPortfolios_(targetFct, targetFctVal, cornerPortfolios);
-
 	
-	// Then:
-	// - In case the desired target value function is not reachable, stop the process 
+	// Retrict the efficient frontier to the domain of definition
+	// of the Sharpe ratio by determining the "first" efficient portfolio 
+	// with a strictly positive volatility.
 	//
-	// - In case there is a unique computed corner portfolio with a target function value
-	// equals to the desired target function value, return the associated portfolio weights
+	// To be noted that:
+	// - In case the covariance matrix is positive definite, this is the minimum 
+	// variance portfolio, so that the efficient frontier is not altered
 	//
-	// - In case there are two corner portfolios (strictly) enclosing the efficient portfolio with 
-	// a target function value equals to the desired target function value, the weights associated
-	// to this efficient portfolio are a (strict) convex combination of the weights of the two 
-	// computed enclosing corner portfolios (c.f. the reference): w = t*w_min + (1-t)*w_max, t in ]0,1[, 
-	// with t now to be determined.
-	var weights;
-	if (efficientEnclosingPortfolios.length == 0) {
-		throw new Error('target return or volatility not reachable');
-	}
-	else if (efficientEnclosingPortfolios.length == 1) {
-		var weights_min = efficientEnclosingPortfolios[0][0];
-		weights = weights_min;		
-	}
-	else {
-		// Extract information about the computed efficient corner portfolios
-		var weights_min = efficientEnclosingPortfolios[0][0];
-		var fctVal_min = efficientEnclosingPortfolios[0][1];
+	// - In case the covariance matrix is semi-positive definite, this is an efficient
+	// portfolio located "close" to the minimum variance portfolio, because the 
+	// variance of corner portfolios is strictly increasing	
+	var idx = cornerPortfolios.length - 1;
+	var weights = cornerPortfolios[idx][0];
+	var volatility = computeVolatility_(sigma, weights);
+	if (volatility < eps) {
+		// The domain of definition of the Sharpe ratio is not the
+		// whole efficient frontier, so that the efficient frontier
+		// needs to be restricted.
 		
-		var weights_max = efficientEnclosingPortfolios[1][0];
-		var fctVal_max = efficientEnclosingPortfolios[1][1];
-		
-		// Depending on the desired target function, the procedure to compute t above is different:
-		// - If the target is return, E(w) = <mu/w> and by linearity of E, we have
-		// E(w) = t*E(w_min) + (1-t)*E(w_max) and E(w) = targetReturn
-		// <=>
-		// t = (E(w_max) - targetReturn)/(E(w_max) - E(w_min))
-		//
-		// - If the target is volatility (i.e., standard deviation), let the volatility be V(x) = <Sigma*w/w>.
-		// Then, by symmetry and bilinerarity of V, we have V(w) = t^2*V(w_min) + (1-t)^2*V(w_max) + 2*t*(1-t)*<Sigma*w_min/w_max>
-		// and V(w) = targetVolatility^2
-		//	<=> t is the solution belonging to ]0,1[ of the second order polynomial equation
-		// t^2*(V(w_min) + V(w_max) - 2*<Sigma*w_min/w_max>) -2*t*(V(w_max) - <Sigma*w_min/w_max>) + V(w_max) - targetVolatility^2 = 0
-		var t;
-		if (targetReturn !== undefined) {
-			t = (fctVal_max - targetFctVal)/(fctVal_max - fctVal_min);
+		// Compute the first efficient portfolio with a strictly positive 
+		// volatility.
+		var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(sigma, eps, cornerPortfolios);
+		if (efficientPortfolio.length == 0) {
+			throw new Error('no corner portfolio with a strictly positive volatility: the covariance matrix might not be semi-definite positive');
 		}
-		else {
-			// Define the coefficients of the second order polynomial at^2 + tx + c
-    	    var fctVal_cross = Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights_min), weights_max); // <Sigma*w_min/w_max>
-			var a = fctVal_min + fctVal_max - 2 * fctVal_cross; // always >= 0, by semi-definite positivity of the covariance matrix
-    	    var b = -2 * (fctVal_max - fctVal_cross); // 
-    	    var c = fctVal_max - targetVolatility*targetVolatility; //always > 0
-    	    
-    	    // Extract the root t of the equation at^2 + bt + c = 0 belonging to ]0,1[, using a stable numerical formula
-    	    var b_p = b/2; // reduced discriminant
-			var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
-			var disc = b_p*b_p - a*c;
-			if (disc < 0) {
-			    throw new Error('internal error, the covariance matrix might not be semi-definite positive');
-			}
-    	    var q = -(b_p + sign_b_p * Math.sqrt(disc));
-    	    var r1 = q/a;
-    	    var r2 = c/q;
+		var efficientPortfolioWeights = efficientPortfolio[0];
+		var cornerPortfolioIndexMin = efficientPortfolio[1];
 			
-			if (r1 > 0 && r1 < 1) {
-				t = r1;
-			}
-			else if (r2 > 0 && r2 < 1) {
-				t = r2;
-			}
-			else {
-				throw new Error('internal error, the covariance matrix might not be semi-definite positive');
-			}
-		}
+		// Add it as a replacement of the last corner
+		// portfolio with a volatility lower than or equal to it.
+		//
+		// A risk aversion parameter of -1 is set so that subsequent processes 
+		// can distinguish between an original corner portfolio and a 
+		// replacement corner portfolio.
+		cornerPortfolios[cornerPortfolioIndexMin] = [efficientPortfolioWeights, -1];
 		
-		// Compute the final efficient portfolio weights
-		weights = Matrix_.fill(nbAssets, 1, 
-								function(i,j) { 
-									return t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1); 
-								})
+		// Remove the corner portfolios with a volatility strictly lower than
+		// the it.
+		cornerPortfolios.length = cornerPortfolioIndexMin + 1;
+	}
+
+	
+	// Further retrict the efficient frontier to the domain of strict positivity
+	// of the Sharpe ratio.
+	//
+	// To be noted that the domain of strict positivity of the Sharpe ratio
+	// can be empty in case there is no feasible portfolio on the efficient
+	// frontier with a strictly positive excess return.
+	var idx = cornerPortfolios.length - 1;
+	var weights = cornerPortfolios[idx][0];
+	var ret = computeReturn_(mu, weights);
+	if (ret < rf + eps) {
+		// The domain of strict positivity of the Sharpe ratio is not the
+		// whole efficient frontier, so that the efficient frontier
+		// needs to be restricted.
+		
+		// Compute the first efficient portfolio with a strictly positive 
+		// excess return.
+		var efficientPortfolio = computeTargetReturnEfficientPortfolio_(mu, rf + eps, cornerPortfolios);
+		if (efficientPortfolio.length == 0) {
+			throw new Error('no corner portfolio with a strictly positive excess return');
+		}
+		var efficientPortfolioWeights = efficientPortfolio[0];
+		var cornerPortfolioIndexMin = efficientPortfolio[1];
+		
+		// Add it as a replacement of the last corner
+		// portfolio with an excess return lower than or equal to it.
+		//
+		// A risk aversion parameter of -1 is set so that subsequent processes 
+		// can distinguish between an original corner portfolio and a 
+		// replacement corner portfolio.
+		cornerPortfolios[cornerPortfolioIndexMin] = [efficientPortfolioWeights, -1];
+		
+		// Remove the corner portfolios with an excess return strictly lower than it.
+		cornerPortfolios.length = cornerPortfolioIndexMin + 1;
+	}
+
+
+	// On the retricted efficient frontier, the Sharpe ratio is a pseudo-concave 
+	// function, c.f. the reference, so that it is strictly unimodal.
+	//
+	// This property allows to search for the corner portfolio with the maximum
+	// Sharpe ratio using a binary search algorithm.
+	var cornerPortfolio = computeMaximumSharpeRatioCornerPortfolio_(mu, sigma, rf, cornerPortfolios);
+	var idx_middle = cornerPortfolio[0];
+	var weights_middle = cornerPortfolio[1];
+	var sr_middle = cornerPortfolio[2][0];
+	
+
+	// The corner portfolio with the maximum Sharpe ratio is adjacent to at most
+	// two other corner portfolios, depending on its position on the efficient
+	// frontier:
+	// - Unique portfolio => zero adjacent corner portfolio
+	// - Non unique leftmost or rightmost corner portfolio => one adjacent corner portfolio
+	// - Non unique any other corner portfolio => two adjacent corner portfolios
+	//
+	// In the first case, the efficient portfolio with the maximum Sharpe ratio
+	// is the same as the corner portfolio with the maximum Sharpe ratio
+	//
+	// In the last two cases, because of the strict unimodality of the Sharpe ratio
+	// on the restricted efficient frontier, the efficient portfolio with the maximum
+	// Sharpe ratio is guaranteed to belong to the efficient segment(s) connecting
+	// the corner portfolio with the maximum Sharpe ratio to its adjacent corner
+	// portfolio(s).
+	//
+	// So, computing the efficient portfolio with the maximum Sharpe ratio is equivalent
+	// to computing the efficient portfolio with the maximum Sharpe ratio on the efficient
+	// segment(s) connecting the corner portfolio with the maximum Sharpe ratio
+	// to its adjacent corner portfolio(s).
+	
+	// Add the corner portfolio with the maximum Sharpe ratio as a candidate 
+	// for being the efficient portfolio with the maximum Sharpe ratio.
+	var candidateSharpeRatios = [[weights_middle, sr_middle]];
+	
+	// Compute the efficient portfolio maximizing the Sharpe ratio
+	// on the efficient segment [idx_middle+1, idx_middle], if existing.
+	var idx_min = idx_middle + 1;
+	if (idx_min <= cornerPortfolios.length - 1) {
+		var weights_min = cornerPortfolios[idx_min][0];
+		
+		var weights_min_middle = computeLocalMaximumSharpeRatioEfficientPortfolio_(mu, sigma, rf, 
+		                                                                           idx_min, weights_min, 
+																			       idx_middle, weights_middle);
+		candidateSharpeRatios.push(weights_min_middle);
 	}
 	
+	// Compute the efficient portfolio maximizing the Sharpe ratio
+	// on the efficient segment [idx_middle, idx_middle-1], if existing.	
+	var idx_max = idx_middle - 1;
+	if (idx_max >= 0) {
+		var weights_max = cornerPortfolios[idx_max][0];
+		
+		var weights_middle_max = computeLocalMaximumSharpeRatioEfficientPortfolio_(mu, sigma, rf, 
+		                                                                           idx_middle, weights_middle, 
+																			       idx_max, weights_max);
+        candidateSharpeRatios.push(weights_middle_max);
+	}
+	
+	// Compute the efficient portfolio maximizing the Sharpe ratio
+	// by merging the efficient portfolios locally maximizing
+	// the Sharpe ratio on each efficient segment.
+	candidateSharpeRatios.sort(function(a, b) {  // descending order
+		return b[1] - a[1];
+	});
+	var weights = candidateSharpeRatios[0][0]; // candidateSharpeRatios[0] is the portfolio with the highest global Sharpe ratio
+
+
 	// Return the computed portfolio weights
 	return weights.toArray();
 }
@@ -7574,16 +7851,12 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * @description This function returns the weights w_i1,...,w_in, the returns r_i and the volatilities
 * std_i, with i = 1..nbPortfolios, associated to nbPortfolios fully invested and long-only portfolios 
 * of n assets belonging to the mean-variance efficient frontier, ordered from the lowest return/volatility
-* portfolio to the highest return/volatility portfolio..
+* portfolio to the highest return/volatility portfolio.
 *
-* The algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
+* The main algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
 *
 * The algorithm used internally generates the portfolios uniformly on the efficient frontier with
-* regard to the risk aversion parameter interval of variation, unless the portfolios to be computed
-* are the corner portfolios.
-*
-* To be noted that the portfolio volatility is defined as the standard deviation of the portfolio
-* variance.
+* regard to the interval of variation of the risk aversion parameter.
 *
 * @see Harry M. Markowitz, Mean-Variance Analysis in Portfolio Choice and Capital Markets, Revised issue (2000), McGraw-Hill Professional;
 *
@@ -7594,7 +7867,10 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
 * @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
-* @return {Array<Array.<number>} the weights of all the corner portfolios, an array of arrays of n real numbers
+* @return {Array.<Array.<Object>>} the weights, returns and volatilities of the computed efficient portfolios, an array of nbPortfolios arrays of three elements:
+* - arr[0..nbPortfolios-1][0], the weights corresponding to an efficient portfolio, an array of n real numbers
+* - arr[0..nbPortfolios-1][1], the return of the efficient portfolio, a real number
+* - arr[0..nbPortfolios-1][2], the volatility of the efficient portfolio, a real number
 *
 * @example
 * meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1, 0.3], [0.3, 1]], {nbPortfolios: 5})
@@ -7640,7 +7916,7 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 			var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, portfolioWeights), 
 																	     portfolioWeights));
 			
-			return [portfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
+			return [[portfolioWeights.toArray(), portfolioReturn, portfolioVolatility]];
 		}
 	}
 	else { // cornerPortfolios.length >= 2
@@ -7748,7 +8024,6 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 }
 
 
-
 /**
 * @function meanVarianceCornerPortfolios
 *
@@ -7761,9 +8036,6 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 * portfolio to the highest return/volatility portfolio.
 *
 * The algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
-*
-* To be noted that the portfolio volatility is defined as the standard deviation of the portfolio
-* variance.
 *
 * @see Harry M. Markowitz, Mean-Variance Analysis in Portfolio Choice and Capital Markets, Revised issue (2000), McGraw-Hill Professional;
 *
@@ -7809,6 +8081,352 @@ self.meanVarianceCornerPortfolios = function(mu, sigma, opt) {
 }
 
 
+
+/**
+* @function computeTargetReturnEfficientPortfolio_
+*
+* @summary Compute the weights of an efficient mean-variance portfolio subject to a target return
+* constraint, as well as the index(es) of its enclosing corner portfolio(s) on the efficient frontier.
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and 
+* long-only mean-variance efficient portfolio of n assets subject to a target return constraint, 
+* as well as the index(es) of its enclosing corner portfolio(s) on the efficient frontier.
+*
+* The main algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
+*
+* @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
+*
+* @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
+* @param {number} targetReturn the desired return of the portfolio, a real number.
+* @param {Array.<Array.<Object>>} cornerPortfolios the corner portfolios defining the mean-variance efficient frontier, an array of m arrays of 2 elements:
+* - cornerPortfolios[0..m-1][0], the weights corresponding to the corner portfolio, an array of n real numbers
+* - cornerPortfolios[0..m-1][1], the risk aversion parameter associated to the corner portfolio, a positive real number
+* @return {Array.<Object>} an array arr of either two or three elements:
+* - arr[0][0], the weights of the efficient portfolio with the desired return, an array of n real numbers
+* - arr[0][1], the index of the corner portfolio with a return equal to (in case arr is made of two elements) or strictly lower than (in case arr is made of three elements)
+* the return of the efficient portfolio, a natural integer
+* - arr[0][2], the index of the corner portfolio with a return strictly greater than the return of the efficient portfolio (only in case arr is made of three elements), a natural integer
+*/
+function computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfolios) {
+	// Internal functon to compute the return of a portfolio
+	function computeReturn_(mu, weights) {
+		return  Matrix_.vectorDotProduct(mu, weights);
+	}
+
+	// Internal function to compute the (at most) two corner portfolios strictly enclosing the
+	// efficient portfolio with a target return, using a binary search algorithm.
+	//
+	// The usage of a binary search algorithm is justified because the corner portfolios
+	// return is strictly decreasing as soon as there are at least two corner
+	// portfolios on the efficient frontier.
+	function computeEnclosingCornerPortfolios_(targetReturn, mu, cornerPortfolios) {
+		// The numerical accuracy for testing equality
+		var eps = 1e-8;
+		
+		// The efficient frontier portfolios are provided from highest return
+		// to lowest return, so that *_min below refers to properties of the portfolio
+		// with the lowest return.
+		var idx_min = cornerPortfolios.length - 1;
+		var idx_max = 0
+
+		var weights_min = cornerPortfolios[idx_min][0];
+		var weights_max = cornerPortfolios[idx_max][0];
+
+		var return_min = computeReturn_(mu, weights_min);
+		var return_max = computeReturn_(mu, weights_max);
+
+		// If the target return is not reachable within numerical accuracy, 
+		// return immediately.
+		if (targetReturn - return_max > eps || -eps > targetReturn - return_min) {
+			return [];
+		}
+		
+		// If the target return is numerically reached on one of the
+		// two extremal corner portfolios, return immediately.
+		if (Math.abs(targetReturn - return_min) <= eps) {
+			return [[idx_min, weights_min, return_min]];
+		}
+		else if (Math.abs(targetReturn - return_max) <= eps) {
+			return [[idx_max, weights_max, return_max]];
+		}
+		
+		// Otherwise, determine the two adjacent corner portfolios strictly enclosing the portfolio
+		// with a return numerically equals to the target return, using a binary search algorithm.
+		while (idx_min - idx_max != 1) { 
+			// Compute properties on the middle point
+			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // formula avoiding numerical overflow
+			var weights_middle = cornerPortfolios[idx_middle][0];
+			var return_middle = computeReturn_(mu, weights_middle);
+			
+			// Determine in which sub-interval ]idx_max, idx_middle[ or ]idx_middle, idx_min[
+			// lies the portfolio with the target return.
+			if (return_middle - targetReturn > eps) {
+				idx_max = idx_middle;
+				return_max = return_middle;
+				weights_max = weights_middle;
+			}
+			else if (return_middle - targetReturn < -eps) {
+				idx_min = idx_middle;
+				return_min = return_middle;
+				weights_min = weights_middle;
+			}
+			else { // the target return is exactly attained on the idx_middle-th corner portfolio
+				return [[idx_middle, weights_middle, return_middle]];
+			}
+		}
+
+		
+		// Return the computed adjacent corner portfolios, as well as
+		// the associated function values.
+		return [[idx_min, weights_min, return_min], [idx_max, weights_max, return_max]];
+	}
+	
+	
+	// ------	
+
+	
+	// Compute the (at most) two corner portfolios strictly enclosing the efficient 
+	// portfolio with a return equals to the target return.
+	var enclosingCornerPortfolios = computeEnclosingCornerPortfolios_(targetReturn, mu, cornerPortfolios);
+
+	
+	// Then:
+	// - In case the desired target return is not reachable, return an empty portfolio 
+	//
+	// - In case there is a unique computed corner portfolio with a return
+	// equals to the target return, return the associated portfolio weights
+	//
+	// - In case there are two corner portfolios strictly enclosing the efficient portfolio with 
+	// a return equals to the target return, the weights associated to this efficient portfolio are
+	// a (strict) convex combination of the weights of the two computed enclosing corner portfolios
+	// (c.f. the reference): w = t*w_min + (1-t)*w_max, t in ]0,1[, with t now to be determined.
+	if (enclosingCornerPortfolios.length == 0) {
+		return [];
+	}
+	else if (enclosingCornerPortfolios.length == 1) {
+		var idx_min = enclosingCornerPortfolios[0][0];
+		var weights = enclosingCornerPortfolios[0][1];
+		
+		// Return the computed portfolio weights
+		return [weights, idx_min];
+	}
+	else {
+		// Extract information about the computed efficient corner portfolios
+		var idx_min = enclosingCornerPortfolios[0][0];
+		var weights_min = enclosingCornerPortfolios[0][1];
+		var return_min = enclosingCornerPortfolios[0][2];
+		
+		var idx_max = enclosingCornerPortfolios[1][0];
+		var weights_max = enclosingCornerPortfolios[1][1];
+		var return_max = enclosingCornerPortfolios[1][2];
+		
+		// The procedure to compute t above is the following:
+		// E(w) = <mu/w> and by linearity of E, we have
+		// E(w) = t*E(w_min) + (1-t)*E(w_max) and E(w) = targetReturn
+		// <=>
+		// t = (E(w_max) - targetReturn)/(E(w_max) - E(w_min))
+		var t = (return_max - targetReturn)/(return_max - return_min);
+
+		// Compute the final efficient portfolio weights
+		var weights = Matrix_.fill(weights_min.nbRows, 1, 
+							   	   function(i,j) { 
+									   return t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1); 
+								   });
+		
+		// Return the computed portfolio weights
+		return [weights, idx_min, idx_max];
+	}
+}
+
+
+
+/**
+* @function computeTargetVolatilityEfficientPortfolio_
+*
+* @summary Compute the weights of an efficient mean-variance portfolio subject to a target volatility
+* constraint, as well as the index(es) of its enclosing corner portfolio(s) on the efficient frontier.
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and 
+* long-only mean-variance efficient portfolio of n assets subject to a target volatility constraint, 
+* as well as the index(es) of its enclosing corner portfolio(s) on the efficient frontier.
+*
+* The main algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
+*
+* @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
+*
+* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {number} targetVolatility the desired volatility of the portfolio, a positive real number.
+* @param {Array.<Array.<Object>>} cornerPortfolios the corner portfolios defining the mean-variance efficient frontier, an array of m arrays of 2 elements:
+* - cornerPortfolios[0..m-1][0], the weights corresponding to the corner portfolio, an array of n real numbers
+* - cornerPortfolios[0..m-1][1], the risk aversion parameter associated to the corner portfolio, a positive real number
+* @return {Array.<Object>} an array arr of either two or three elements:
+* - arr[0][0], the weights of the efficient portfolio with the desired volatility, an array of n real numbers
+* - arr[0][1], the index of the corner portfolio with a volatility equal to (in case arr is made of two elements) or strictly lower than (in case arr is made of three elements)
+* the volatility of the efficient portfolio, a natural integer
+* - arr[0][2], the index of the corner portfolio with a volatility strictly greater than the volatility of the efficient portfolio (only in case arr is made of three elements), a natural integer
+*/
+function computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cornerPortfolios) {
+	// Internal functon to compute the volatility of a portfolio
+	function computeVolatility_(sigma, weights) {
+		return Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights));
+	}
+	
+	// Internal function to compute the (at most) two corner portfolios strictly enclosing the
+	// efficient portfolio with a target volatility, using a binary search algorithm.
+	//
+	// The usage of a binary search algorithm is justified because the corner portfolios
+	// volatility is strictly decreasing as soon as there are at least two corner
+	// portfolios on the efficient frontier.
+	function computeEnclosingCornerPortfolios_(targetVolatility, sigma, cornerPortfolios) {
+		// The numerical accuracy for testing equality
+		var eps = 1e-8;
+		
+		// The efficient frontier portfolios are provided from highest volatility
+		// to lowest volatility, so that *_min below refers to properties of the portfolio
+		// with the lowest volatility.
+		var idx_min = cornerPortfolios.length - 1;
+		var idx_max = 0
+
+		var weights_min = cornerPortfolios[idx_min][0];
+		var weights_max = cornerPortfolios[idx_max][0];
+
+		var volatility_min = computeVolatility_(sigma, weights_min);
+		var volatility_max = computeVolatility_(sigma, weights_max);
+
+		// If the target volatility is not reachable within numerical accuracy, 
+		// return immediately.
+		if (targetVolatility - volatility_max > eps || -eps > targetVolatility - volatility_min) {
+			return [];
+		}
+		
+		// If the target volatility is numerically reached on one of the
+		// two extremal corner portfolios, return immediately.
+		if (Math.abs(targetVolatility - volatility_min) <= eps) {
+			return [[idx_min, weights_min, volatility_min]];
+		}
+		else if (Math.abs(targetVolatility - volatility_max) <= eps) {
+			return [[idx_max, weights_max, volatility_max]];
+		}
+		
+		// Otherwise, determine the two adjacent corner portfolios strictly enclosing the portfolio
+		// with a volatility numerically equals to the target volatility, using a binary search algorithm.
+		while (idx_min - idx_max != 1) { 
+			// Compute properties on the middle point
+			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // formula avoiding numerical overflow
+			var weights_middle = cornerPortfolios[idx_middle][0];
+			var volatility_middle = computeVolatility_(sigma, weights_middle);
+			
+			// Determine in which sub-interval ]idx_max, idx_middle[ or ]idx_middle, idx_min[
+			// lies the portfolio with the target volatility.
+			if (volatility_middle - targetVolatility > eps) {
+				idx_max = idx_middle;
+				volatility_max = volatility_middle;
+				weights_max = weights_middle;
+			}
+			else if (volatility_middle - targetVolatility < -eps) {
+				idx_min = idx_middle;
+				volatility_min = volatility_middle;
+				weights_min = weights_middle;
+			}
+			else { // the target volatility is exactly attained on the idx_middle-th corner portfolio
+				return [[idx_middle, weights_middle, volatility_middle]];
+			}
+		}
+
+		
+		// Return the computed adjacent corner portfolios, as well as
+		// the associated function values.
+		return [[idx_min, weights_min, volatility_min], [idx_max, weights_max, volatility_max]];
+	}
+	
+	
+	// ------	
+
+	
+	// Compute the (at most) two corner portfolios strictly enclosing the efficient 
+	// portfolio with a volatility equals to the target volatility.
+	var enclosingCornerPortfolios = computeEnclosingCornerPortfolios_(targetVolatility, sigma, cornerPortfolios);
+
+	
+	// Then:
+	// - In case the desired target volatility is not reachable, return an empty portfolio 
+	//
+	// - In case there is a unique computed corner portfolio with a volatility
+	// equals to the target volatility, return the associated portfolio weights
+	//
+	// - In case there are two corner portfolios strictly enclosing the efficient portfolio with 
+	// a volatility equals to the target volatility, the weights associated to this efficient portfolio are
+	// a strict convex combination of the weights of the two computed enclosing corner portfolios
+	// (c.f. the reference): w = t*w_min + (1-t)*w_max, t in ]0,1[, with t now to be determined.
+	if (enclosingCornerPortfolios.length == 0) {
+		return [];
+	}
+	else if (enclosingCornerPortfolios.length == 1) {
+		var idx_min = enclosingCornerPortfolios[0][0];
+		var weights = enclosingCornerPortfolios[0][1];
+		
+		// Return the computed portfolio weights
+		return [weights, idx_min];
+	}
+	else {
+		// Extract information about the computed efficient corner portfolios
+		var idx_min = enclosingCornerPortfolios[0][0];
+		var weights_min = enclosingCornerPortfolios[0][1];
+		var volatility_min = enclosingCornerPortfolios[0][2];
+		var variance_min = volatility_min * volatility_min;
+		
+		var idx_max = enclosingCornerPortfolios[1][0];
+		var weights_max = enclosingCornerPortfolios[1][1];
+		var volatility_max = enclosingCornerPortfolios[1][2];
+		var variance_max = volatility_max * volatility_max;
+		
+		// The procedure to compute t above is the following:
+		// Let the volatility be V(w) = <Sigma*w/w>.
+		// Then, by symmetry and bilinerarity of V, we have V(w) = t^2*V(w_min) + (1-t)^2*V(w_max) + 2*t*(1-t)*<Sigma*w_min/w_max>
+		// and V(w) = targetVolatility^2
+		// <=> t is the solution belonging to ]0,1[ of the second order polynomial equation
+		// t^2*(V(w_min) + V(w_max) - 2*<Sigma*w_min/w_max>) -2*t*(V(w_max) - <Sigma*w_min/w_max>) + V(w_max) - targetVolatility^2 = 0
+		
+		// Define the coefficients of the second order polynomial at^2 + bt + c
+		var variance_cross = Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights_min), weights_max); // <Sigma*w_min/w_max>
+		var a = variance_min + variance_max - 2 * variance_cross; // always >= 0, by semi-definite positivity of the covariance matrix
+		var b = -2 * (variance_max - variance_cross); // 
+		var c = variance_max - targetVolatility*targetVolatility; //always > 0
+		
+		// Extract the root t of the equation at^2 + bt + c = 0 belonging to ]0,1[, using a stable numerical formula
+		var b_p = b/2; // reduced discriminant
+		var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
+		var disc = b_p*b_p - a*c;
+		if (disc < 0) {
+			throw new Error('internal error, the covariance matrix might not be semi-definite positive');
+		}
+		var q = -(b_p + sign_b_p * Math.sqrt(disc));
+		var r1 = q/a;
+		var r2 = c/q;
+		
+		var t;
+		if (r1 > 0 && r1 < 1) {
+			t = r1;
+		}
+		else if (r2 > 0 && r2 < 1) {
+			t = r2;
+		}
+		else {
+			throw new Error('internal error, the covariance matrix might not be semi-definite positive');
+		}
+
+		// Compute the final efficient portfolio weights
+		var weights = Matrix_.fill(weights_min.nbRows, 1, 
+							   	   function(i,j) { 
+									   return t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1); 
+								   });
+		
+		// Return the computed portfolio weights
+		return [weights, idx_min, idx_max];
+	}
+}
+
+
 /**
 * @function computeCornerPortfolios_
 *
@@ -7838,7 +8456,7 @@ self.meanVarianceCornerPortfolios = function(mu, sigma, opt) {
 * // [[new Matrix_([0, 1]), 7], [new Matrix_([0.5, 0.5]), 0]] 
 */
 function computeCornerPortfolios_(mu, sigma, opt) {	
-	// The numerical tolerance for testing equality
+	// The numerical zero
 	var eps = 1e-8; 
 	
 	// Internal object managing the statuses of the asset and lambda variables

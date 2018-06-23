@@ -1,6 +1,7 @@
 ### 0.0.7 - XX/YY/2018
 - Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities.
-- Introduced the meanVarianceCornerPortfolios to compute the corner portfolios with their returns and volatilities.
+- Added the meanVarianceCornerPortfolios to compute the corner portfolios with their returns and volatilities.
+- Added the computation of the maximum Sharpe ratio portfolio, through the efficient frontier computation.
 
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights
@@ -32,13 +33,11 @@
 - New portfolio allocation method: Cluster Risk Parity, with a included clustering method: Fast Threshold Clustering Algorithm
 
 ### 0.0.2 - 24/06/2017
-
 - New portfolio allocation methods: most diversified portfolio, minimum correlation portfolio, proportional minimum variance portfolio
 - Included a covariance computation function using a corrected two pass formula
 - New Matrix/Vector operations, plus code refactoring for future split
 
 ### 0.0.1 - 09/06/2017
-
 - Initial commit
 - Four portfolio allocation methods supported: equal weights, equal risk budget, equal risk contributions, risk budgeting
 - Several Matrix/Vector basic operations implemented to support above algorithms

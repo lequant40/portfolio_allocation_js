@@ -1054,14 +1054,14 @@ QUnit.test('Mean variance portfolio - target return weights portfolio', function
 		var unreachableMaxReturn = maxReturn + (1 - Math.random()); // > maxReturn
 		assert.throws(function() { 
 		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {targetReturn: unreachableMaxReturn}}) },
-			new Error('target return or volatility not reachable'),
+			new Error('target return not reachable'),
 			"Mean variance portfolio - Target return weights portfolio, unreachable target return #1");
 			
 		var minReturn = returns[0];
 		var unreachableMinReturn = minReturn - (1 - Math.random()); // < minReturn
 		assert.throws(function() { 
 		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {targetReturn: unreachableMinReturn}}) },
-			new Error('target return or volatility not reachable'),
+			new Error('target return not reachable'),
 			"Mean variance portfolio - Target return weights portfolio, unreachable target return #2");
 	}
 	
@@ -1139,14 +1139,14 @@ QUnit.test('Mean variance portfolio - target volatility weights portfolio', func
 			var unreachableMaxVolatility = generateRandomValue(maxVolatility - 1e-6, 2 * maxVolatility); // > maxVolatility
 			assert.throws(function() { 
 			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {targetVolatility: unreachableMaxVolatility}}) },
-				new Error('target return or volatility not reachable'),
+				new Error('target volatility not reachable'),
 				"Mean variance portfolio - Target volatility weights portfolio, unreachable target volatility #1 - " + k + "/" + nbSamples);
 		
 			var minVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
 			var unreachableMinVolatility = generateRandomValue(0, minVolatility - 1e-6); // < minVolatility
 			assert.throws(function() { 
 			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {targetVolatility: unreachableMinVolatility}}) },
-				new Error('target return or volatility not reachable'),
+				new Error('target volatility not reachable'),
 				"Mean variance portfolio - Target volatility weights portfolio, unreachable target volatility #2 - " + k + "/" + nbSamples);
 		}
 	}
@@ -1172,6 +1172,216 @@ QUnit.test('Mean variance portfolio - target volatility weights portfolio', func
 		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - target volatility weights portfolio #1');
 	}
 });	
+
+
+QUnit.test('Mean variance portfolio - efficient portfolios computation', function(assert) {    
+	// Test using static data
+	// Test the limit case of only one corner portfolio
+	{
+		// Lower bounds binding (sum lb_i == 1)
+		assert.throws(function() { 
+			PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.6]} }) },
+			new Error('efficient frontier made of only one corner portfolio: only one efficient portfolio can be computed'),
+			"Mean variance portfolio - Efficient portfolios, lower bounds binding KO");
+			
+		var efficientPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { nbPortfolios: 1, constraints: {minWeights: [0.4, 0.6]} });
+		assert.deepEqual(efficientPortfolios, [[[0.4, 0.6],  0.16, 0.7211102550927979]], 'Mean variance portfolio - Efficient portfolios, lower bounds binding OK');
+	}
+
+	// Test using static data
+	// Test the limit case of only one efficient portfolio to be computed
+	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII "The computing procedure"
+	{
+		var covMat = [[0.0146, 0.0187, 0.0145],
+					 [0.0187, 0.0854, 0.0104],
+					  [0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		assert.throws(function() { 
+			PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { nbPortfolios: 1 }) },
+			new Error('efficient frontier made of several corner portfolios: at least two efficient portfolios must be computed'),
+			"Mean variance portfolio - Efficient portfolios, one efficient portfolio KO");
+	}
+	
+	// Test using static data
+	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII "The computing procedure"
+	{		
+		var covMat = [[0.0146, 0.0187, 0.0145],
+					 [0.0187, 0.0854, 0.0104],
+					  [0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		// Test that by default, 100 efficient portfolios are computed
+		var efficientPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat);
+		assert.equal(efficientPortfolios.length, 100, 'Mean variance portfolio - Efficient portfolios, default number of efficient portfolios computed');
+		
+		// Test a small number of efficient portfolios
+		var expectedEfficientPortfolios = [[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482], 
+											 [[0, 0.39839572192513373, 0.6016042780748663], 0.1351711229946524, 0.1702926860745384], 
+											 [[0, 0.5989304812834225, 0.4010695187165775], 0.13878074866310158, 0.20069797992103716], 
+											 [[0, 0.7994652406417113, 0.20053475935828874], 0.1423903743315508, 0.24306339262469084], 
+											 [[0, 1, 0], 0.146, 0.29223278392404917]];
+										
+		var efficientPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { nbPortfolios: 5 });
+		assert.deepEqual(efficientPortfolios, expectedEfficientPortfolios, 'Mean variance portfolio - Efficient portfolios #1');
+	}
+});
+
+
+QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', function(assert) {    
+	// Test using static data
+	// Reference: An Open-Source Implementation of the Critical-Line Algorithm for Portfolio Optimization, David H. Bailey and Marcos Lopez de Prado
+	{
+		// Note: this portfolio has a Sharpe ratio of ~4.4535(3...), with a null risk free rate, which
+		// is exactly the same value as in the reference.
+		var expectedWeights = [0.08397318948217423, 0.04890598613711377, 0, 0.21830925954049477, 0.0016773041709357821,
+							   0.18120064671441183, 0, 0.031183038765169507, 0.007859012532850177, 0.42689156265685];
+										
+		var covMat = [[0.40755159,0.03175842,0.05183923,0.05663904,0.0330226,0.00827775,0.02165938,0.01332419,0.0343476,0.02249903],
+					[0.03175842,0.9063047,0.03136385,0.02687256,0.01917172,0.00934384,0.02495043,0.00761036,0.02874874,0.01336866],
+					[0.05183923,0.03136385,0.19490901,0.04408485,0.03006772,0.01322738,0.03525971,0.0115493,0.0427563,0.02057303],
+					[0.05663904,0.02687256,0.04408485,0.19528471,0.02777345,0.00526665,0.01375808,0.00780878,0.02914176,0.01640377],
+					[0.0330226,0.01917172,0.03006772,0.02777345,0.34059105,0.00777055,0.02067844,0.00736409,0.02542657,0.01284075],
+					[0.00827775,0.00934384,0.01322738,0.00526665,0.00777055,0.15983874,0.02105575,0.00518686,0.01723737,0.00723779],
+					[0.02165938,0.02495043,0.03525971,0.01375808,0.02067844,0.02105575,0.68056711,0.01377882,0.04627027,0.01926088],
+					[0.01332419,0.00761036,0.0115493,0.00780878,0.00736409,0.00518686,0.01377882,0.95526918,0.0106553,0.00760955],
+					[0.0343476,0.02874874,0.0427563,0.02914176,0.02542657,0.01723737,0.04627027,0.0106553,0.31681584,0.01854318],
+					[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]];
+		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
+		var rf = 0;
+		
+		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #1');
+	}
+	
+	// Test using static data
+	// Reference: Optimal Portfolio Selection Without Short Sales Under the Full-Information Covariance Structure: A Pedagogic Consideration, Clarence C. Y. Kwan and Yufei Yuan
+	{
+		var expectedRoundedWeights = [0.3318, 0, 0.2443, 0, 0.4239, 0];
+
+		// Note: the covariance matrix below is the result of Diag(STD)*CORR*Diag(STD), because
+		// the covariance matrix as displayed in the reference has some digits truncated.
+		var covMat = [[0.010, 0.010, -0.0018, 0.0024, 0.0016, 0.0048],
+		              [0.010, 0.0625, 0.0135, 0.009, 0.002, 0.008],
+					  [-0.0018, 0.0135, 0.0324, 0.00432, -0.00288, 0.00864],
+					  [0.0024, 0.009, 0.00432, 0.0144, 0.0096, 0.00192],
+					  [0.0016, 0.002, -0.00288, 0.0096, 0.0064, 0.00256],
+					  [0.0048, 0.008, 0.00864, 0.00192, 0.00256, 0.0256]];
+		var returns = [0.15, 0.18, 0.20, 0.11, 0.13, 0.12];
+		var rf = 0.08;
+		
+		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		maxSharpeRatioPortfolioWeights = PortfolioAllocation.roundedWeights(maxSharpeRatioPortfolioWeights, 10000);
+		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedRoundedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #2');
+	}
+	
+	// Test using static data
+	// Reference: Maximizing the Sharpe Ratio and Information Ratio in the Barra Optimizer, Leonid Kopman, Scott Liu
+	{
+		var expectedRoundedWeights = [0.2727, 0.7273];
+		
+		var covMat = [[0.05, 0.02],
+		              [0.02, 0.07]];
+		var returns = [0.05, 0.1];
+		var rf = 0;
+		
+		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		maxSharpeRatioPortfolioWeights = PortfolioAllocation.roundedWeights(maxSharpeRatioPortfolioWeights, 10000);
+		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedRoundedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #3');
+	}
+
+	// Test using static data
+	// Reference: Optimal mean-variance portfolio selection using Cauchy–Schwarz maximization, Hsin-Hung Chen, Hsien-Tang Tsai, Dennis K. J. Lin
+	{
+		// Note: the weights in the reference do not sum to 1 (they sum to 0.999)
+		//
+		// Note 2: the weights in the reference do not reach the maximum Sharpe ratio, 
+		// because they reach ~0.743369... compared to ~0.743391... for the computed weights
+		// below, plus there is a mismatch between the computed Sharpe ratio and the 
+		// Sharpe ratio provided in the reference.
+		//
+		// Most probably, this is due to truncated numerical data displayed in the reference
+		// v.s. non truncated data used by the researchers in their algorithm.
+		
+		//var referenceRoundedWeights = [0, 0.1355, 0, 0.5153, 0.2292, 0.119];
+		var expectedRoundedWeights = [0, 0.1355, 0, 0.5153, 0.2290, 0.1202];
+		
+		/* The covariance matrix below has been obtained through Diag(STD)*CORR*Diag(STD)
+		var stdDev = [0.2929, 0.3252, 0.3278, 0.2555, 0.3943, 0.5698];
+		var corrMat = [[1.0000, 0.1484, 0.3076, 0.3685, 0.4482, 0.3802],
+		              [0.1484, 1.0000, 0.0382, -0.1451, 0.2714, 0.1025],
+					  [0.3076, 0.0382, 1.0000, 0.2990, 0.3634, 0.4388],
+					  [0.3685, -0.1451, 0.2990, 1.0000, 0.2756, 0.2796],
+					  [0.4482, 0.2714, 0.3634, 0.2756, 1.0000, 0.7542],
+					  [0.3802, 0.1025, 0.4388, 0.2796, 0.7542, 1.0000]];
+		*/
+		var covMat = [[0.08579041, 0.014135260272, 0.029533481911999993, 0.027577047575, 0.05176282865399999, 0.06345325848399999 ],
+						[0.014135260271999999, 0.10575504, 0.004072141391999999, -0.01205615586, 0.034800634104, 0.018993143399999995 ],
+						[0.029533481911999997, 0.004072141392, 0.10745284, 0.0250421171, 0.046970009635999996, 0.081959257072 ],
+						[0.027577047575000003, -0.01205615586, 0.0250421171, 0.06528025, 0.02776494994, 0.04070525844 ],
+						[0.051762828654, 0.03480063410399999, 0.046970009635999996, 0.027764949940000002, 0.15547249, 0.16944772798799998 ],
+						[0.06345325848399999, 0.018993143399999995, 0.081959257072, 0.04070525844, 0.16944772798799998, 0.32467204 ]];
+		var returns = [0.0912, 0.1087, 0.1283, 0.1882, 0.2896, 0.3739];
+		var rf = 0.05;
+		
+		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		maxSharpeRatioPortfolioWeights = PortfolioAllocation.roundedWeights(maxSharpeRatioPortfolioWeights, 10000);
+		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedRoundedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #4');
+	}
+	
+	// Test using static data
+	// Test the case of a positive semi-definite covariance matrix with a 0 volatility point, as well as a 0 return point, on the efficient frontier
+	// The result has been validated with a grid search
+	// Reference: Portfolio Selection, H. Markowitz example, chapter II "Illustrative portfolio analyses"
+	{		
+		var expectedWeights = [0, 0, 0.16171761768982862, 0.0316824768157338, 0.1179234805759474, 0, 0.6886764249184905, 0, 0, 0];
+		
+		var covMat = [[0.05338816358,0.02149069753,0.02865533642,0.04896485802,0.01624895062,0.03223945062,0.02425553395,0.03999812963,0.0361509784, 0],
+					[0.02149069753,0.01468446914,0.01878391358,0.02441658642,0.008041938272,0.01002193827,0.01448993827,0.02536259259,0.02083593827, 0],
+					[0.02865533642,0.01878391358,0.08550016358,0.06260714198,0.04439938272,0.01328671605,0.01043991049,0.06864603704,0.0420215216, 0],
+					[0.04896485802,0.02441658642,0.06260714198,0.09546446914,0.05153806173,0.02902461728,0.02077028395,0.09002012963,0.03664589506, 0],
+					[0.01624895062,0.008041938272,0.04439938272,0.05153806173,0.1278900988,0.0128384321,0.02091715432,0.1015344074,0.04497232099, 0],
+					[0.03223945062,0.01002193827,0.01328671605,0.02902461728,0.0128384321,0.04125832099,0.01127854321,0.02960762963,0.02165332099, 0],
+					[0.02425553395,0.01448993827,0.01043991049,0.02077028395,0.02091715432,0.01127854321,0.02883379321,0.02913762963,0.01739445988, 0],
+					[0.03999812963,0.02536259259,0.06864603704,0.09002012963,0.1015344074,0.02960762963,0.02913762963,0.1467278889,0.05284057407, 0],
+					[0.0361509784,0.02083593827,0.0420215216,0.03664589506,0.04497232099,0.02165332099,0.01739445988,0.05284057407,0.07926979321, 0],
+					[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
+		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
+		var rf = 0;
+		
+		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #5');
+	}
+	
+	// Test using static data
+	// Test the case of only one portfolio on the efficient frontier
+	{
+		var expectedWeights = [0.4, 0.6];
+		
+		var covMat = [[1,0],[0,1]];
+		var returns = [0.1, 0.2];
+		var rf = 0;
+		
+		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, { constraints: {minWeights: [0.4, 0.6]} });
+		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #6');
+	}
+	
+	
+	// Test using random data
+	// Test the case of a too high risk free rate
+	// Reference: Maximizing the Sharpe Ratio and Information Ratio in the Barra Optimizer, Leonid Kopman, Scott Liu
+	{
+		var covMat = [[0.05, 0.02],
+		              [0.02, 0.07]];
+		var returns = [0.05, 0.1];
+		var rf = 0.1 + (1 - Math.random()); // rf will be > 0.1, which is the maximum return attainable
+		
+		assert.throws(function() { 
+			PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf) },
+			new Error('no corner portfolio with a strictly positive excess return'),
+			"Mean variance portfolio - Maximum Sharpe Ratio portfolio #7");
+	}
+});
 
 
 QUnit.test('Rounded weights portfolio', function(assert) {    
