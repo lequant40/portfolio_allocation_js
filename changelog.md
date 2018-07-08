@@ -2,6 +2,10 @@
 - Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities.
 - Added the meanVarianceCornerPortfolios to compute the corner portfolios with their returns and volatilities.
 - Added the computation of the maximum Sharpe ratio portfolio, through the efficient frontier computation.
+- Added a max function
+- Added toTypedArray method for bit sets, and updated the critical line algorithm to use typed arrays for variables indexes
+- Reorganized the bit set structure files
+- Misc. tests improvements
 
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights

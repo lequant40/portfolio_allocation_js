@@ -6,6 +6,264 @@ QUnit.module('Optimisation internal module', {
 });
 	
 
+	
+QUnit.test('Compositve convex programming solver - FISTA', function(assert) {    
+	// Functions used to generate random optimization problems
+	function generateRandomDimension(min, max) {
+		return Math.floor(Math.random()*(max-min+1) + min);
+	}
+	
+	function generateRandomValue(minVal, maxVal) {
+		return Math.random() * (maxVal - minVal) + minVal;
+	}
+	
+	// Test with a 1D function from Scipy documentation
+	// Reference: https://www.scipy-lectures.org/advanced/mathematical_optimization/#id36
+	{
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			return Math.exp((x_1 - 0.7)*(x_1 - 0.7));
+		}
+		
+		var gradf = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var df_x_1 = 2 * Math.exp((x_1 - 0.7)*(x_1 - 0.7)) * (x_1 - 0.7);
+			return new PortfolioAllocation.Matrix([df_x_1]); 
+		}
+		
+		// The minimum of the function f is attained at x = 0.7
+		var expectedSol = new PortfolioAllocation.Matrix([0.7]); 
+		
+		// Let's minimize f over the convex set H = [0, 1]
+		var g = function(x) {
+			var x_1 = x.getValue(1, 1);
+			if (0 > x_1 || x_1 > 1) {
+				return Math.POSITIVE_INFINITY;
+			}
+			return 0;
+		}
+		
+		// The proximal function associated to g is the orthogonal
+		// projection on H.
+		var proxg = function(x, mu) {
+			var x_1 = x.getValue(1, 1);
+			return new PortfolioAllocation.Matrix([Math.max(0, Math.min(x_1, 1))]);
+		}
+		
+		// The initial point is arbitrary, let's take a random value belonging to [-2, 2]
+		var x0 = new PortfolioAllocation.Matrix([generateRandomValue(-2, 2)]);
+
+		// Compute the minimum of the function f on the convex set H, with default values
+		var sol = PortfolioAllocation.ccpsolveFISTA_(f, gradf, g, proxg, x0);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-04), true, 'Scipy 1D example function');
+		
+		
+		// Generate another initial point, deterministic (0),
+		// in order to check the convergence properties of the FISTA
+		// algorithm.
+		var x0 = PortfolioAllocation.Matrix.zeros(1,1);
+
+		// Compute the minimum of the function f on the convex set H, with default values
+		var sol = PortfolioAllocation.ccpsolveFISTA_(f, gradf, g, proxg, x0);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-10), false, 'Scipy 1D example function, higher precision KO');
+
+		// Compute the minimum of the function f on the convex set H, with a higher precision
+		var sol = PortfolioAllocation.ccpsolveFISTA_(f, gradf, g, proxg, x0, {eps: 1e-10});
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-10), true, 'Scipy 1D example function, higher precision OK');
+	}
+
+	// Test with the first function of De Jong, using random data
+	// Reference: Molga M., Smutnicki C. (2005) Test functions for optimization needs.
+	{
+		var n = generateRandomDimension(1, 100);
+
+		// The first function of De Jong’s is f(x1,...,xn) = sum x_i^2, i=1..n
+		var f = function(x) {
+			var sum_x_i_square = 0;
+			for (var i = 1; i <= n; ++i) {
+				var x_i = x.getValue(i, 1);
+				
+				sum_x_i_square += x_i * x_i;
+			}
+			return sum_x_i_square;
+		}
+		// The gradient of f at (x1,...,xn) is (2x1,...,2xn)
+		var gradf = function(x) {
+			return PortfolioAllocation.Matrix.fill(n, 1, 
+			                                       function(i,j) { 
+														return 2*x.getValue(i, 1);
+													}); 
+		}
+
+		// The unique global minimum of f is located at point x^* = (0,...,0)
+		var expectedSol = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		// The first function of De Jong is usually optimized on the 
+		// hyperrectangle H = {x, -5.12 <= x_i <= 5.12, i=1..n}, so that g is the 
+		// indicator function of H: 
+		// - g(x) = 0 <=> x in H
+		// - g(x) = +oo <=> x not in H
+		var g = function(x) {
+			for (var i = 1; i <= n; ++i) {
+				var x_i = x.getValue(i, 1);
+				
+				if (-5.12 > x_i || x_i > 5.12) {
+					return Math.POSITIVE_INFINITY;
+				}
+			}
+			return 0;
+		}
+		
+		// The proximal function associated to g is the orthogonal
+		// projection on H.
+		var proxg = function(x, mu) {
+			return PortfolioAllocation.Matrix.fill(n, 1, 
+			                                       function(i,j) { 
+														return Math.max(-5.12, Math.min(x.getValue(i, 1), 5.12));
+													});
+		}
+		
+		// The initial point is arbitrary, let's take 2 * H
+		var x0 = PortfolioAllocation.Matrix.fill(n, 1, 
+											   function(i,j) { 
+													return generateRandomValue(2 * -5.12, 5.12 * 2);
+												});
+		
+		// Compute the minimum of the function f on the convex set H
+		var sol = PortfolioAllocation.ccpsolveFISTA_(f, gradf, g, proxg, x0);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-04), true, 'First function of De Jong, n = ' + n);
+	}
+	
+	// Test with the weighted sphere model function, using random data
+	// Reference: Molga M., Smutnicki C. (2005) Test functions for optimization needs.
+	{
+		var n = generateRandomDimension(1, 100);
+
+		// The weighted sphere model function is f(x1,...,xn) = sum i*x_i^2, i=1..n
+		var f = function(x) {
+			var sum_i_x_i_square = 0;
+			for (var i = 1; i <= n; ++i) {
+				var x_i = x.getValue(i, 1);
+				
+				sum_i_x_i_square += i * x_i * x_i;
+			}
+			return sum_i_x_i_square;
+		}
+		// The gradient of f at (x1,...,xn) is (2x1,4x2,6x3...,2nxn)
+		var gradf = function(x) {
+			return PortfolioAllocation.Matrix.fill(n, 1, 
+			                                       function(i,j) { 
+														return 2*i*x.getValue(i, 1);
+													}); 
+		}
+
+		// The unique global minimum of f is located at point x^* = (0,...,0)
+		var expectedSol = PortfolioAllocation.Matrix.zeros(n, 1);
+		
+		// The  weighted sphere model function is usually optimized on the 
+		// hyperrectangle H = {x, -5.12 <= x_i <= 5.12, i=1..n}, so that g is the 
+		// indicator function of H: 
+		// - g(x) = 0 <=> x in H
+		// - g(x) = +oo <=> x not in H
+		var g = function(x) {
+			for (var i = 1; i <= n; ++i) {
+				var x_i = x.getValue(i, 1);
+				
+				if (-5.12 > x_i || x_i > 5.12) {
+					return Math.POSITIVE_INFINITY;
+				}
+			}
+			return 0;
+		}
+		
+		// The proximal function associated to g is the orthogonal
+		// projection on H.
+		var proxg = function(x, mu) {
+			return PortfolioAllocation.Matrix.fill(n, 1, 
+			                                       function(i,j) { 
+														return Math.max(-5.12, Math.min(x.getValue(i, 1), 5.12));
+													});
+		}
+		
+		// The initial point is arbitrary, let's take 2 * H
+		var x0 = PortfolioAllocation.Matrix.fill(n, 1, 
+											   function(i,j) { 
+													return generateRandomValue(2 * -5.12, 5.12 * 2);
+												});
+		
+		// Compute the minimum of the function f on the convex set H
+		var sol = PortfolioAllocation.ccpsolveFISTA_(f, gradf, g, proxg, x0);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-04), true, 'Weighted sphere model function, n = ' + n);
+	}
+	
+	// Test with the the ARWHEAD function
+	// Reference: Problem 55 in A.R. Conn, N.I.M. Gould, M. Lescrenier and Ph.L. Toint, Performance of a multifrontal scheme for partially separable optimization.
+	{
+		var n = generateRandomDimension(1000, 5000);
+
+		// The arrow head function is f(x1,...,xn) = sum((x_i^2 + x_n^2)^2 - 4*x_i + 3), i=1..n-1
+		var f = function(x) {		
+			var x_n = x.getValue(n, 1);
+
+			var sum_f_i = 0;
+			for (var i = 1; i <= n-1; ++i) {
+				var x_i = x.getValue(i, 1);
+				
+				sum_f_i += (x_i*x_i + x_n*x_n)*(x_i*x_i + x_n*x_n) - 4*x_i + 3;
+			}
+			return sum_f_i;
+		}
+		// The gradient of f at (x1,...,xn) is (4*(x_1^2 + x_n^2)*x_1 - 4,...,sum (4*(x_i^2 + x_n^2)*x_n), i=1..n-1)
+		var gradf = function(x) {
+			return PortfolioAllocation.Matrix.fill(n, 1, 
+			                                       function(i,j) { 
+														var x_n = x.getValue(n, 1);
+														
+														if (i <= n-1) {
+															var x_i = x.getValue(i, 1);
+															
+															return 4*(x_i*x_i + x_n*x_n)*x_i - 4;
+														}
+														else if (i == n) {
+															var sum_gradf_i = 0;
+															for (var i = 1; i <= n-1; ++i) {
+																var x_i = x.getValue(i, 1);
+																
+																sum_gradf_i += 4*(x_i*x_i + x_n*x_n)*x_n;
+															}
+															return sum_gradf_i;
+														}
+													}); 
+		}
+
+		// The unique global minimum of f is located at point x^* = (1,1,...,0)
+		var expectedSol = PortfolioAllocation.Matrix.ones(n, 1);
+		expectedSol.setValue(n, 1, 
+		                     0);
+		
+		// The arrow head function is optimized on R^n so that g is the 
+		// projection on R^n.
+		var g = function(x) {
+			return 0;
+		}
+		
+		// The proximal function associated to g is the orthogonal
+		// projection on R^n, i.e., the identity.
+		var proxg = function(x, mu) {
+			return x;
+		}
+		
+		// The initial point is usually taken to be a vector of ones.
+		var x0 = PortfolioAllocation.Matrix.ones(n, 1);
+		
+		// Compute the minimum of the function f on R^n
+		var sol = PortfolioAllocation.ccpsolveFISTA_(f, gradf, g, proxg, x0);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-04), true, 'ARWHEAD function, n = ' + n);
+	}
+	
+});
+
+	
 QUnit.test('Quadratic programming solver (single linear constraint and finite bound constraints) - Sequential Minimization Optimization algorithm', function(assert) {    
 	// Functions to generate random feasible instances of the quadratic problem
 	function generateRandomDimension(min, max) { // used for n

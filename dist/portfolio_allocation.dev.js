@@ -35,7 +35,7 @@ self.Matrix = Matrix_;
 * @return {this} the constructed matrix.
 *
 * @example
-* Matrix_([[1,2,3], [4,5,6]]);
+* new Matrix_([[1,2,3], [4,5,6]]);
 */
 function Matrix_(input) {
 	function fromDoubleArray(dblarr) {
@@ -824,8 +824,8 @@ Matrix_.prototype = {
 	* rindexes/cindexes, where p is equal to the length of rindexes and q is equal to the length of cindexes, with coefvectorDotProductficients satisfying c_ij = a_rindexes[i]cindexes[j].
 	*
 	* @memberof Matrix_
-	* @param {Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..n.
-    * @param {Array.<number>} cindexes the column indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..m.
+	* @param {Array.<number>|Uint32Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..n.
+    * @param {Array.<number>|Uint32Array.<number>} cindexes the column indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..m.
 	* @param {Matrix_} out an optional rindexes by cindexes matrix.
 	* @return {Matrix_} a rindexes by cindexes matrix whose elements correspond to the elements of the original matrix
 	* whose row/column indexes belong to the input lists of row/column indexes to keep, either stored in the matrix out or in a new matrix.
@@ -836,10 +836,10 @@ Matrix_.prototype = {
 	*/
     submatrix : function(rindexes, cindexes, out) {
     	// Check that indexes are arrays
-    	if (!(rindexes instanceof Array) || rindexes.length == 0) {
+    	if (!(rindexes instanceof Array || rindexes instanceof Uint32Array) || rindexes.length == 0) {
     		throw new Error('first parameter must be a non empty array');
     	}
-    	if (!(cindexes instanceof Array) || cindexes.length == 0) {
+    	if (!(cindexes instanceof Array || cindexes instanceof Uint32Array) || cindexes.length == 0) {
     		throw new Error('second parameter must be a non empty array');
     	}
 	
@@ -2028,7 +2028,7 @@ Matrix_.identity = function(n) {
 * @return {Matrix_} the Hadamard product x*y.
 *
 * @example
-* vectorHadamardProduct(Vector_([1,2,3]), Vector_([1,2,3]));
+* vectorHadamardProduct(Matrix_([1,2,3]), Matrix_([1,2,3]));
 * // Matrix_([[1],[4],[9]])
 */
 Matrix_.vectorHadamardProduct = function(x, y) {
@@ -2881,29 +2881,10 @@ Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 			++iter;
 
 			// Check the number of iterations
-			if (maxIterations !== -1 && iter > maxIterations) {
+			if (maxIterations !== -1 && iter >= maxIterations) {
 				throw new Error('maximum number of iterations reached: ' + maxIterations);
 			}
-			
-			// Orthogonally project the current iterate z_k onto the hyperplane generated 
-			// by the columns A(:,j), j=1..n
-			for (var j = 1; j <= n; ++j) {
-				if (a_columns_two_norm_sq[j-1] == 0) {
-					continue;
-				}
-				
-				// Compute <A(:,j)/z_k>
-				var a_j_z_k = 0;
-				for (var i = 1; i <= m; ++i) {
-					a_j_z_k += A.data[(i-1) * A.nbColumns + (j-1)] * z_k.data[(i-1) * z_k.nbColumns + 0];
-				}
-				
-				// Update z_k: z_k+1 = z_k - <A(:,j)/z_k>/||A(:,j)||_2^2 * A(:,j)
-				for (var i = 1; i <= m; ++i) {
-					z_k.data[(i-1) * z_k.nbColumns + 0] -= a_j_z_k / a_columns_two_norm_sq[j-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
-				}
-			}
-			
+						
 			// Orthogonally project the current iterate x_k onto the solution hyperplane 
 			// of <A(i,:)/x_k> = b(i) - z_k(i), i=1..m
 			for (var i = 1; i <= m; ++i) {
@@ -2924,6 +2905,25 @@ Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 				}
 			}
 
+			// Orthogonally project the current iterate z_k onto the hyperplane generated 
+			// by the columns A(:,j), j=1..n
+			for (var j = 1; j <= n; ++j) {
+				if (a_columns_two_norm_sq[j-1] == 0) {
+					continue;
+				}
+				
+				// Compute <A(:,j)/z_k>
+				var a_j_z_k = 0;
+				for (var i = 1; i <= m; ++i) {
+					a_j_z_k += A.data[(i-1) * A.nbColumns + (j-1)] * z_k.data[(i-1) * z_k.nbColumns + 0];
+				}
+				
+				// Update z_k: z_k+1 = z_k - <A(:,j)/z_k>/||A(:,j)||_2^2 * A(:,j)
+				for (var i = 1; i <= m; ++i) {
+					z_k.data[(i-1) * z_k.nbColumns + 0] -= a_j_z_k / a_columns_two_norm_sq[j-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
+				}
+			}
+			
 			// Convergence condition (adapted from formula 4.3 of the first reference):
 			// - ||Ax_k - (b - z_k)||_2 <= eps * ||A||_f * ||x_k||_2
 			
@@ -2955,6 +2955,7 @@ Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 		for (var i = 1; i <= m; ++i) {
 			q[i-1] = a_rows_two_norm_sq[i-1]/a_frob_norm_sq;
 		}
+
 		var qSampler = new aliasMethodSampler_(q);
 	
 		// Preliminary computation of theprobabilities p_j with their associated sampler.
@@ -2974,8 +2975,25 @@ Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 			++iter;
 
 			// Check the number of iterations
-			if (maxIterations !== -1 && iter > maxIterations) {
+			if (maxIterations !== -1 && iter >= maxIterations) {
 				throw new Error('maximum number of iterations reached: ' + maxIterations);
+			}
+			
+			// Pick a row index i with probability q_i
+			var i = qSampler.sample() + 1;
+			
+			// Orthogonally project the current iterate x_k onto the solution hyperplane 
+			// of <A(i,:)/x_k> = b(i) - z_k(i)
+				// Compute r_k = <A(i,:)/x_k> - (b(i) - z_k(i))
+			var a_i_x_k = 0;
+			for (var j = 1; j <= n; ++j) {
+				a_i_x_k += A.data[(i-1) * A.nbColumns + (j-1)] * x_k.data[(j-1) * x_k.nbColumns];
+			}
+			var r_k = a_i_x_k - (b.data[(i-1) * b.nbColumns + 0] - z_k.data[(i-1) * z_k.nbColumns + 0]);
+
+				// Update x_k: x_k+1 = x_k - r_k/||A(i,:)||_2^2 * A(i,:)
+			for (var j = 1; j <= n; ++j) {
+				x_k.data[(j-1) * x_k.nbColumns] -= r_k / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
 			}
 			
 			// Pick a column index j with probability p_j
@@ -2994,23 +3012,6 @@ Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 				z_k.data[(i-1) * z_k.nbColumns + 0] -= a_j_z_k / a_columns_two_norm_sq[j-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
 			}
 
-			// Pick a row index i with probability q_i
-			var i = qSampler.sample() + 1;
-			
-			// Orthogonally project the current iterate x_k onto the solution hyperplane 
-			// of <A(i,:)/x_k> = b(i) - z_k(i)
-				// Compute r_k = <A(i,:)/x_k> - (b(i) - z_k(i))
-			var a_i_x_k = 0;
-			for (var j = 1; j <= n; ++j) {
-				a_i_x_k += A.data[(i-1) * A.nbColumns + (j-1)] * x_k.data[(j-1) * x_k.nbColumns];
-			}
-			var r_k = a_i_x_k - (b.data[(i-1) * b.nbColumns + 0] - z_k.data[(i-1) * z_k.nbColumns + 0]);
-
-				// Update x_k: x_k+1 = x_k - r_k/||A(i,:)||_2^2 * A(i,:)
-			for (var j = 1; j <= n; ++j) {
-				x_k.data[(j-1) * x_k.nbColumns] -= r_k / a_rows_two_norm_sq[i-1] * A.data[(i-1) * A.nbColumns + (j-1)]; 
-			}
-			
 			// Convergence conditions every 8 min(m, n) iterations: 
 			// - ||Ax_k - (b - z_k)||_2 <= eps * ||A||_f * ||x_k||_2
 			// - ||A^tz_k||_2 <= eps * ||A||_f^2 * ||x_k||_2
@@ -3287,6 +3288,516 @@ function addCovarianceMatrixMethods_(matrix) {
 };
 
 
+
+/**
+ * @file Functions related to bit set object.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+self.BitSet_ = BitSet_;
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function BitSet_
+*
+* @summary Construct a bit set.
+*
+* @description This function constructs an empty bit set (a.k.a. bit array, bit vector),
+* which is a data structure taylored to storing (relatively small) integers.
+*
+* The internal way to handle bit sets has been fully adapted from: 
+* - https://github.com/infusion/BitSet.js
+* - https://github.com/lemire/FastBitSet.js
+*
+* @see <a href="https://en.wikipedia.org/wiki/Bit_array">Bit array</a>
+*
+* @return {this} the constructed bit set.
+*
+* @example
+* var myBitSet = new BitSet_();
+*/
+function BitSet_() {
+    // Catches incorrect usage of var b = BitSet_() instead of var b = new BitSet_()
+	if (!(this instanceof BitSet_)) {
+      return new BitSet_();
+    }
+
+	// The number of bits hold in a word
+	this.WORD_LENGTH = 32;
+
+	// The log base 2 of WORD_LENGTH
+	this.WORD_LOG = 5;
+	
+	// The "list" of words hold by the BitSet
+	this.words = typeof Uint32Array === 'function' ? new Uint32Array(0) : new Array(0);
+	
+	// For subsequent usage in initialization sub-functions
+	var that = this;
+	
+	/**
+	* @function iterator
+	*
+	* @summary Returns an iterator to compute the indexes
+	* corresponding to the bits set to 1 in the bit set.
+	*
+	* @description This function constructs an iterator to compute the indexes
+	* corresponding to the bits set to 1 in the bit set.
+	*
+	* To be noted that once an index corresponding to a bit set to 1 has been
+	* iterated over by the iterator, this index and all the indexes lower than
+	* this index can be altered (i.e., set to 0) without invalidating the iterator.
+	*
+	* @memberof BitSet_
+	* @return {function} a function to be used as an iterator through its .next() method, computing  
+	* the indexes corresponding to the bits set to 1 in the bit set.
+	*
+	* @example
+	* var myBitSet = new BitSet_().add(2);
+	* var myIterator = new myBitSet.iterator();
+	* myIterator.next(); myIterator.next();
+	* // 2; -1;
+	*/
+	this.iterator = function() {
+		// Initialize the current words index and the current word to
+		// the first non-null word, if existing.
+		this.w_idx = -1;
+		this.w = 0;
+		while (this.w_idx < that.words.length && this.w == 0) {
+			++this.w_idx;
+			this.w = that.words[this.w_idx];
+		}
+
+		/**
+		* @function next
+		*
+		* @summary Returns the index corresponding to the next bit set to 1 in the bit set.
+		*
+		* @description This function computes the index corresponding to the next bit set to 1
+		* in the bit set.
+		*
+		* The initial index computed by the first call to this function is the index corresponding
+		* to the first bit set to 1, and each subsequent call to this function will result in computing
+		* the index corresponding to the next bit set to 1, in increasing order, until the index 
+		* corresponding to the last bit set to 1 is reached.
+		*
+		* A subsequent call to this function when the index corresponding to the last bit set to 1
+		* has been reached will result in 0 being returned.
+		*
+		* @memberof BitSet_.iterator
+		* @return {number} a natural integer corresponding to the index of the computed bit set to 1 
+		* or 0 in case all the bits set to 1 have already been iterated over.
+		*/
+		this.next = function() {
+			// If the end of the bit set has already been reached, there is nothing more to do
+			if (this.w_idx == that.words.length) {
+				return 0;
+			}			
+			
+			// Otherwise, extract the next bit set to 1 and compute its associated index, from the current
+			// remaining word.
+			var t = this.w & -this.w;
+			var value = (this.w_idx << that.WORD_LOG) + BitSet_.populationCount((t - 1) | 0);
+			this.w ^= t;
+			
+			// In case the current word has been exhausted, next iteration needs to
+			// take place on the next non-null word, if existing.
+			while (this.w_idx < that.words.length && this.w == 0) {
+				++this.w_idx;
+				this.w = that.words[this.w_idx];
+			}
+		
+			// If the end of the bit set is reached, no subsequent call to .next are necessary
+			return value;
+		}
+	}
+}
+
+/**
+* @function populationCount_
+*
+* @summary Return the number of 1-bits in a 32-bit word.
+*
+* @description This function computes the number of 1-bits in a 32-bit word,
+* using the formula 5-2 of the chapter 5 of the reference.
+*
+* @see Warren, H. (2009), Hacker`s Delight, New York, NY: Addison-Wesley
+* 
+* @param {number} x a 32-bit word.
+* @return {number} the number of bits set to 1 in the binary representation of x.
+*
+* @example
+* populationCount_(5);
+* // 2
+*/
+BitSet_.populationCount = function(x) {
+	x = x - ((x >>> 1) & 0x55555555);
+	x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
+	x = (x + (x >>> 4)) & 0x0F0F0F0F;
+	x = x + (x >>> 8);
+	x = x + (x >>> 16);
+	return x & 0x0000003F;
+};
+
+BitSet_.prototype = {
+    constructor: BitSet_,
+
+	/**
+	* @function resize
+	*
+	* @summary Resize the bit set.
+	*
+	* @description This function resizes the bit set so that
+	* the bit corresponding to an index is stored within the bit set.
+	*
+	* @memberof BitSet_
+	* @param {number} idx the index of the bit to be stored within the bit set, 
+	* a natural integer.
+	*
+	* @example
+	* resize_(123);
+	* // 
+	*/
+	resize : function(idx) {
+	    // Short circuit in case there is nothing to do
+		var c = this.words.length;
+		if ((c << this.WORD_LOG) > idx) {
+			return;
+		}
+		
+		// Compute the total number of words needed in order to
+		// store the bit corresponding to the index provided in input.
+	    var count = (idx + this.WORD_LENGTH) >>> this.WORD_LOG;
+		
+		// Depending on whether typed arrays are supported by the JavaScript
+		// engine, resize the bit set differently.
+		if (typeof Uint32Array === 'function') {
+			var words_new = new Uint32Array(count); // the new typed array is (automatically) initialized with 0s
+			words_new.set(this.words); // copy the previous words into the new typed array
+			this.words = words_new;
+		}
+		else {  
+			// Expand the array
+			this.words[count-1] = 0; // copy (automatically) the previous words into the new array
+			
+			// Fill the expanded array with 0s
+			for (var i = c; i < count-1; ++i) {
+				this.words[i] = 0;
+			}
+		}
+	},
+	
+	/**
+	* @function toString
+	*
+	* @summary Return a string representation of the bit set as 0s and 1s.
+	*
+	* @description This function builds a base-2 string representation of
+	* the bit set.
+	* 
+	* @memberof BitSet_
+	* @return {string} a base-2 string representation of the bit set' content.
+	*
+	* @example
+	* BitSet_().add(5).toString()
+	* // 00000000000000000000000000000101
+	*/
+	toString: function () {
+		// Initialize the final string
+		var fullStr = '';
+
+		// Concatenate the base-2 representation of each word hold by the bit set, 
+		// possibly padded with leading WORD_LENGTH 0s.
+		var c = this.words.length;
+		for (var i = 0; i < c; ++i) {
+			// Compute the base-2 string representation of the i-th word of the bit set.
+			//
+			// Note: if the underlying array of words is a standard array, words greater than
+			// 2^(this.WORD_LENGTH-1)-1 will be considered as negative by the toString(2)
+			// method below, so that the unsigned right shift bitwise operator (>>>) is
+			// used to coerce the word to an unsigned integer.
+			//
+			// C.f. https://stackoverflow.com/questions/9939760/how-do-i-convert-an-integer-to-binary-in-javascript
+			var str = "";
+			if (typeof Uint32Array === 'function') {
+				str = this.words[i].toString(2);
+			}
+			else {
+				str = (this.words[i] >>> 0).toString(2);
+			}
+
+			// Concatenate the (possibly) padded string above with the other words
+			// already built.
+			fullStr += str.length >= this.WORD_LENGTH ? str : new Array(this.WORD_LENGTH - str.length + 1).join('0') + str;
+		}
+
+		// Return the computed string
+		return fullStr;
+	},
+
+	/**
+	* @function set
+	*
+	* @summary Set a single bit to 1.
+	*
+	* @description This function sets the bit corresponding to an index to 1.
+	* 
+	* @memberof BitSet_
+	* @param {number} idx the index of the bit to set to 1, a natural integer.
+	* @return {BitSet_} this.
+	*
+	* @example
+	* BitSet_().set(5)
+	* //
+	*/
+	set: function(idx) {
+		// Logic to transparently grow the bit set
+		var c = this.words.length;
+		if ((c << this.WORD_LOG) <= idx) {
+			this.resize(idx);
+		}
+		
+		// Set the proper bit to 1, in the proper word
+		this.words[idx >>> this.WORD_LOG] |= (1 << idx);
+		
+		// Return the altered bit set
+		return this;
+	},
+
+	/**
+	* @function setRange
+	*
+	* @summary Set a continuous range of bits to 1.
+	*
+	* @description This function sets the bits within a continuous range of indexes to 1.
+	* 
+	* @memberof BitSet_
+	* @param {number} idxFrom the index of the first bit to set to 1, a natural integer.
+	* @param {number} idxTo the index of the last bit to set to 1, a natural integer greater than or equal to idxFrom.
+	* @return {BitSet_} this.
+	*
+	* @example
+	* BitSet_().setRange(5, 10)
+	* //
+	*/
+	setRange: function (idxFrom, idxTo) {
+		// Logic to transparently grow the bit set
+		var c = this.words.length;
+		if ((c << this.WORD_LOG) <= idxTo) {
+			this.resize(idxTo);
+		}
+	  
+		// Set the proper bits to 1, in the proper words
+		for (var i = idxFrom; i <= idxTo; ++i) {
+			this.words[i >>> this.WORD_LOG] |= (1 << i);
+		}
+
+		// Return the altered bit set
+		return this;
+	},
+	
+	/**
+	* @function unset
+	*
+	* @summary Set a single bit to 0.
+	*
+	* @description This function sets the bit corresponding to an index to 0.
+	* 
+	* @memberof BitSet_
+	* @param {number} idx the index of the bit to set to 0, a natural integer.
+	* @return {BitSet_} this.
+	*
+	* @example
+	* BitSet_().unset(5)
+	* //
+	*/
+	unset: function(idx) {
+		// Logic to transparently grow the bit set
+		var c = this.words.length;
+		if ((c << this.WORD_LOG) <= idx) {
+			this.resize(idx);
+		}
+		
+		// Set the proper bit to 0, in the proper word
+		this.words[idx >>> this.WORD_LOG] &= ~(1 << idx);
+		
+		// Return the altered bit set
+		return this;
+	},
+
+	/**
+	* @function get
+	*
+	* @summary Return the bit corresponding to an index.
+	*
+	* @description This function returns the bit corresponding to an index.
+	* 
+	* @memberof BitSet_
+	* @param {number} idx the index of the bit to retrieve, a natural integer.
+	* @return {boolean} true if the bit corresponding to the index idx is set to true,
+	* false if the bit corresponding to the index idx does not exist in the bit set 
+	* or is set to false.
+	*
+	* @example
+	* BitSet_().set(5).get(5)
+	* // true
+	*/
+	get: function(idx) {
+		return (this.words[idx  >>> this.WORD_LOG] & (1 << idx)) !== 0;
+	},	
+	
+	/**
+	* @function clear
+	*
+	* @summary Clear the bit set.
+	*
+	* @description This function clears the bit set by resetting it to 0.
+	* 
+	* @memberof BitSet_
+	* @return {BitSet_} this.
+	*
+	* @example
+	* BitSet_().clear()
+	* //
+	*/
+	clear: function() {
+		// Re-initialize the bit set
+		this.words = typeof Uint32Array === 'function' ? new Uint32Array(0) : new Array(0);
+		
+		// Return the altered bit set
+		return this;
+	},
+	
+	/**
+	* @function flip
+	*
+	* @summary Flip/toggle the value of a single bit.
+	*
+	* @description This function flips/toggles the value of the bit corresponding to
+	* an index.
+	* 
+	* @memberof BitSet_
+	* @param {number} idx the index of the bit to flipt/toggle, a natural integer.
+	* @return {BitSet_} this.
+	*
+	* @example
+	* BitSet_().flip(5)
+	* //
+	*/
+	flip: function(idx) {
+		// Logic to transparently grow the bit set
+		var c = this.words.length;
+		if ((c << this.WORD_LOG) <= idx) {
+			this.resize(idx);
+		}
+		
+	  // Set the proper bit to its boolean negation, in the proper word
+	  this.words[idx >>> this.WORD_LOG] ^= 1 << idx;
+	  
+	  // Return the altered bit set
+	  return this;
+	},
+	 
+	/**
+	* @function isEmpty
+	*
+	* @summary Determine whether the bit set is empty.
+	*
+	* @description This function determines whether the bit set is empty
+	* (i.e., has no bit set to 1).
+	* 
+	* @memberof BitSet_
+	* @return {boolean} true if the bit set is empty, false otherwise.
+	*
+	* @example
+	* BitSet_().set(5).isEmpty()
+	* // false
+	*/
+	isEmpty: function() {
+	  // Loop over all the words help by the bit set to detetmine
+	  // if there is a non-null word.
+	  var c = this.words.length;
+	  for (var  i = 0; i < c; ++i) {
+		if (this.words[i] != 0) {
+			return false;
+		}
+	  }
+	  
+	  // Arrived here, the bit set has only null words (if any), so that
+	  // it is empty.
+	  return true;
+	},
+
+	/**
+	* @function nbSetBits
+	*
+	* @summary Compute the number of bits set to 1.
+	*
+	* @description This function computes the number of bits set to 1 in the bit set.
+	* 
+	* @memberof BitSet_
+	* @return {number} the number of bits set to 1 in the bit set, a natural integer.
+	*
+	* @example
+	* BitSet_().set(5).nbSetBits()
+	* // 1
+	*/
+	nbSetBits: function() {
+	  // Loop over all the words help by the bit set and compute their
+	  // number of bits set to 1 thanks to the populationCount function.
+	  var s = 0;
+	  var c = this.words.length;
+	  for (var i = 0; i < c; ++i) {
+		s += BitSet_.populationCount(this.words[i] | 0);
+	  }
+	  
+	  // Return the computed value
+	  return s;
+	},
+
+	/**
+	* @function toArray
+	*
+	* @summary Return an array representation of the bit set.
+	*
+	* @description This function builds an array representation of the bit set,
+	* which contains the indexes of the bits set to 1 in increasing order.
+	* 
+	* @memberof BitSet_
+	* @return {Uint32Array<number>} an array representation of the bit set' content, 
+	* a newly allocated array of length the number of bits set to 1 in the
+	* bit set.
+	*
+	* @example
+	* BitSet_().add(5).add(10).toArray()
+	* // [5, 10]
+	*/
+	toArray: function() {
+	  // Initialize the output array, and its associated elements pointer
+	  var arr = new Array(this.nbSetBits());
+	  var pos = 0;
+	  
+	  // Loop over all the words help by the bit set 
+	  var c = this.words.length;
+	  for (var i = 0; i < c; ++i) {
+		var w = this.words[i];
+		
+		// For each word help by the bit set, extract the bits set to 1
+		// and compute their associated index.
+		while (w != 0) {
+		  var t = w & -w;
+		  arr[pos++] = (i << this.WORD_LOG) + BitSet_.populationCount((t - 1) | 0);
+		  w ^= t;
+		}
+	  }
+	  
+	  // Return the computed array
+	  return arr;
+	},
+
+};
 
 /**
  * @file Misc. combinatorics functions.
@@ -3831,7 +4342,7 @@ function binomial_(n, k) {
  */
 
 /* Start Wrapper private methods - Unit tests usage only */
-self.BitSet_ = BitSet_;
+self.max_ = max_;
 self.median_ = median_;
 self.select_ = select_;
 self.hypot_ = hypot_;
@@ -3841,490 +4352,50 @@ self.ftca_ = ftca_;
 
 
 /**
-// TODO: Proper comments
-https://en.wikipedia.org/wiki/Bit_array
-BitSet.js is an infinite Bit-Array (aka bit vector, bit string, bit set) implementation in JavaScript. 
-	https://github.com/infusion/BitSet.js
-	https://github.com/lemire/FastBitSet.js
-	 a word is an unsigned integer
-*/
-function BitSet_() {
-    // Catches incorrect usage of var b = BitSet_() instead of var b = new BitSet_()
-	if (!(this instanceof BitSet_)) {
-      return new BitSet_();
-    }
-
-	// The number of bits hold in a word
-	this.WORD_LENGTH = 32;
-
-	// The log base 2 of WORD_LENGTH
-	this.WORD_LOG = 5;
-	
-	// The "list" of words hold by the BitSet
-	this.words = typeof Uint32Array === 'function' ? new Uint32Array(0) : new Array(0);
-	
-	// For subsequent usage in initialization sub-functions
-	var that = this;
-	
-	/**
-	* @function iterator
-	*
-	* @summary Returns an iterator to compute the indexes
-	* corresponding to the bits set to 1 in the bit set.
-	*
-	* @description This function constructs an iterator to compute the indexes
-	* corresponding to the bits set to 1 in the bit set.
-	*
-	* To be noted that once an index corresponding to a bit set to 1 has been
-	* iterated over by the iterator, this index and all the indexes lower than
-	* this index can be altered (i.e., set to 0) without invalidating the iterator.
-	*
-	* @memberof BitSet_
-	* @return {function} a function to be used as an iterator through its .next() method, computing  
-	* the indexes corresponding to the bits set to 1 in the bit set.
-	*
-	* @example
-	* var myBitSet = new BitSet_().add(2);
-	* var myIterator = new myBitSet.iterator();
-	* myIterator.next(); myIterator.next();
-	* // 2; -1;
-	*/
-	this.iterator = function() {
-		// Initialize the current words index and the current word to
-		// the first non-null word, if existing.
-		this.w_idx = -1;
-		this.w = 0;
-		while (this.w_idx < that.words.length && this.w == 0) {
-			++this.w_idx;
-			this.w = that.words[this.w_idx];
-		}
-
-		/**
-		* @function next
-		*
-		* @summary Returns the index corresponding to the next bit set to 1 in the bit set.
-		*
-		* @description This function computes the index corresponding to the next bit set to 1
-		* in the bit set.
-		*
-		* The initial index computed by the first call to this function is the index corresponding
-		* to the first bit set to 1, and each subsequent call to this function will result in computing
-		* the index corresponding to the next bit set to 1, in increasing order, until the index 
-		* corresponding to the last bit set to 1 is reached.
-		*
-		* A subsequent call to this function when the index corresponding to the last bit set to 1
-		* has been reached will result in 0 being returned.
-		*
-		* @memberof BitSet_.iterator
-		* @return {number} a natural integer corresponding to the index of the computed bit set to 1 
-		* or 0 in case all the bits set to 1 have already been iterated over.
-		*/
-		this.next = function() {
-			// If the end of the bit set has already been reached, there is nothing more to do
-			if (this.w_idx == that.words.length) {
-				return 0;
-			}			
-			
-			// Otherwise, extract the next bit set to 1 and compute its associated index, from the current
-			// remaining word.
-			var t = this.w & -this.w;
-			var value = (this.w_idx << that.WORD_LOG) + BitSet_.populationCount((t - 1) | 0);
-			this.w ^= t;
-			
-			// In case the current word has been exhausted, next iteration needs to
-			// take place on the next non-null word, if existing.
-			while (this.w_idx < that.words.length && this.w == 0) {
-				++this.w_idx;
-				this.w = that.words[this.w_idx];
-			}
-		
-			// If the end of the bit set is reached, no subsequent call to .next are necessary
-			return value;
-		}
-	}
-}
-
-/**
-* @function populationCount_
+* @function max_
 *
-* @summary Return the number of 1-bits in a 32-bit word.
+* @summary Compute the maximum of a serie of values.
 *
-* @description This function computes the number of 1-bits in a 32-bit word,
-* using the formula 5-2 of the chapter 5 of the reference.
+* @description This function returns the maximum of a serie of values [x_1,...,x_n],
+* as well as its index.
 *
-* @see Warren, H. (2009), Hacker`s Delight, New York, NY: Addison-Wesley
-* 
-* @param {number} x a 32-bit word.
-* @return {number} the number of bits set to 1 in the binary representation of x.
+* In case there are several identical maximum values, the one corresponding to the
+* lowest indice in the array x is returned.
+*
+* @param {Array.<number>} x an array of real numbers.
+* @param {function} compareFunction an optional sort function that defines the sort order, using the standard prototype for JavaScript sort functions (c.f. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort).
+* @return {Array.<number>} an array arr of two elements:
+* arr[0], the maximum of the values of the array x, a real number
+* arr[1], the index of the maximum of the values of the array x, a positive integer
 *
 * @example
-* populationCount_(5);
-* // 2
+* max_([2,4,4,1]);
+* // [4, 1]
 */
-BitSet_.populationCount = function(x) {
-	x = x - ((x >>> 1) & 0x55555555);
-	x = (x & 0x33333333) + ((x >>> 2) & 0x33333333);
-	x = (x + (x >>> 4)) & 0x0F0F0F0F;
-	x = x + (x >>> 8);
-	x = x + (x >>> 16);
-	return x & 0x0000003F;
-};
-
-BitSet_.prototype = {
-    constructor: BitSet_,
-
-	/**
-	* @function resize
-	*
-	* @summary Resize the bit set.
-	*
-	* @description This function resizes the bit set so that
-	* the bit corresponding to an index is stored within the bit set.
-	*
-	* @memberof BitSet_
-	* @param {number} idx the index of the bit to be stored within the bit set, 
-	* a natural integer.
-	*
-	* @example
-	* resize_(123);
-	* // 
-	*/
-	resize : function(idx) {
-	    // Short circuit in case there is nothing to do
-		var c = this.words.length;
-		if ((c << this.WORD_LOG) > idx) {
-			return;
-		}
-		
-		// Compute the total number of words needed in order to
-		// store the bit corresponding to the index provided in input.
-	    var count = (idx + this.WORD_LENGTH) >>> this.WORD_LOG;
-		
-		// Depending on whether typed arrays are supported by the JavaScript
-		// engine, resize the bit set differently.
-		if (typeof Uint32Array === 'function') {
-			var words_new = new Uint32Array(count); // the new typed array is (automatically) initialized with 0s
-			words_new.set(this.words); // copy the previous words into the new typed array
-			this.words = words_new;
-		}
-		else {  
-			// Expand the array
-			this.words[count-1] = 0; // copy (automatically) the previous words into the new array
-			
-			// Fill the expanded array with 0s
-			for (var i = c; i < count-1; ++i) {
-				this.words[i] = 0;
-			}
-		}
-	},
+function max_(x, compareFunction) {
+	// Initialisations.
+	var defaultCompareFct = function (a, b) {
+		return a - b;
+	};
+	var compareFunction = compareFunction || defaultCompareFct;
 	
-	/**
-	* @function toString
-	*
-	* @summary Return a string representation of the bit set as 0s and 1s.
-	*
-	* @description This function builds a base-2 string representation of
-	* the bit set.
-	* 
-	* @memberof BitSet_
-	* @return {string} a base-2 string representation of the bit set' content.
-	*
-	* @example
-	* BitSet_().add(5).toString()
-	* // 00000000000000000000000000000101
-	*/
-	toString: function () {
-		// Initialize the final string
-		var fullStr = '';
-
-		// Concatenate the base-2 representation of each word hold by the bit set, 
-		// possibly padded with leading WORD_LENGTH 0s.
-		var c = this.words.length;
-		for (var i = 0; i < c; ++i) {
-			// Compute the base-2 string representation of the i-th word of the bit set.
-			//
-			// Note: if the underlying array of words is a standard array, words greater than
-			// 2^(this.WORD_LENGTH-1)-1 will be considered as negative by the toString(2)
-			// method above, so that the unsigned right shift bitwise operator (>>>) is
-			// used to coerce the word to an unsigned integer.
-			//
-			// C.f. https://stackoverflow.com/questions/9939760/how-do-i-convert-an-integer-to-binary-in-javascript
-			var str = "";
-			if (typeof Uint32Array === 'function') {
-				str = this.words[i].toString(2);
-			}
-			else {
-				str = (this.words[i] >>> 0).toString(2);
-			}
-
-			// Concatenate the (possibly) padded string above with the other words
-			// already built.
-			fullStr += str.length >= this.WORD_LENGTH ? str : new Array(this.WORD_LENGTH - str.length + 1).join('0') + str;
-		}
-
-		// Return the computed string
-		return fullStr;
-	},
-
-	/**
-	* @function set
-	*
-	* @summary Set a single bit to 1.
-	*
-	* @description This function sets the bit corresponding to an index to 1.
-	* 
-	* @memberof BitSet_
-	* @param {number} idx the index of the bit to set to 1, a natural integer.
-	* @return {BitSet_} this.
-	*
-	* @example
-	* BitSet_().set(5)
-	* //
-	*/
-	set: function(idx) {
-		// Logic to transparently grow the bit set
-		var c = this.words.length;
-		if ((c << this.WORD_LOG) <= idx) {
-			this.resize(idx);
-		}
-		
-		// Set the proper bit to 1, in the proper word
-		this.words[idx >>> this.WORD_LOG] |= (1 << idx);
-		
-		// Return the altered bit set
-		return this;
-	},
-
-	/**
-	* @function setRange
-	*
-	* @summary Set a continuous range of bits to 1.
-	*
-	* @description This function sets the bits within a continuous range of indexes to 1.
-	* 
-	* @memberof BitSet_
-	* @param {number} idxFrom the index of the first bit to set to 1, a natural integer.
-	* @param {number} idxTo the index of the last bit to set to 1, a natural integer greater than or equal to idxFrom.
-	* @return {BitSet_} this.
-	*
-	* @example
-	* BitSet_().setRange(5, 10)
-	* //
-	*/
-	setRange: function (idxFrom, idxTo) {
-		// Logic to transparently grow the bit set
-		var c = this.words.length;
-		if ((c << this.WORD_LOG) <= idxTo) {
-			this.resize(idxTo);
-		}
-	  
-		// Set the proper bits to 1, in the proper words
-		for (var i = idxFrom; i <= idxTo; ++i) {
-			this.words[i >>> this.WORD_LOG] |= (1 << i);
-		}
-
-		// Return the altered bit set
-		return this;
-	},
+	var n = x.length;
 	
-	/**
-	* @function unset
-	*
-	* @summary Set a single bit to 0.
-	*
-	* @description This function sets the bit corresponding to an index to 0.
-	* 
-	* @memberof BitSet_
-	* @param {number} idx the index of the bit to set to 0, a natural integer.
-	* @return {BitSet_} this.
-	*
-	* @example
-	* BitSet_().unset(5)
-	* //
-	*/
-	unset: function(idx) {
-		// Logic to transparently grow the bit set
-		var c = this.words.length;
-		if ((c << this.WORD_LOG) <= idx) {
-			this.resize(idx);
+	// Core loop
+	var maxValue = x[0];
+	var maxValueIdx = 0;
+	for (var i = 1; i < n; ++i) {
+		//if (x[i] > maxValue) {
+		if (compareFunction(x[i], maxValue) > 0) {
+			maxValue = x[i];
+			maxValueIdx = i;
 		}
-		
-		// Set the proper bit to 0, in the proper word
-		this.words[idx >>> this.WORD_LOG] &= ~(1 << idx);
-		
-		// Return the altered bit set
-		return this;
-	},
-
-	/**
-	* @function get
-	*
-	* @summary Return the bit corresponding to an index.
-	*
-	* @description This function returns the bit corresponding to an index.
-	* 
-	* @memberof BitSet_
-	* @param {number} idx the index of the bit to retrieve, a natural integer.
-	* @return {boolean} true if the bit corresponding to the index idx is set to true,
-	* false if the bit corresponding to the index idx does not exist in the bit set 
-	* or is set to false.
-	*
-	* @example
-	* BitSet_().set(5).get(5)
-	* // true
-	*/
-	get: function(idx) {
-		return (this.words[idx  >>> this.WORD_LOG] & (1 << idx)) !== 0;
-	},	
+	}
 	
-	/**
-	* @function clear
-	*
-	* @summary Clear the bit set.
-	*
-	* @description This function clears the bit set by resetting it to 0.
-	* 
-	* @memberof BitSet_
-	* @return {BitSet_} this.
-	*
-	* @example
-	* BitSet_().clear()
-	* //
-	*/
-	clear: function() {
-		// Re-initialize the bit set
-		this.words = typeof Uint32Array === 'function' ? new Uint32Array(0) : new Array(0);
-		
-		// Return the altered bit set
-		return this;
-	},
-	
-	/**
-	* @function flip
-	*
-	* @summary Flip/toggle the value of a single bit.
-	*
-	* @description This function flips/toggles the value of the bit corresponding to
-	* an index.
-	* 
-	* @memberof BitSet_
-	* @param {number} idx the index of the bit to flipt/toggle, a natural integer.
-	* @return {BitSet_} this.
-	*
-	* @example
-	* BitSet_().flip(5)
-	* //
-	*/
-	flip: function(idx) {
-		// Logic to transparently grow the bit set
-		var c = this.words.length;
-		if ((c << this.WORD_LOG) <= idx) {
-			this.resize(idx);
-		}
-		
-	  // Set the proper bit to its boolean negation, in the proper word
-	  this.words[idx >>> this.WORD_LOG] ^= 1 << idx;
-	  
-	  // Return the altered bit set
-	  return this;
-	},
-	 
-	/**
-	* @function isEmpty
-	*
-	* @summary Determine whether the bit set is empty.
-	*
-	* @description This function determines whether the bit set is empty
-	* (i.e., has no bit set to 1).
-	* 
-	* @memberof BitSet_
-	* @return {boolean} true if the bit set is empty, false otherwise.
-	*
-	* @example
-	* BitSet_().set(5).isEmpty()
-	* // false
-	*/
-	isEmpty: function() {
-	  // Loop over all the words help by the bit set to detetmine
-	  // if there is a non-null word.
-	  var c = this.words.length;
-	  for (var  i = 0; i < c; ++i) {
-		if (this.words[i] != 0) {
-			return false;
-		}
-	  }
-	  
-	  // Arrived here, the bit set has only null words (if any), so that
-	  // it is empty.
-	  return true;
-	},
+	// Return the computed maximum value and its index
+	return [maxValue, maxValueIdx];
+}
 
-	/**
-	* @function nbSetBits
-	*
-	* @summary Compute the number of bits set to 1.
-	*
-	* @description This function computes the number of bits set to 1 in the bit set.
-	* 
-	* @memberof BitSet_
-	* @return {number} the number of bits set to 1 in the bit set, a natural integer.
-	*
-	* @example
-	* BitSet_().set(5).nbSetBits()
-	* // 1
-	*/
-	nbSetBits: function() {
-	  // Loop over all the words help by the bit set and compute their
-	  // number of bits set to 1 thanks to the populationCount function.
-	  var s = 0;
-	  var c = this.words.length;
-	  for (var i = 0; i < c; ++i) {
-		s += BitSet_.populationCount(this.words[i] | 0);
-	  }
-	  
-	  // Return the computed value
-	  return s;
-	},
-
-	/**
-	* @function toArray
-	*
-	* @summary Return an array representation of the bit set.
-	*
-	* @description This function builds an array representation of the bit set,
-	* which contains the indexes of the bits set to 1 in increasing order.
-	* 
-	* @memberof BitSet_
-	* @return {Array<number>} an array representation of the bit set' content.
-	*
-	* @example
-	* BitSet_().add(5).add(10).toArray()
-	* // [5, 10]
-	*/
-	toArray: function() {
-	  // Initialize the output array, and its associated elements pointer
-	  var arr = new Array(this.nbSetBits());
-	  var pos = 0;
-	  
-	  // Loop over all the words help by the bit set 
-	  var c = this.words.length;
-	  for (var i = 0; i < c; ++i) {
-		var w = this.words[i];
-		
-		// For each word help by the bit set, extract the bits set to 1
-		// and compute their associated index.
-		while (w != 0) {
-		  var t = w & -w;
-		  arr[pos++] = (i << this.WORD_LOG) + BitSet_.populationCount((t - 1) | 0);
-		  w ^= t;
-		}
-	  }
-	  
-	  // Return the computed array
-	  return arr;
-	},
-
-};
 
 /**
 * @function median_
@@ -4341,6 +4412,7 @@ BitSet_.prototype = {
 * @see <a href="https://www.sciencedirect.com/science/article/pii/S0304397505004081">Krzysztof C. Kiwiel, On Floyd and Rivest's SELECT algorithm, Theoretical Computer Science, Volume 347, Issues 1–2, 2005, Pages 214-238</a>
 * 
 * @param {Array.<number>} x an array of real numbers.
+* @param {function} compareFunction an optional sort function that defines the sort order, using the standard prototype for JavaScript sort functions (c.f. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort).
 * @return {number} the median of the values of the array x.
 *
 * @example
@@ -4350,13 +4422,13 @@ BitSet_.prototype = {
 * median_([2,4,1,3]);
 * // 2.5
 */
-function median_(x) {
+function median_(x, compareFunction) {
 	// Initialisations.
 	var n = x.length;
 	var xx = x.slice(); // to avoid altering the array x
 	
 	// Compute the smallest |-n/2-| element of the array, which corresponds to the median
-	return select_(xx, Math.ceil(n/2));
+	return select_(xx, Math.ceil(n/2), compareFunction);
 }
 
 
@@ -5187,8 +5259,379 @@ function sampleCovariance_(x, y) {
 self.lpsolvePDHG_ = lpsolvePDHG_;
 self.qpsolveGSMO_ = qpsolveGSMO_;
 self.qksolveBS_ = qksolveBS_;
+self.ccpsolveFISTA_ = ccpsolveFISTA_;
 /* End Wrapper private methods - Unit tests usage only */
  
+
+/**
+* @function ccpsolveFISTA_
+*
+* @summary Returns an optimal solution to a compositive convex problem, 
+* using a FISTA-like accelerated first-order algorithm.
+*
+* @description This function computes an optimal solution to a compositive convex
+* problem using a FISTA-like accelerated first-order algorithm, c.f. the first reference.
+*
+* The compositive convex problem to solve is assumed to be provided in the
+* following format:
+*
+* min F(x) = f(x) + g(x), x in R^n
+*
+* f : R^n -> R is a continuously differentiable convex function with a Lipschitz continuous gradient
+* g : R^n -> R u {+oo} is a (proximable) proper closed convex function
+* gradf : R^n -> R^n is the Lipschitz continuous gradient of f
+* proxg : R^n x R^+* -> R^n is the proximal operator associated to g defined as 
+* proxg(x, mu) = argmin u in R^n ( g(u) + 1/(2*mu) * ||u - x||_2^2 )
+*
+* The problem is assumed to be solvable, i.e., argmin F(x), x in R^n, is
+* assumed to be non-empty.
+*
+* The algorithm used internally is based on the FISTA-BKTR algorithm of the third 
+* reference, with the following additions:
+* - The usage of a convergence criterion based on the gradient of f and on a subdifferential of g,
+* c.f. the fourth reference
+* - The usage of fixed and of an adaptative restart mechanism, c.f. the fifth reference
+* - The usage of a Barzilai and Borwein like stepsize, c.f. the sixth reference
+*
+* @see <a href="https://doi.org/10.1137/080716542">Amir Beck and Marc Teboulle, A Fast Iterative Shrinkage-Thresholding Algorithm for Linear Inverse Problems, SIAM Journal on Imaging Sciences 2009 2:1, 183-202</a>
+* @see <a href="https://doi.org/10.1109/TIP.2009.2028250">A. Beck, M. Teboulle, "Fast gradient-based algorithms for constrained total variation image denoising and deblurring problems", IEEE Trans. Image Process., vol. 18, no. 11, pp. 2419-2434, 2009</a>
+* @see <a href="https://doi.org/10.1007/s10208-014-9189-9">Scheinberg, K., Goldfarb, D. & Bai, X. Fast First-Order Methods for Composite Convex Optimization with Backtracking Found Comput Math (2014) 14: 389.</a>
+* @see <a href="https://arxiv.org/abs/1411.3406">T. Goldstein, C. Studer, and R. G. Baraniuk, “A field guide to forward-backward splitting with a FASTA implementation,” Nov. 2014</a>
+* @see <a href="https://doi.org/10.1137/16M1055323">Bo Wen, Xiaojun Chen, and Ting Kei Pong. Linear Convergence of Proximal Gradient Algorithm with Extrapolation for a Class of Nonconvex Nonsmooth Minimization Problems. SIAM Journal on Optimization 2017 27:1, 124-145</a>
+* @see <a href="https://doi.org/10.1007/s10589-006-6446-0">Gradient Methods with Adaptive Step-Sizes. Zhou, B., Gao, L. & Dai, YH. Comput Optim Applic (2006) 35: 69.</a>
+*
+* @param {function} f, a function representing the function f above, which must take as input argument
+* a n by 1 matrix x corresponding to a point in R^n and which must return as output a real number 
+* corresponding to f(x).
+* @param {function} gradf, a function representing the gradient of the function f above, 
+* which must take as input argument a n by 1 matrix x corresponding to a point in R^n and 
+* which must return as output a n by 1 matrix gradf(x) corresponding to gradf(x).
+* @param {function} g, a function representing the function g above, which must take as input argument
+* a n by 1 matrix x corresponding to a point in R^n and which must return as output a real number 
+* or Math.POSITIVE_INFINITY corresponding to g(x).
+* @param {function} proxg, a function representing the proximal operator associated to 
+* the function g above, which must take as input arguments a n by 1 matrix x corresponding to 
+* a point in R^n and a strictly positive real number mu corresponding to a step size and which 
+* must return as output a n by 1 matrix corresponding to proxg(x, mu).
+* @param {Matrix_} x0 an n by 1 matrix corresponding to the point on which to
+* start the FISTA algorithm (usually, the best possible guess of the optimal solution).
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the absolute tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 10000.
+* @param {number} opt.maxLine the maximum number of line searches in one iteration of the algorithm, a strictly positive natural integer or -1 to force an infinite number of line searches; defaults to 100.
+* @param {number} opt.beta the step size multiplicative shrinkage factor used in the backtracking procedure, a real number belonging to ]0,1[; defaults to 0.5.
+* @param {number} opt.alphaMin the minimum value of the step size, a strictly positive real number; defaults to 1e-10.
+* @param {number} opt.alphaMax the maximum value of the step size, a strictly positive real number; defaults to 1e10.
+* @param {number} opt.restartPeriod the restart period, expressed in a number of iterations, of the fixed restart mechanism of the algorithm; defaults to 1000 iterations.
+* @return {Array<Object>} an array arr containing two elements: 
+* - arr[0] an n by 1 matrix containing the optimal solution x^* to the compositive convex problem
+* - arr[1] the optimal value of the function f, i.e. F(x^*)
+*
+* @example
+* ccpsolveFISTA_(function(x) { return Math.exp((x.getValue(1, 1) - 0.7)*(x.getValue(1, 1) - 0.7)); }, // f(x) = exp((x - 0.7)^2)
+*                function(x) { return new Matrix_([2 * (x.getValue(1, 1) - 0.7) * Math.exp((x.getValue(1, 1) - 0.7)*(x.getValue(1, 1) - 0.7))]); },  // gradf(x) = 2*(x - 0.7)*exp((x - 0.7)^2)
+*				 function(x) { if (0 > x.getValue(1, 1) || x.getValue(1, 1) > 1) {
+*				                   return Math.POSITIVE_INFINITY;
+*			                   }
+*			                   else {
+*                                  return 0;
+*	                           }
+*			                 }, // g is the usual indicator function of a convex set, here [0,1]
+*                function(x, mu) { return new PortfolioAllocation.Matrix([Math.max(0, Math.min(x.getValue(1, 1), 1))]); }, // proxg(x, mu) = orthogonal projection of x on [0,1]
+*                new Matrix_([0]) // the starting point of the algorithm
+*               )
+* // new Matrix_([~0.7])
+*/
+function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
+	// Internal function to compute F(x) = f(x) + g(x), 
+	// c.f. formula 1.1 of the third reference.
+	function F(x) {
+		return f(x) + g(x);
+	}
+
+	// Internal function to compute Q_mu(u,v) = f(v) + <u - v/gradf(v)> + 1/(2*mu) * ||u - v||_2^2 + g(u), 
+	// c.f. formula 2.2 of the third reference.
+	function Q(mu, u, v, gradf_v) {
+		// Compute f(v)
+		var f_v = f(v);
+
+		// Compute u - v and ||u - v||_2
+		var u_m_v = Matrix_.xmy(u, v);
+		var u_m_v_two_norm = u_m_v.vectorNorm('two');
+		
+		// Compute g(u)
+		var g_u = g(u);
+
+		// Compute Q_mu
+		var Q_mu_u_v = f_v + Matrix_.vectorDotProduct(u_m_v, gradf_v) + 1/(2 * mu) * u_m_v_two_norm * u_m_v_two_norm + g_u;
+		
+		// Return the computed value
+		return Q_mu_u_v;
+	}
+
+	// Internal function to compute p_mu(v) = argmin_u Q_mu(u,v), 
+	// c.f. formula 2.3 of the third reference.
+	//
+	// This function is shown to be equal to proxg(v - mu*gradf(v), mu)
+	// in formula 3.13 of the second reference.
+	function p(mu, v, gradf_v) {
+		// Compute v - mu*gradf(v)
+		var v_m_mu_gradf_v = Matrix_.axpby(1, v, -mu, gradf_v);
+		
+		// Compute p_mu
+		var p_mu_v = proxg(v_m_mu_gradf_v, mu);
+		
+		// Return both values
+		return [v_m_mu_gradf_v, p_mu_v];
+	}
+	
+	
+    // ------
+    
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var eps = opt.eps || 1e-04;
+	var maxIterations = opt.maxIter || 10000;
+	var maxLineSearches = opt.maxLine || 100;
+	var beta = opt.beta || 0.5;
+	var alphaMin = opt.alphaMin || 1e-10;
+	var alphaMax = opt.alphaMax || 1e10;
+	var restartPeriod = opt.restartPeriod || 1000;
+	
+	
+	// ------
+	
+	
+	// Misc; initializations
+	var n = x0.nbRows;
+	var eps_tol = 1e-12; // used to numerically determine some conditions (backtrack, adaptative restart, stepsize)
+	
+	// Initializations, c.f. line 0 of the Algorithm 2 of the third reference			
+	// Prediction parameter
+	var t_km; 
+	var t_k;
+
+	// Theta parameter
+	var theta_km;
+	var theta_k;
+
+	// Step size parameters
+	var tau_k = 0.5;
+	var mu_k_0 = alphaMin;
+	
+	// x iterates
+	var x_k; // placeholder for the x_k vector
+	var x_km; // placeholder for the x_k-1 vector
+	var x_kmm; // placeholder for the x_k-2 vector
+	var x_km_m_x_kmm; //  placeholder for the x_k-1 - x_k-2 vector
+	var gradf_x_k; // placeholder for the gradf(x_k) vector
+	var gradf_x_km; // placeholder for the gradf(x_k-1) vector
+	var gradf_x_kmm; // placeholder for the gradf(x_k-2) vector
+	var gradf_x_km_m_gradf_x_kmm; // // placeholder for the gradf(x_k-1) - gradf(x_k-2) vector
+
+	// y iterates
+	var y_k; // placeholder for the y_k vector
+	var gradf_y_k; // placeholder for the gradf(y_k) vector	
+	
+	
+	// Main loop of the Algorithm 2 of the third reference,
+	// guaranteed to converge per theorem 3.2 of the third reference.
+	var restart = true; // a first initialization is needed at the first iteration 
+
+	var iter = 0;	
+	while (true) {
+		// Check the number of iterations
+		if (maxIterations !== -1 && iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+		
+		
+		// Update the number of iterations
+		++iter;
+		
+		
+		// (-) Check the condition for a fixed restart of the algorithm, 
+		// c.f. section 3.3 of the fifth reference.
+		if (iter % restartPeriod === 0) {
+			x0 = x_k;
+			restart = true;
+		}
+		
+		
+		// (-) Restart of the algorithm as needed
+		if (restart === true) {
+			// Initialization of the prediction parameter
+			t_km = 0; 
+			t_k = 1;
+			
+			// Initialization of the theta parameter
+			theta_km = 1;
+			theta_k = null;
+			
+			// Initialization of the x iterates
+			x_k = x0;
+			x_km = x_k;
+			x_kmm = x_km;
+			x_km_m_x_kmm = Matrix_.zeros(n, 1);
+			gradf_x_k = gradf(x_k);
+			gradf_x_km = gradf_x_k;
+			gradf_x_kmm = gradf_x_km;
+			gradf_x_km_m_gradf_x_kmm = Matrix_.zeros(n, 1);
+
+			// Initialization of the y iterates
+			y_k = x_k; 
+			gradf_y_k = gradf_x_k;		
+			
+			// No update of the step size parameters, as the step size can take any value
+			// per algorithm 2 of the third reference.
+			
+			// The restart is completed
+			restart = false;
+		}
+		
+		
+		// (1) of the Algorithm 2 of the third reference
+		// - Initialization of the initial stepsize for the current iteration
+		var mu_k = mu_k_0;
+		
+		
+		// (2) of the Algorithm 2 of the third reference
+		// - Optimized backtracking line search
+		var p_mu = p(mu_k, y_k, gradf_y_k);
+		var y_k_m_mu_k_gradf_y_k = p_mu[0];
+		var p_mu_k_y_k = p_mu[1];
+		
+		var iter_ls = 0;
+		while ( F(p_mu_k_y_k) > Q(mu_k, p_mu_k_y_k, y_k, gradf_y_k) + eps_tol ) {
+			// Check the number of iterations
+			if (maxLineSearches !== -1 && iter_ls > maxLineSearches) {
+				throw new Error('maximum number of line searches reached: ' + maxLineSearches + ' at iteration: ' + iter);
+			}
+			
+			// Update the number of line search iterations
+			++iter_ls;
+			
+			// Reduction in step size, and associated update of the theta_k parameter
+			mu_k = beta * mu_k;
+			theta_km = theta_km/beta;
+			
+			// Update of the current t_k and y_k iterates, due to the change in the theta_km
+			// parameter.
+			//
+			// This is FistaStep(xk−1, xk−2, tk−1, θk−1)
+			t_k = ( 1 + Math.sqrt(1 + 4*theta_km*t_km*t_km) ) / 2;
+			y_k = Matrix_.axpby(1, x_km, (t_km - 1)/t_k, x_km_m_x_kmm);
+			
+			// Recomputation of gradf(y_k) and p_mu_k(y_k) for the next iteration
+			//
+			// The naive way to recompute gradf(y_k), i.e., computing the
+			// gradient of f at point y_k can be improved by noticing
+			// that the line search procedure do not update x_km and x_kmm,
+			// c.f. the discussion after formula 3.17 of the third reference.
+			gradf_y_k = Matrix_.axpby(1, gradf_x_km, (t_km - 1)/t_k, gradf_x_km_m_gradf_x_kmm);
+			p_mu = p(mu_k, y_k, gradf_y_k);
+			y_k_m_mu_k_gradf_y_k = p_mu[0];
+			p_mu_k_y_k = p_mu[1];
+		}
+		
+		
+		// (3) of the Algorithm 2 of the third reference
+		// - Computation of the x_k and t_k+1, y_k+1 iterates
+		// - Computation of the initial stepsize for the next iteration
+		// - Update of the theta_k parameter
+		
+		// Computation of the current x_k iterate
+		x_k = p_mu_k_y_k;
+		gradf_x_k = gradf(x_k); // gradf(x_k)
+		
+		var x_k_m_x_km = Matrix_.xmy(x_k, x_km); // x_k - x_k-1
+		var gradf_x_k_m_gradf_x_km = Matrix_.xmy(gradf_x_k, gradf_x_km); // gradf(x_k) - gradf(x_k-1)
+		
+		// Computation of the initial stepsize for the next iteration,
+		// using a Barzilai and Borwein like stepsize, c.f. algorithm SS of the sixth reference.
+		var s_k_d_s_k = Matrix_.vectorDotProduct(x_k_m_x_km, x_k_m_x_km); // <x_k - x_k-1/x_k - x_k-1>
+		var z_k_d_z_k = Math.max(Matrix_.vectorDotProduct(gradf_x_k_m_gradf_x_km, gradf_x_k_m_gradf_x_km), // <gradf(x_k) - gradf(x_k-1)/gradf(x_k) - gradf(x_k-1)>
+		                         eps_tol); // to avoid numerical issues in the division below
+		var s_k_d_z_k = Matrix_.vectorDotProduct(x_k_m_x_km, gradf_x_k_m_gradf_x_km); // <x_k - x_k-1/gradf(x_k) - gradf(x_k-1)>
+
+		if (s_k_d_z_k <= eps_tol) {
+			mu_kp_0 = alphaMax;
+		}
+		else {
+			var alpha_k_1 = Math.max(alphaMin, Math.min(s_k_d_s_k/s_k_d_z_k, alphaMax));
+			var alpha_k_2 = Math.max(alphaMin, Math.min(s_k_d_z_k/z_k_d_z_k, alphaMax));
+			
+			if (alpha_k_2/alpha_k_1 <= tau_k) {
+				mu_kp_0 = alpha_k_2;
+				tau_k = 0.9 * tau_k;
+			}
+			else {
+				mu_kp_0 = alpha_k_1;
+				tau_k = 1.1 * tau_k;
+			}
+		}
+		
+		// Update of the theta_k parameter
+		theta_k = mu_k/mu_kp_0;
+		
+		// Computation of the current t_k+1 and y_k+1 iterates,
+		// plus misc. associated vectors.
+		//
+		// This is FistaStep(xk , xk−1, tk, θk)
+		var t_kp = ( 1 + Math.sqrt(1 + 4*theta_k*t_k*t_k) ) / 2; // t_k+1
+		var y_kp = Matrix_.axpby(1, x_k, (t_k - 1)/t_kp, x_k_m_x_km); // y_k+1	
+		
+		var gradf_y_kp = Matrix_.axpby(1, gradf_x_k, (t_k - 1)/t_kp, gradf_x_k_m_gradf_x_km); // gradf(y_k+1)
+
+
+		// (-) Check the absolute convergence criteria (not in the third reference), 
+		// c.f. paragraph 4.6 of the fourth reference
+		var subgradg_x_k = Matrix_.axpby(1/mu_k, y_k_m_mu_k_gradf_y_k, -1/mu_k, x_k);
+		var r_k = Matrix_.xpy(gradf_x_k, subgradg_x_k);
+		if (r_k.vectorNorm('infinity') <= eps) {
+			break;
+		}
+		
+		
+		// (-) Check the condition for an adaptative restart of the algorithm, 
+		// c.f. section 3.3 of the fifth reference.
+		var gs_k = Matrix_.vectorDotProduct(Matrix_.xmy(y_k, x_k), Matrix_.xmy(x_k, x_km));
+		if (gs_k >= eps_tol) {
+			x0 = x_k;
+			restart = true;
+		}
+
+		
+		// (-) Preparation of the next iteration:
+		// Update of the step size
+		mu_k_0 = mu_kp_0;
+		
+		// Update of the x_k iterates
+		x_kmm = x_km;
+		x_km = x_k;
+		x_km_m_x_kmm = x_k_m_x_km;
+		gradf_x_kmm = gradf_x_km;
+		gradf_x_km = gradf_x_k;
+		gradf_x_km_m_gradf_x_kmm = gradf_x_k_m_gradf_x_km;
+		
+		// Update of the y_k iterates
+		y_k = y_kp;
+		gradf_y_k = gradf_y_kp;
+		
+		// Update of the thera parameter
+		theta_km = theta_k;
+		
+		// Update of the prediction parameters
+		t_km = t_k;
+		t_k = t_kp;
+	}
+	
+	// Return the computed x_k value, as well as F(x_k)
+	return [x_k, F(x_k)];
+}
+
 
 /**
 * @function qksolveBS_
@@ -5698,7 +6141,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	var iter = 0;
 	while (true) {
 		// Check the number of iterations
-		if (maxIterations !== -1 && iter > maxIterations) {
+		if (maxIterations !== -1 && iter >= maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 
@@ -6172,7 +6615,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	var iter = 0;
 	while (true) {
 		// Check the number of iterations
-		if (maxIterations !== -1 && iter > maxIterations) {
+		if (maxIterations !== -1 && iter >= maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 
@@ -6330,34 +6773,39 @@ function simplexSparseEuclidianProjection_(x, k) {
 	// Initializations
 	var n = x.length;
 	
+	
 	// Short circuit in case there is no sparsity
 	if (k === n) {
 		return simplexEuclidianProjection_(x);
 	}
 	
+	
 	// Otherwise, compute the support of the projection, i.e., the k largest elements of x.
-		// Initialize the indexes of the elements of x
+	
+	// Initialize the indexes of the elements of x
 	var idx = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n);
 	for (var i = 0; i < n; ++i) {
 		idx[i] = i;
 	}
 	
-		// Per property of the SELECT algorithm of Floyd and Rivest, the array idx is permuted
-		// so that the indexes of the largest k elements of x are at the indexes 0..k-1 of the
-		// array idx.
+	// Per property of the SELECT algorithm of Floyd and Rivest, the array idx is permuted
+	// so that the indexes of the largest k elements of x are at the indexes 0..k-1 of the
+	// array idx.
 	var compareIndexes = function (a, b) {
 	    return x[b] - x[a];
 	};
 	select_(idx, k, compareIndexes);
 
-		// Extract the k largest elements of x
+	// Extract the k largest elements of x
 	var x_k = x.slice(0, k);
 	for (var i = 0; i < k; ++i) {
 		x_k[i] = x[idx[i]];
 	}
 	
+	
 	// Compute the projection on the standard simplex of the k largest elements of x.
 	var proj_x_k = simplexEuclidianProjection_(x_k);
+	
 	
 	// Compute the final projection by reconciliating the support of the
 	// projection above and its complementary set.
@@ -6368,6 +6816,7 @@ function simplexSparseEuclidianProjection_(x, k) {
 	for (var i = k; i < n;  ++i) {
 		y[idx[i]] = 0;
 	}
+	
 	
 	// Return the computed projection
 	return y;
@@ -6477,8 +6926,9 @@ function simplexDeterministicRationalSampler_(n, k) {
 		
 		// Compute the current rational grid point by normalizing the generated k-composition
 		var x = nextComposition[1];
-		for (var i = 0; i < x.length; ++i) {
-			x[i] = x[i] / k;
+		var n = x.length;
+		for (var i = 0; i < n; ++i) {
+			x[i] = x[i] / this.k;
 		}
 
 		// Update the internal iterator status
@@ -6540,7 +6990,7 @@ function simplexRandomSampler_(n) {
 			// Set the i-th coordinate of the point being sampled.
 			this.x[i] = e;
 			
-			// Compute the running sum of the exponential variables, for the subsequant normalization step.
+			// Compute the running sum of the exponential variables, for the subsequent normalization step.
 			sum += e;
 		}
 
@@ -6650,7 +7100,7 @@ function simplexRationalRounding_(x, r) {
 * @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
 *
 * @param {function} fct a real-valued function of n real variables defined on the unit simplex of R^n, 
-* which must take as first input argument an array of n real numbers corresponding to a point on the unit simplex of R^n 
+* which must take as input argument an array of n real numbers corresponding to a point on the unit simplex of R^n 
 * and which must return as output a real number.
 * @param {number} n the number of variables of the function fct, natural integer superior or equal to 1.
 * @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function fct, a natural integer superior or equal to 1.
@@ -7428,6 +7878,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 *
 * @see <a href="https://doi.org/10.1111/j.1540-6261.1976.tb03217.x">Elton, E. J., Gruber, M. J. and Padberg, M. W. (1976), SIMPLE CRITERIA FOR OPTIMAL PORTFOLIO SELECTION. The Journal of Finance, 31: 1341-1357</a>
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
+* @see <a href="https://www.jstor.org/stable/1924119">Lintner, John. The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets. The Review of Economics and Statistics 47, no. 1 (1965): 13-37.</a>
 *
 * @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
 * @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
@@ -7440,7 +7891,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 *
 * @example
 * maximumSharpeRatioWeights([0.1, 0.2], [[1, 0.3], [0.3, 1]], 0)
-* // TODO
+* // [~0.19, ~0.81]
 */
 self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// Internal function to compute the return of a portfolio
@@ -7456,8 +7907,7 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// Internal function to compute the Sharpe ratio of a portfolio,
 	// as well as the intermediate values of return and volatility.
 	function computeSharpeRatio_(mu, sigma, rf, weights) {
-		// The numerical zero
-		var eps = 1e-8;
+		var eps = 1e-8; // the numerical zero
 		
 		// The numerator: <mu/w> - rf
 		var ret = computeReturn_(mu, weights);
@@ -7489,8 +7939,7 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// the Sharpe ratio is a strictly unimodular function on the above restricted
 	// efficient frontier, c.f. the reference.
 	function computeMaximumSharpeRatioCornerPortfolio_(mu, sigma, rf, cornerPortfolios) {
-		// The numerical zero
-		var eps = 1e-8;
+		var eps = 1e-8; // the numerical zero
 		
 		// The efficient frontier portfolios are provided from highest return/volatility
 		// to lowest return/volatility, so that *_min below refers to properties of the portfolio
@@ -7662,14 +8111,13 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 
 			candidateSharpeRatios.push([weights_t2, sr_t2]);
 		}
-		
-		candidateSharpeRatios.sort(function(a, b) {
-			return b[1] - a[1];
-		});
-		
+
 		// Return the efficient portfolio which maximizes the Sharpe ratio
 		// on the efficient segment.
-		return candidateSharpeRatios[0]; 
+		var compareSharpeRatios = function (a, b) {
+			return a[1] - b[1];
+		};
+		return max_(candidateSharpeRatios, compareSharpeRatios)[0];
 	}
 	
 	
@@ -7831,10 +8279,11 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// Compute the efficient portfolio maximizing the Sharpe ratio
 	// by merging the efficient portfolios locally maximizing
 	// the Sharpe ratio on each efficient segment.
-	candidateSharpeRatios.sort(function(a, b) {  // descending order
-		return b[1] - a[1];
-	});
-	var weights = candidateSharpeRatios[0][0]; // candidateSharpeRatios[0] is the portfolio with the highest global Sharpe ratio
+	var compareSharpeRatios = function (a, b) {
+		return a[1] - b[1];
+	};
+	var maxSharpeRatio = max_(candidateSharpeRatios, compareSharpeRatios)[0];
+	var weights = maxSharpeRatio[0];
 
 
 	// Return the computed portfolio weights
@@ -8120,8 +8569,7 @@ function computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfoli
 	// return is strictly decreasing as soon as there are at least two corner
 	// portfolios on the efficient frontier.
 	function computeEnclosingCornerPortfolios_(targetReturn, mu, cornerPortfolios) {
-		// The numerical accuracy for testing equality
-		var eps = 1e-8;
+		var eps = 1e-8; // the numerical zero
 		
 		// The efficient frontier portfolios are provided from highest return
 		// to lowest return, so that *_min below refers to properties of the portfolio
@@ -8456,8 +8904,7 @@ function computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cor
 * // [[new Matrix_([0, 1]), 7], [new Matrix_([0.5, 0.5]), 0]] 
 */
 function computeCornerPortfolios_(mu, sigma, opt) {	
-	// The numerical zero
-	var eps = 1e-8; 
+	var eps = 1e-8; // the numerical zero
 	
 	// Internal object managing the statuses of the asset and lambda variables
 	function variablesStatusManager_(nbAssets, nbEqualityConstraints) {
@@ -8561,22 +9008,21 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 	function computeMaxReturnPortfolio_(mu, lowerBounds, upperBounds) {		
 		// Check that the problem is feasible (l_i <= u_i, sum l_i <= 1 and 1 <= sum u_i,
 		// c.f. paragraph 12.3.1 of the second reference).
-		var sum_lb = 0;
-		var sum_ub = 0;
 		for (var i = 1; i <= nbAssets; ++i) {
 			var lb_i = lowerBounds.getValue(i, 1);
-			sum_lb += lb_i;
-			
 			var ub_i = upperBounds.getValue(i, 1);
-			sum_ub += ub_i;
 			
 			if (lb_i > ub_i) {
 				throw new Error('infeasible problem detected');
 			}
 		}
+
+		var sum_lb = lowerBounds.sum();
+		var sum_ub = upperBounds.sum();
 		if (sum_lb > 1 || sum_ub < 1) {
 			throw new Error('infeasible problem detected');
 		}
+
 		
 		// Order the assets in descending order w.r.t. their returns
 		var mu_idx = typeof Uint32Array === 'function' ? new Uint32Array(nbAssets) : new Array(nbAssets);
@@ -8935,7 +9381,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 	var lambda_in = 0;
 	while (true) {
 		// Check the number of iterations
-		if (maxIterations !== -1 && iter > maxIterations) {
+		if (maxIterations !== -1 && iter >= maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 
@@ -9002,7 +9448,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 				}
 			}
 			else { // an asset OUT goes IN				
-				// Get the new IN variables indexes
+				// Get the current IN variables indexes
 				var variablesInIdx = variablesStatusManager.getInIndexes();
 
 				
@@ -9216,7 +9662,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 		// In case lambda_e == lambda_out, it means an asset first goes OUT as lambda_e
 		// is decreased; otherwise, in case lambda_e == lambda_in, it means an asset
 		// first goes IN as lambda_e is decreased.
-		lambda_e = Math.max(lambda_out, lambda_in, 0);
+		lambda_e = max_([lambda_out, lambda_in, 0])[0];
 		
 		
 		// Compute the weights of the next corner portfolio

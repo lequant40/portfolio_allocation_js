@@ -13,7 +13,7 @@ QUnit.test('Alias method sampler', function(assert) {
 	  var nbTests = 10;
 	  var minSizeProbabilityDistribution = 1;
 	  var maxSizeProbabilityDistribution = 50;
-	  var nbSamplesToDraw = 100;
+	  var nbSamplesToDraw = 1000;
 	  
 	  // For each test, generate a probability distribution, and then sample
 	  // from this probability distribution, ensuring the generated values are coherent.
@@ -34,13 +34,17 @@ QUnit.test('Alias method sampler', function(assert) {
 		var aliasSampler = new PortfolioAllocation.aliasMethodSampler_(probabilityDistribution);
 		
 		// Sample from the alias sampler.
+		var sampleOk = true;
 		for (var j = 0; j < nbSamplesToDraw; ++j) {
 			var s = aliasSampler.sample();
-			assert.equal(s >= 0 && s <= probabilityDistribution.length -1, true, "Alias method sampler, elements in correct range - Test " + i + "," + j);
+			if (!(s >= 0 && s <= probabilityDistribution.length - 1)) {
+				sampleOk = false;
+				break;
+			}
 		}
+		assert.equal(sampleOk, true, "Alias method sampler, elements in correct range - Test " + i);
 	  }	  
   }
-
 });
 
 

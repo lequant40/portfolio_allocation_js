@@ -32,7 +32,7 @@ PortfolioAllocation = (function(self) {
 * @return {this} the constructed matrix.
 *
 * @example
-* Matrix_([[1,2,3], [4,5,6]]);
+* new Matrix_([[1,2,3], [4,5,6]]);
 */
 function Matrix_(input) {
 	function fromDoubleArray(dblarr) {
@@ -821,8 +821,8 @@ Matrix_.prototype = {
 	* rindexes/cindexes, where p is equal to the length of rindexes and q is equal to the length of cindexes, with coefvectorDotProductficients satisfying c_ij = a_rindexes[i]cindexes[j].
 	*
 	* @memberof Matrix_
-	* @param {Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..n.
-    * @param {Array.<number>} cindexes the column indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..m.
+	* @param {Array.<number>|Uint32Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..n.
+    * @param {Array.<number>|Uint32Array.<number>} cindexes the column indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..m.
 	* @param {Matrix_} out an optional rindexes by cindexes matrix.
 	* @return {Matrix_} a rindexes by cindexes matrix whose elements correspond to the elements of the original matrix
 	* whose row/column indexes belong to the input lists of row/column indexes to keep, either stored in the matrix out or in a new matrix.
@@ -833,10 +833,10 @@ Matrix_.prototype = {
 	*/
     submatrix : function(rindexes, cindexes, out) {
     	// Check that indexes are arrays
-    	if (!(rindexes instanceof Array) || rindexes.length == 0) {
+    	if (!(rindexes instanceof Array || rindexes instanceof Uint32Array) || rindexes.length == 0) {
     		throw new Error('first parameter must be a non empty array');
     	}
-    	if (!(cindexes instanceof Array) || cindexes.length == 0) {
+    	if (!(cindexes instanceof Array || cindexes instanceof Uint32Array) || cindexes.length == 0) {
     		throw new Error('second parameter must be a non empty array');
     	}
 	
@@ -3821,12 +3821,22 @@ function binomial_(n, k) {
 
 
 /**
-// TODO: Proper comments
-https://en.wikipedia.org/wiki/Bit_array
-BitSet.js is an infinite Bit-Array (aka bit vector, bit string, bit set) implementation in JavaScript. 
-	https://github.com/infusion/BitSet.js
-	https://github.com/lemire/FastBitSet.js
-	 a word is an unsigned integer
+* @function BitSet_
+*
+* @summary Construct a bit set.
+*
+* @description This function constructs an empty bit set (a.k.a. bit array, bit vector).
+*
+* The internal way to handle bit sets has been greatly inspired from: 
+* - https://github.com/infusion/BitSet.js
+* - https://github.com/lemire/FastBitSet.js
+*
+* @see <a href="https://en.wikipedia.org/wiki/Bit_array">Bit array</a>
+*
+* @return {this} the constructed bit set.
+*
+* @example
+* var myBitSet = new BitSet_();
 */
 function BitSet_() {
     // Catches incorrect usage of var b = BitSet_() instead of var b = new BitSet_()
@@ -4025,7 +4035,7 @@ BitSet_.prototype = {
 			//
 			// Note: if the underlying array of words is a standard array, words greater than
 			// 2^(this.WORD_LENGTH-1)-1 will be considered as negative by the toString(2)
-			// method above, so that the unsigned right shift bitwise operator (>>>) is
+			// method below, so that the unsigned right shift bitwise operator (>>>) is
 			// used to coerce the word to an unsigned integer.
 			//
 			// C.f. https://stackoverflow.com/questions/9939760/how-do-i-convert-an-integer-to-binary-in-javascript
@@ -4275,7 +4285,9 @@ BitSet_.prototype = {
 	* which contains the indexes of the bits set to 1 in increasing order.
 	* 
 	* @memberof BitSet_
-	* @return {Array<number>} an array representation of the bit set' content.
+	* @return {Uint32Array<number>} an array representation of the bit set' content, 
+	* a newly allocated array of length the number of bits set to 1 in the
+	* bit set.
 	*
 	* @example
 	* BitSet_().add(5).add(10).toArray()
@@ -4304,7 +4316,93 @@ BitSet_.prototype = {
 	  return arr;
 	},
 
+	/**
+	* @function toTypedArray
+	*
+	* @summary Return a typed array representation of the bit set.
+	*
+	* @description This function builds a typed array representation of the bit set,
+	* which contains the indexes of the bits set to 1 in increasing order.
+	* 
+	* @memberof BitSet_
+	* @return {Array<number>|Uint32Array<number>} either a uint32 typed array (if supported) 
+	* or a standard array (if not supported) representation of the bit set' content, 
+	* a newly allocated array of length the number of bits set to 1 in the
+	* bit set.
+	*
+	* @example
+	* BitSet_().add(5).add(10).toTypedArray()
+	* // [5, 10]
+	*/
+	toTypedArray: function() {
+	  // Initialize the output array, and its associated elements pointer
+	  var arr = typeof Uint32Array === 'function' ? new Uint32Array(this.nbSetBits()) : new Array(this.nbSetBits());
+	  var pos = 0;
+	  
+	  // Loop over all the words help by the bit set 
+	  var c = this.words.length;
+	  for (var i = 0; i < c; ++i) {
+		var w = this.words[i];
+		
+		// For each word help by the bit set, extract the bits set to 1
+		// and compute their associated index.
+		while (w != 0) {
+		  var t = w & -w;
+		  arr[pos++] = (i << this.WORD_LOG) + BitSet_.populationCount((t - 1) | 0);
+		  w ^= t;
+		}
+	  }
+	  
+	  // Return the computed array
+	  return arr;
+	},
 };
+
+/**
+* @function max_
+*
+* @summary Compute the maximum of a serie of values.
+*
+* @description This function returns the maximum of a serie of values [x_1,...,x_n],
+* as well as its index.
+*
+* In case there are several identical maximum values, the one corresponding to the
+* lowest indice in the array x is returned.
+*
+* @param {Array.<number>} x an array of real numbers.
+* @param {function} compareFunction an optional sort function that defines the sort order, using the standard prototype for JavaScript sort functions (c.f. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort).
+* @return {Array.<number>} an array arr of two elements:
+* arr[0], the maximum of the values of the array x, a real number
+* arr[1], the index of the maximum of the values of the array x, a positive integer
+*
+* @example
+* max_([2,4,4,1]);
+* // [4, 1]
+*/
+function max_(x, compareFunction) {
+	// Initialisations.
+	var defaultCompareFct = function (a, b) {
+		return a - b;
+	};
+	var compareFunction = compareFunction || defaultCompareFct;
+	
+	var n = x.length;
+	
+	// Core loop
+	var maxValue = x[0];
+	var maxValueIdx = 0;
+	for (var i = 1; i < n; ++i) {
+		//if (x[i] > maxValue) {
+		if (compareFunction(x[i], maxValue) > 0) {
+			maxValue = x[i];
+			maxValueIdx = i;
+		}
+	}
+	
+	// Return the computed maximum value and its index
+	return [maxValue, maxValueIdx];
+}
+
 
 /**
 * @function median_
@@ -4321,6 +4419,7 @@ BitSet_.prototype = {
 * @see <a href="https://www.sciencedirect.com/science/article/pii/S0304397505004081">Krzysztof C. Kiwiel, On Floyd and Rivest's SELECT algorithm, Theoretical Computer Science, Volume 347, Issues 1–2, 2005, Pages 214-238</a>
 * 
 * @param {Array.<number>} x an array of real numbers.
+* @param {function} compareFunction an optional sort function that defines the sort order, using the standard prototype for JavaScript sort functions (c.f. https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Array/sort).
 * @return {number} the median of the values of the array x.
 *
 * @example
@@ -4330,13 +4429,13 @@ BitSet_.prototype = {
 * median_([2,4,1,3]);
 * // 2.5
 */
-function median_(x) {
+function median_(x, compareFunction) {
 	// Initialisations.
 	var n = x.length;
 	var xx = x.slice(); // to avoid altering the array x
 	
 	// Compute the smallest |-n/2-| element of the array, which corresponds to the median
-	return select_(xx, Math.ceil(n/2));
+	return select_(xx, Math.ceil(n/2), compareFunction);
 }
 
 
@@ -7378,6 +7477,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 *
 * @see <a href="https://doi.org/10.1111/j.1540-6261.1976.tb03217.x">Elton, E. J., Gruber, M. J. and Padberg, M. W. (1976), SIMPLE CRITERIA FOR OPTIMAL PORTFOLIO SELECTION. The Journal of Finance, 31: 1341-1357</a>
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
+* @see <a href="https://www.jstor.org/stable/1924119">Lintner, John. The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets. The Review of Economics and Statistics 47, no. 1 (1965): 13-37.</a>
 *
 * @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
 * @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
@@ -7390,7 +7490,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 *
 * @example
 * maximumSharpeRatioWeights([0.1, 0.2], [[1, 0.3], [0.3, 1]], 0)
-* // TODO
+* // [~0.19, ~0.81]
 */
 self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// Internal function to compute the return of a portfolio
@@ -7406,8 +7506,7 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// Internal function to compute the Sharpe ratio of a portfolio,
 	// as well as the intermediate values of return and volatility.
 	function computeSharpeRatio_(mu, sigma, rf, weights) {
-		// The numerical zero
-		var eps = 1e-8;
+		var eps = 1e-8; // the numerical zero
 		
 		// The numerator: <mu/w> - rf
 		var ret = computeReturn_(mu, weights);
@@ -7439,8 +7538,7 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// the Sharpe ratio is a strictly unimodular function on the above restricted
 	// efficient frontier, c.f. the reference.
 	function computeMaximumSharpeRatioCornerPortfolio_(mu, sigma, rf, cornerPortfolios) {
-		// The numerical zero
-		var eps = 1e-8;
+		var eps = 1e-8; // the numerical zero
 		
 		// The efficient frontier portfolios are provided from highest return/volatility
 		// to lowest return/volatility, so that *_min below refers to properties of the portfolio
@@ -7612,14 +7710,13 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 
 			candidateSharpeRatios.push([weights_t2, sr_t2]);
 		}
-		
-		candidateSharpeRatios.sort(function(a, b) {
-			return b[1] - a[1];
-		});
-		
+
 		// Return the efficient portfolio which maximizes the Sharpe ratio
 		// on the efficient segment.
-		return candidateSharpeRatios[0]; 
+		var compareSharpeRatios = function (a, b) {
+			return a[1] - b[1];
+		};
+		return max_(candidateSharpeRatios, compareSharpeRatios)[0];
 	}
 	
 	
@@ -7781,10 +7878,11 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// Compute the efficient portfolio maximizing the Sharpe ratio
 	// by merging the efficient portfolios locally maximizing
 	// the Sharpe ratio on each efficient segment.
-	candidateSharpeRatios.sort(function(a, b) {  // descending order
-		return b[1] - a[1];
-	});
-	var weights = candidateSharpeRatios[0][0]; // candidateSharpeRatios[0] is the portfolio with the highest global Sharpe ratio
+	var compareSharpeRatios = function (a, b) {
+		return a[1] - b[1];
+	};
+	var maxSharpeRatio = max_(candidateSharpeRatios, compareSharpeRatios)[0];
+	var weights = maxSharpeRatio[0];
 
 
 	// Return the computed portfolio weights
@@ -8070,8 +8168,7 @@ function computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfoli
 	// return is strictly decreasing as soon as there are at least two corner
 	// portfolios on the efficient frontier.
 	function computeEnclosingCornerPortfolios_(targetReturn, mu, cornerPortfolios) {
-		// The numerical accuracy for testing equality
-		var eps = 1e-8;
+		var eps = 1e-8; // the numerical zero
 		
 		// The efficient frontier portfolios are provided from highest return
 		// to lowest return, so that *_min below refers to properties of the portfolio
@@ -8406,8 +8503,7 @@ function computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cor
 * // [[new Matrix_([0, 1]), 7], [new Matrix_([0.5, 0.5]), 0]] 
 */
 function computeCornerPortfolios_(mu, sigma, opt) {	
-	// The numerical zero
-	var eps = 1e-8; 
+	var eps = 1e-8; // the numerical zero
 	
 	// Internal object managing the statuses of the asset and lambda variables
 	function variablesStatusManager_(nbAssets, nbEqualityConstraints) {
@@ -8488,10 +8584,10 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 		
 		// Public functions to iterate over the different sets.
 		this.getInIndexes = function() {
-			return this.varIn.toArray();
+			return this.varIn.toTypedArray();
 		}
 		this.getOutIndexes = function() {
-			return this.varOut.toArray();
+			return this.varOut.toTypedArray();
 		}
 	}
 
@@ -8952,7 +9048,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 				}
 			}
 			else { // an asset OUT goes IN				
-				// Get the new IN variables indexes
+				// Get the current IN variables indexes
 				var variablesInIdx = variablesStatusManager.getInIndexes();
 
 				
@@ -9166,7 +9262,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 		// In case lambda_e == lambda_out, it means an asset first goes OUT as lambda_e
 		// is decreased; otherwise, in case lambda_e == lambda_in, it means an asset
 		// first goes IN as lambda_e is decreased.
-		lambda_e = Math.max(lambda_out, lambda_in, 0);
+		lambda_e = max_([lambda_out, lambda_in, 0])[0];
 		
 		
 		// Compute the weights of the next corner portfolio
