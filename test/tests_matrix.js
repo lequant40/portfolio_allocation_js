@@ -537,6 +537,13 @@ QUnit.test('Matrix AXPBY', function(assert) {
 	assert.equal(PortfolioAllocation.Matrix.areEqual(computedMat, expectedMat), true, 'Matrix axpby #1/1');
 	assert.equal(PortfolioAllocation.Matrix.areEqual(outputMat, outputComputedMat), true, 'Matrix axpby #1/2');
 	assert.equal(PortfolioAllocation.Matrix.areEqual(outputComputedMat, expectedMat), true, 'Matrix axpby #1/3');
+	
+	// Test that incrementing in place a matrix is possible
+	var mat3 = new PortfolioAllocation.Matrix.ones(3, 3);
+	var mat4 = PortfolioAllocation.Matrix.axpby(1, mat3, 2, mat3, mat3);
+	var expectedMat = new PortfolioAllocation.Matrix([[3,3,3], [3,3,3], [3,3,3]]);
+	assert.equal(PortfolioAllocation.Matrix.areEqual(mat3, expectedMat), true, 'Matrix axpby #2/1');
+	assert.equal(mat3 === mat4, true, 'Matrix axpby #2/2');
   }
   
   // TODO: Test random data

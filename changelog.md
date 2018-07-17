@@ -6,6 +6,8 @@
 - Added toTypedArray method for bit sets, and updated the critical line algorithm to use typed arrays for variables indexes
 - Reorganized the bit set structure files
 - Misc. tests improvements
+- Added a FISTA-like optimization method for composite convex problems
+- Added the computation of geometric center and geometric median
 
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights

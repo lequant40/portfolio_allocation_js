@@ -38,7 +38,7 @@ QUnit.test('Compositve convex programming solver - FISTA', function(assert) {
 		var g = function(x) {
 			var x_1 = x.getValue(1, 1);
 			if (0 > x_1 || x_1 > 1) {
-				return Math.POSITIVE_INFINITY;
+				return Number.POSITIVE_INFINITY;
 			}
 			return 0;
 		}
@@ -108,7 +108,7 @@ QUnit.test('Compositve convex programming solver - FISTA', function(assert) {
 				var x_i = x.getValue(i, 1);
 				
 				if (-5.12 > x_i || x_i > 5.12) {
-					return Math.POSITIVE_INFINITY;
+					return Number.POSITIVE_INFINITY;
 				}
 			}
 			return 0;
@@ -170,7 +170,7 @@ QUnit.test('Compositve convex programming solver - FISTA', function(assert) {
 				var x_i = x.getValue(i, 1);
 				
 				if (-5.12 > x_i || x_i > 5.12) {
-					return Math.POSITIVE_INFINITY;
+					return Number.POSITIVE_INFINITY;
 				}
 			}
 			return 0;
@@ -199,7 +199,7 @@ QUnit.test('Compositve convex programming solver - FISTA', function(assert) {
 	// Test with the the ARWHEAD function
 	// Reference: Problem 55 in A.R. Conn, N.I.M. Gould, M. Lescrenier and Ph.L. Toint, Performance of a multifrontal scheme for partially separable optimization.
 	{
-		var n = generateRandomDimension(1000, 5000);
+		var n = generateRandomDimension(5000, 5000);
 
 		// The arrow head function is f(x1,...,xn) = sum((x_i^2 + x_n^2)^2 - 4*x_i + 3), i=1..n-1
 		var f = function(x) {		

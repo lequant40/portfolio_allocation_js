@@ -1305,6 +1305,9 @@ Matrix_.xmy = function(X, Y, out) {
 * @param {Matrix_} out an optional n by m matrix, possibly either the matrix X or the matrix Y.
 * @return {Matrix_} the matrix a*X + b*Y, either stored in the matrix out or in a new matrix, an n by m matrix.
 *
+* Note: the matrix out can safely be choosen as either the matrix X or the matrix Y, in which case this matrix
+* is overwritten.
+*
 * @example
 * axpy(-1, Matrix_([[1,2,3], [4,5,6]]), 1, Matrix_([[7,8,9], [10,11,12]]));
 * // Matrix_([[6,6,6], [6,6,6]])
@@ -1666,6 +1669,48 @@ Matrix_.axy = function(a, X, Y, out) {
 	// Return the computed matrix
     return obj;
 };
+
+
+/**
+* @function ax
+*
+* @summary Returns the product of a matrix with a real number.
+*
+* @description This function computes a*X, the product of a n by m matrix X with a real number a.
+*
+* @param {number} a a real number.
+* @param {Matrix_} X a n by m matrix.
+* @param {Matrix_} out an optional n by p matrix.
+* @return {Matrix_} the matrix a*X, either stored in the matrix out or in a new matrix, a n by p matrix.
+*
+* @example
+* ax(Matrix_(2, [[1,2,3]));
+* // Matrix_([2,4,6])
+*/
+Matrix_.ax = function(a, X, out) {
+	// Ensure X is a matrix
+	if (!(X instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+		
+	// Result matrix allocation
+	var obj = allocateMatrix_(X.nbRows, X.nbColumns, out);
+
+	// Computation of the a*X product
+	var n = X.nbRows;
+	var m = X.nbColumns;
+	
+	for (var i = 1; i <= n; ++i) {
+		for (var j = 1; j <= m; ++j) {
+			obj.setValue(i, j,
+			             a * X.getValue(i, j));
+		}
+	}
+	
+	// Return the computed matrix
+    return obj;
+};
+
 
 /**
 * @function axty
@@ -2077,6 +2122,9 @@ Matrix_.vectorDotProduct = function(x, y) {
 	// Return it
 	return dotProd;
 }
+
+
+
 
 
 /**
@@ -4337,6 +4385,257 @@ function binomial_(n, k) {
 }
      
 /**
+ * @file Misc. computational geometry functions.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+/* Start Wrapper private methods - Unit tests usage only */
+self.geometricCenter_ = geometricCenter_;
+self.geometricMedian_ = geometricMedian_;
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function geometricCenter_
+*
+* @summary Compute the geometric center of a finite set of points belonging to R^n.
+*
+* @description This function returns the geometric center of m points x_1,...x_m 
+* belonging to R^n, which is defined as the component-wise arithmetic mean of the m points.
+*
+* The geometric center of the m points x_1, ..., x_m is also the point y which 
+* minimizes the sum of the squared Euclidean distances between itself and each point:
+*
+* y = argmin_x in R^n f(x) = sum ||y - x_i||_2^2, i = 1..m
+*
+* The algorithm implemented uses a two pass formula in order to reduce the computation error
+* in the computation of the component wise mean, c.f. the second reference.
+*
+* @see <a href="https://en.wikipedia.org/wiki/Centroid">Centroid</a>
+* @see <a href="http://dl.acm.org/citation.cfm?doid=365719.365958">Peter M. Neely (1966) Comparison of several algorithms for computation of means, standard deviations and correlation coefficients. Commun ACM 9(7):496–499.</a>
+*
+* @param {Array.<Matrix_>} x an array of m n by 1 matrices, corresponding to the coordinates 
+* of the m points belonging to R^n.
+* @return {Matrix_} the geometric center of the m points x_1,...x_m
+*
+* @example
+* geometricCenter_([new Matrix([0,1,2]), new Matrix([1,2,3])]);
+* // new Matrix([0.5,1.5,2.5]) 
+*/
+function geometricCenter_(x) {
+	// TODO: Checks
+	
+	// Initialisations
+	var m = x.length;
+	var n = x[0].nbRows;
+
+	// Instanciate the geometric center
+	var y = Matrix_.zeros(n, 1);
+	
+	// For each coordinate i of the input points:
+	// - Compute the mean over the m points of the coordinate i (first pass)
+	// - Compute the correction factor (second pass), c.f. M_3 formula of the 
+	// second reference
+	// - Set the geometric center coordinate i to the corrected mean over the m points
+	// of the coordinate i
+	for (var i = 1; i <= n; ++i) {
+		// Mean computation
+		var sum_i = 0.0;
+		for (var k = 0; k < m; ++k) {
+			sum_i += x[k].getValue(i, 1);
+		}
+		var tmpMean_i = sum_i/m;
+
+		// Correction factor computation
+		var sumDiff_i = 0.0;
+		for (var k = 0; k < m; ++k) {
+			sumDiff_i += (x[k].getValue(i, 1) - tmpMean_i);
+		}
+
+		// Corrected mean computation
+		y.setValue(i, 1,
+		           (sum_i + sumDiff_i)/m);
+	}
+	
+	// Return the computed geometric center
+	return y;
+}
+
+/**
+* @function geometricMedian_
+*
+* @summary Compute the geometric median of a finite set of points belonging to R^n.
+*
+* @description This function returns the geometric median of m points x_1,...x_m 
+* belonging to R^n, which is defined as the point y which minimizes 
+* the sum of the Euclidean distances between itself and each point:
+*
+* y = argmin_x in R^n f(x) = sum ||y - x_i||_2, i = 1..m
+*
+* The algorithm implemented uses a serie of successive hyperbolic approximations of
+* the euclidian norms appearing in the function f above, c.f. the second reference,
+* which allows to compute the geometric median using a standard first-order convex
+* optimization algorithm.
+*
+* @see <a href="https://en.wikipedia.org/wiki/Geometric_median">Geometric median</a>
+* @see <a href="http://dx.doi.org/10.1287/opre.23.3.581">Robert F. Love, James G. Morris, (1975) Technical Note—Solving Constrained Multi-Facility Location Problems Involving lp Distances Using Convex Programming. Operations Research 23(3):581-587.</a>
+* @see <a href="https://arxiv.org/abs/1606.05225">Michael B. Cohen, Yin Tat Lee, Gary Miller, Jakub Pachocki, Aaron Sidford. Geometric Median in Nearly Linear Time. arXiv:1606.05225 [cs.DS]</a>
+*
+* @param {Array.<Matrix_>} x an array of m n by 1 matrices, corresponding to the coordinates 
+* of the m points belonging to R^n.
+* @return {Matrix_} the geometric median of the m points x_1,...x_m
+*
+* @example
+* geometricMedian_([new Matrix([0,1,2]), new Matrix([1,2,3])]);
+* // new Matrix([0.5, 1.5, 2.5]) 
+*/
+function geometricMedian_(x) {
+    // Internal function to compute the function C_ph, 
+	// approximation of the function f, c.f. formula 1 
+	// of the second reference.
+	function f_eps(y) {
+		var sum = 0.0;
+
+		for (var k = 0; k < m; ++k) {
+			// Compute Math.SQRT(||y - x_k||_2^2 + eps), using an inlined version
+			// of the vectorNorm('two') Matrix function and a stable way to
+			// compute the square root of two numbers squared.
+			//var y_m_x_k = Matrix_.xmy(y, x[k], tmp_vec_n);
+			//var y_m_x_k_two_norm = y_m_x_k.vectorNorm('two');
+			var t = 0;
+			var s = 1;
+			for (var i = 1; i <= n; ++i) {
+				var val = y.getValue(i, 1) - x[k].getValue(i, 1); // y_i - (x_k)_i
+				var absVal = Math.abs(val);
+				if (absVal != 0) {
+					if (absVal > t) {
+						s = 1 + s * (t/val) * (t/val);
+						t = absVal;
+					}
+					else  {
+						s = s + (val/t) * (val/t);
+					}
+				}
+			}
+			var y_m_x_k_two_norm = t * Math.sqrt(s);
+			
+			sum += hypot_(y_m_x_k_two_norm, eps_f);
+		}
+		return sum;
+	}
+	
+    // Internal function to compute the function grad(C_ph),
+	// approximation of the gradient of the function f, c.f.
+	// formula 1 of the second reference.
+	function gradf_eps(y) {
+		var res = Matrix_.zeros(n, 1);
+		
+		for (var k = 0; k < m; ++k) {
+			// Compute (y - x_k)/||y - x_k||_2 and add it
+			// to the currently computed gradient, using an inlined version
+			// of the vectorNorm('two') Matrix function and a stable way to
+			// compute the square root of two numbers squared.
+			//var y_m_x_k = Matrix_.xmy(y, x[k-1], tmp_vec_n);
+			//var y_m_x_k_two_norm = y_m_x_k.vectorNorm('two');
+			var t = 0;
+			var s = 1;
+			for (var i = 1; i <= n; ++i) {
+				var val = y.getValue(i, 1) - x[k].getValue(i, 1);  // y_i - (x_k)_i
+				tmp_vec_n.setValue(i, 1, 
+				                   val);
+				
+				var absVal = Math.abs(val);
+				if (absVal != 0) {
+					if (absVal > t) {
+						s = 1 + s * (t/val) * (t/val);
+						t = absVal;
+					}
+					else  {
+						s = s + (val/t) * (val/t);
+					}
+				}
+			}
+			var y_m_x_k = tmp_vec_n;
+			var y_m_x_k_two_norm = t * Math.sqrt(s);
+
+			res = Matrix_.axpby(1, res, 1/hypot_(y_m_x_k_two_norm, eps_f), y_m_x_k, res);
+		}
+		return res;
+	}
+	
+	
+	// TODO: Checks
+	
+	
+	// Initialisations
+	var m = x.length; // the number of points provided in input
+	var n = x[0].nbRows; // the dimension of each point provided in input
+
+	var tmp_vec_n = Matrix_.zeros(n, 1); // a temporary placeholder vector of dimension n
+	
+	
+	// The geometric median is computed using successive hyperbolic approximations of
+	// the euclidian norms appearing in its objective function, c.f. the second
+	// reference.
+	//
+	// Each hyperbolic approximation of the objective function of the geometric median
+	// problem is a smooth convex(/strictly convex) function, so that the associated
+	// minimization problem can be solved using a standard first-order convex optimization
+	// algorithm (here, FISTA-like).
+	
+	
+	// Compute a proper starting point for the optimization algorithm.
+	//
+	// Per lemma 18 of the third reference, the geometric center is a 
+	// 2-approximation of the geometric median.
+	var x0 = geometricCenter_(x);
+	
+	
+	// Define additional functions used by the optimization algorithm
+	
+	// The projection on R^n
+	var g = function(x) {
+		return 0;
+	}
+		
+	// The proximal function associated to g is the orthogonal
+	// projection on R^n, i.e., the identity.
+	var proxg = function(x, mu) {
+		return x;
+	}
+		
+			
+	// Compute the minimum of the function f_eps on R^n, for successive decreasing values
+	// of epsilon (which is actually squared in the computation of f_eps and gradf_eps).
+	//
+	// Precision in the early stages is not of paramount importance.
+	//
+	// Note: the associated loop has been unrolled.
+	var eps_f = 1e-3;
+	var sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, x0, {eps: 1e-2, maxIter: -1, maxLine: -1});
+
+	eps_f = 1e-4;
+	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-2, maxIter: -1, maxLine: -1});
+	
+	eps_f = 1e-5;
+	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-3, maxIter: -1, maxLine: -1});
+	
+	eps_f = 1e-6;
+	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-3, maxIter: -1, maxLine: -1});
+
+	eps_f = 1e-7;
+	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-4, maxIter: -1, maxLine: -1});
+
+	eps_f = 1e-8;
+	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-4, maxIter: -1, maxLine: -1});
+
+
+	// Return the computed optimal solution to the last hyperbolic approximation of the 
+	// geometric median.
+	return sol[0];
+}
+
+/**
  * @file Misc. statistical functions.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -5287,11 +5586,12 @@ self.ccpsolveFISTA_ = ccpsolveFISTA_;
 * assumed to be non-empty.
 *
 * The algorithm used internally is based on the FISTA-BKTR algorithm of the third 
-* reference, with the following additions:
+* reference, which is an optimal first-order method for a smooth problem (i.e., 
+* it ensures a convergence rate of O(1/k^2)), with the following additions:
 * - The usage of a convergence criterion based on the gradient of f and on a subdifferential of g,
 * c.f. the fourth reference
-* - The usage of fixed and of an adaptative restart mechanism, c.f. the fifth reference
-* - The usage of a Barzilai and Borwein like stepsize, c.f. the sixth reference
+* - The usage of both a fixed and of an adaptative restart mechanism, c.f. the fifth reference
+* - The usage of a Barzilai and Borwein like step size, c.f. the sixth reference
 *
 * @see <a href="https://doi.org/10.1137/080716542">Amir Beck and Marc Teboulle, A Fast Iterative Shrinkage-Thresholding Algorithm for Linear Inverse Problems, SIAM Journal on Imaging Sciences 2009 2:1, 183-202</a>
 * @see <a href="https://doi.org/10.1109/TIP.2009.2028250">A. Beck, M. Teboulle, "Fast gradient-based algorithms for constrained total variation image denoising and deblurring problems", IEEE Trans. Image Process., vol. 18, no. 11, pp. 2419-2434, 2009</a>
@@ -5308,7 +5608,7 @@ self.ccpsolveFISTA_ = ccpsolveFISTA_;
 * which must return as output a n by 1 matrix gradf(x) corresponding to gradf(x).
 * @param {function} g, a function representing the function g above, which must take as input argument
 * a n by 1 matrix x corresponding to a point in R^n and which must return as output a real number 
-* or Math.POSITIVE_INFINITY corresponding to g(x).
+* or Number.POSITIVE_INFINITY corresponding to g(x).
 * @param {function} proxg, a function representing the proximal operator associated to 
 * the function g above, which must take as input arguments a n by 1 matrix x corresponding to 
 * a point in R^n and a strictly positive real number mu corresponding to a step size and which 
@@ -5331,7 +5631,7 @@ self.ccpsolveFISTA_ = ccpsolveFISTA_;
 * ccpsolveFISTA_(function(x) { return Math.exp((x.getValue(1, 1) - 0.7)*(x.getValue(1, 1) - 0.7)); }, // f(x) = exp((x - 0.7)^2)
 *                function(x) { return new Matrix_([2 * (x.getValue(1, 1) - 0.7) * Math.exp((x.getValue(1, 1) - 0.7)*(x.getValue(1, 1) - 0.7))]); },  // gradf(x) = 2*(x - 0.7)*exp((x - 0.7)^2)
 *				 function(x) { if (0 > x.getValue(1, 1) || x.getValue(1, 1) > 1) {
-*				                   return Math.POSITIVE_INFINITY;
+*				                   return Number.POSITIVE_INFINITY;
 *			                   }
 *			                   else {
 *                                  return 0;
@@ -5379,7 +5679,7 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 		var v_m_mu_gradf_v = Matrix_.axpby(1, v, -mu, gradf_v);
 		
 		// Compute p_mu
-		var p_mu_v = proxg(v_m_mu_gradf_v, mu);
+		var p_mu_v = Matrix_.copy(proxg(v_m_mu_gradf_v, mu));
 		
 		// Return both values
 		return [v_m_mu_gradf_v, p_mu_v];
@@ -5426,14 +5726,14 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 	var x_km; // placeholder for the x_k-1 vector
 	var x_kmm; // placeholder for the x_k-2 vector
 	var x_km_m_x_kmm; //  placeholder for the x_k-1 - x_k-2 vector
-	var gradf_x_k; // placeholder for the gradf(x_k) vector
-	var gradf_x_km; // placeholder for the gradf(x_k-1) vector
-	var gradf_x_kmm; // placeholder for the gradf(x_k-2) vector
+	var gradf_x_k = Matrix_.zeros(n, 1); // placeholder for the gradf(x_k) vector
+	var gradf_x_km = Matrix_.zeros(n, 1);; // placeholder for the gradf(x_k-1) vector
+	var gradf_x_kmm = Matrix_.zeros(n, 1);; // placeholder for the gradf(x_k-2) vector
 	var gradf_x_km_m_gradf_x_kmm; // // placeholder for the gradf(x_k-1) - gradf(x_k-2) vector
 
 	// y iterates
-	var y_k; // placeholder for the y_k vector
-	var gradf_y_k; // placeholder for the gradf(y_k) vector	
+	var y_k = Matrix_.zeros(n, 1); // placeholder for the y_k vector
+	var gradf_y_k = Matrix_.zeros(n, 1); // placeholder for the gradf(y_k) vector	
 	
 	
 	// Main loop of the Algorithm 2 of the third reference,
@@ -5471,18 +5771,18 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 			theta_k = null;
 			
 			// Initialization of the x iterates
-			x_k = x0;
-			x_km = x_k;
-			x_kmm = x_km;
+			x_k = Matrix_.copy(x0);
+			x_km = Matrix_.copy(x_k);
+			x_kmm = Matrix_.copy(x_km);
 			x_km_m_x_kmm = Matrix_.zeros(n, 1);
-			gradf_x_k = gradf(x_k);
-			gradf_x_km = gradf_x_k;
-			gradf_x_kmm = gradf_x_km;
+			gradf_x_k = Matrix_.copy(gradf(x_k), gradf_x_k);
+			gradf_x_km = Matrix_.copy(gradf_x_k, gradf_x_km);
+			gradf_x_kmm = Matrix_.copy(gradf_x_km, gradf_x_kmm);
 			gradf_x_km_m_gradf_x_kmm = Matrix_.zeros(n, 1);
 
 			// Initialization of the y iterates
-			y_k = x_k; 
-			gradf_y_k = gradf_x_k;		
+			y_k = Matrix_.copy(x_k, y_k); 
+			gradf_y_k = Matrix_.copy(gradf_x_k, gradf_y_k);
 			
 			// No update of the step size parameters, as the step size can take any value
 			// per algorithm 2 of the third reference.
@@ -5522,7 +5822,7 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 			//
 			// This is FistaStep(xk−1, xk−2, tk−1, θk−1)
 			t_k = ( 1 + Math.sqrt(1 + 4*theta_km*t_km*t_km) ) / 2;
-			y_k = Matrix_.axpby(1, x_km, (t_km - 1)/t_k, x_km_m_x_kmm);
+			y_k = Matrix_.axpby(1, x_km, (t_km - 1)/t_k, x_km_m_x_kmm, y_k);
 			
 			// Recomputation of gradf(y_k) and p_mu_k(y_k) for the next iteration
 			//
@@ -5530,7 +5830,7 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 			// gradient of f at point y_k can be improved by noticing
 			// that the line search procedure do not update x_km and x_kmm,
 			// c.f. the discussion after formula 3.17 of the third reference.
-			gradf_y_k = Matrix_.axpby(1, gradf_x_km, (t_km - 1)/t_k, gradf_x_km_m_gradf_x_kmm);
+			gradf_y_k = Matrix_.axpby(1, gradf_x_km, (t_km - 1)/t_k, gradf_x_km_m_gradf_x_kmm, gradf_y_k);
 			p_mu = p(mu_k, y_k, gradf_y_k);
 			y_k_m_mu_k_gradf_y_k = p_mu[0];
 			p_mu_k_y_k = p_mu[1];
@@ -5544,7 +5844,7 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 		
 		// Computation of the current x_k iterate
 		x_k = p_mu_k_y_k;
-		gradf_x_k = gradf(x_k); // gradf(x_k)
+		gradf_x_k = Matrix_.copy(gradf(x_k), gradf_x_k); // gradf(x_k)
 		
 		var x_k_m_x_km = Matrix_.xmy(x_k, x_km); // x_k - x_k-1
 		var gradf_x_k_m_gradf_x_km = Matrix_.xmy(gradf_x_k, gradf_x_km); // gradf(x_k) - gradf(x_k-1)
@@ -5597,7 +5897,7 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 		
 		// (-) Check the condition for an adaptative restart of the algorithm, 
 		// c.f. section 3.3 of the fifth reference.
-		var gs_k = Matrix_.vectorDotProduct(Matrix_.xmy(y_k, x_k), Matrix_.xmy(x_k, x_km));
+		var gs_k = Matrix_.vectorDotProduct(Matrix_.xmy(y_k, x_k), x_k_m_x_km);
 		if (gs_k >= eps_tol) {
 			x0 = x_k;
 			restart = true;
@@ -5612,13 +5912,13 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 		x_kmm = x_km;
 		x_km = x_k;
 		x_km_m_x_kmm = x_k_m_x_km;
-		gradf_x_kmm = gradf_x_km;
-		gradf_x_km = gradf_x_k;
+		gradf_x_kmm = Matrix_.copy(gradf_x_km, gradf_x_kmm);
+		gradf_x_km = Matrix_.copy(gradf_x_k, gradf_x_km);
 		gradf_x_km_m_gradf_x_kmm = gradf_x_k_m_gradf_x_km;
 		
 		// Update of the y_k iterates
-		y_k = y_kp;
-		gradf_y_k = gradf_y_kp;
+		y_k = Matrix_.copy(y_kp, y_k);
+		gradf_y_k = Matrix_.copy(gradf_y_kp, gradf_y_k);
 		
 		// Update of the thera parameter
 		theta_km = theta_k;
@@ -7095,20 +7395,20 @@ function simplexRationalRounding_(x, r) {
 * factorial(n + k - 1) / (factorial(k - 1) * factorial(n)), i.e., binomial(n+k-1, n-1), 
 * so that this method can be of limited use, even for small n.
 *
-* For instance, n=5 and k=100 already result in 4598126 points on which to evaluate fct.
+* For instance, n=5 and k=100 already result in 4598126 points on which to evaluate f.
 *
 * @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
 *
-* @param {function} fct a real-valued function of n real variables defined on the unit simplex of R^n, 
-* which must take as input argument an array of n real numbers corresponding to a point on the unit simplex of R^n 
-* and which must return as output a real number.
-* @param {number} n the number of variables of the function fct, natural integer superior or equal to 1.
-* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function fct, a natural integer superior or equal to 1.
+* @param {function} f, a function which must take as input argument
+* an array of n real numbers corresponding to a point on the unit simplex of R^n and which must return as output a real number 
+* corresponding to f(x).
+* @param {number} n the number of variables of the function f, natural integer superior or equal to 1.
+* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function f, a natural integer superior or equal to 1.
 * @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to a point of R^n 
-* minimizing the function fct on the k-th rational grid of the unit simplex of R^n.
+* minimizing the function f on the k-th rational grid of the unit simplex of R^n.
 *
 */
-function simplexRationalGirdSearch_(fct, n, k) {
+function simplexRationalGirdSearch_(f, n, k) {
 	// Initialize the current minimum value and the current list of associated grid points
 	var minValue = Number.POSITIVE_INFINITY;
 	var minValueGridPoints = [];
@@ -7117,8 +7417,8 @@ function simplexRationalGirdSearch_(fct, n, k) {
 	var sampler = new simplexDeterministicRationalSampler_(n, k);
 	var weights = sampler.sample();
 	while (weights !== null) {  
-		// Evaluate the function fct at the current grid point
-		var fctValue = fct(weights);
+		// Evaluate the function f at the current grid point
+		var fctValue = f(weights);
 	  
 		// If the function value at the current grid point is lower than the current minimum value, this value
 		// becomes the new minimum value and the current grid point becomes the new (unique for now) associated grid point.
@@ -7137,7 +7437,7 @@ function simplexRationalGirdSearch_(fct, n, k) {
 		weights = sampler.sample();
 	}
 	
-	// Return the list of grid points associated to the minimum value of fct
+	// Return the list of grid points associated to the minimum value of f
 	return minValueGridPoints;
 }
 
