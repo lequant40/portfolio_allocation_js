@@ -41,14 +41,17 @@ I hope you will enjoy !
 - Minimum correlation algorithm (MCA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA portfolio is meant to be an approximation of the MDP portfolio.
 
-- Mean-variance optimisation (MVO)  
+- Mean-variance optimization (MVO)  
   Based on the modern portfolio theory introduced by Harry M. Markowitz in numerous articles and books ([Portfolio Selection: Efficient Diversification of Investments](https://www.jstor.org/stable/j.ctt1bh4c8h)...), the portfolio obtained through mean-variance optimization is mean-variance efficient, that is, for a given level of return, it possesses the lowest attainable volatility and for a given level of volatility, it possesses the highest attainable return.
 
 - Global minimum variance (GMV)  
   The leftmost portfolio on the mean-variance efficient frontier, the GMV portfolio possesses the smallest attainable volatility among all the mean-variance efficient portfolios.
 
 - Maximum Sharpe ratio (MSR), a.k.a. (Lintner) tangency portfolio  
-  Introduced by John Lintner in the research paper (https://www.jstor.org/stable/1924119)[The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets], the MSR portfolio - when it exists - possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
+  Introduced by John Lintner in the research paper (https://www.jstor.org/stable/1924119)[The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets], the MSR portfolio - when existing - possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
+
+- Random subspace mean-variance optimization (RSO-MVO)  (ON-GOING)  
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), RSO-MVO portfolios combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with mean-variance optimization.
 
 - Proportional minimum variance algorithm (MVA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MVA portfolio is meant to be an approximation of the GMV portfolio.

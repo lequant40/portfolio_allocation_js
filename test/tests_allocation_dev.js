@@ -197,10 +197,65 @@ QUnit.test('Mean variance portfolio - internal target volatility weights portfol
 		// Compute the associated portfolio weights
 		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {targetVolatility: targetVolatility}});
 		
-		// Compare the computed portfolio volatility with the target return
+		// Compare the computed portfolio volatility with the target volatility
 		var portfolioVolatility = Math.sqrt(PortfolioAllocation.Matrix.vectorDotProduct(PortfolioAllocation.Matrix.xy(new PortfolioAllocation.Matrix(covMat), new PortfolioAllocation.Matrix(weights)), 
-																			  new PortfolioAllocation.Matrix(weights)));
+																			            new PortfolioAllocation.Matrix(weights)));
 		assert.equal(Math.abs(portfolioVolatility - targetVolatility) <= 1e-8, true, 'Mean variance portfolio - internal target volatility weights portfolio #1');
 	}
 });	
 
+
+QUnit.test('Random subspace mean variance portfolio - internal target return weights portfolio', function(assert) {    
+	function generateRandomValue(minVal, maxVal) {	
+		return Math.random() * (maxVal - minVal) + minVal;
+	}
+	
+	// Test using random data
+	{
+		// Problem data
+		var covMat =[[0.0146, 0.0187, 0.0145],
+					[0.0187, 0.0854, 0.0104],
+					[0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		// Compute the target return at random
+		var minReturn = returns[0];
+		var maxReturn = returns[1];
+		var targetReturn = generateRandomValue(minReturn, maxReturn);
+		
+		// Compute the associated portfolio weights
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: {targetReturn: targetReturn}});
+
+		// Compare the computed portfolio return with the target return
+		var portfolioReturn = PortfolioAllocation.Matrix.vectorDotProduct(new PortfolioAllocation.Matrix(returns), new PortfolioAllocation.Matrix(weights));
+		assert.equal(Math.abs(portfolioReturn - targetReturn) <= 1e-8, true, 'Random subspace mean variance portfolio - internal target return weights portfolio #1');
+	}
+});	
+
+QUnit.test('Random subspace mean variance portfolio - internal target volatility weights portfolio', function(assert) {    
+	function generateRandomValue(minVal, maxVal) {	
+		return Math.random() * (maxVal - minVal) + minVal;
+	}
+	
+	// Test using random data
+	{
+		// Problem data
+		var covMat = [[0.0146, 0.0187, 0.0145],
+					[0.0187, 0.0854, 0.0104],
+					[0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		// Compute the target return at random
+		var maxVolatility = Math.sqrt(covMat[1][1]);
+		var minVolatility = Math.sqrt(0.014599310344827589); // computed thanks to the efficient frontier
+		var targetVolatility = generateRandomValue(minVolatility, maxVolatility);
+		
+		// Compute the associated portfolio weights
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: {targetVolatility: targetVolatility}});
+		
+		// Compare the computed portfolio volatility with the target volatility
+		var portfolioVolatility = Math.sqrt(PortfolioAllocation.Matrix.vectorDotProduct(PortfolioAllocation.Matrix.xy(new PortfolioAllocation.Matrix(covMat), new PortfolioAllocation.Matrix(weights)), 
+																			            new PortfolioAllocation.Matrix(weights)));
+		assert.equal(portfolioVolatility <= targetVolatility, true, 'Random subspace mean variance portfolio - internal target volatility weights portfolio #1');
+	}
+});	

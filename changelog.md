@@ -8,6 +8,9 @@
 - Misc. tests improvements
 - Added a FISTA-like optimization method for composite convex problems
 - Added the computation of geometric center and geometric median
+- Added a remark on the bias of the method randomKSubsetIterator_
+- Added the computation of the random subspace mean variance optimization portfolio
+- Added the computation of all the k-subsets of a n-set
 
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights

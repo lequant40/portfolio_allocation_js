@@ -1384,6 +1384,141 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 });
 
 
+QUnit.test('Random subspace mean variance portfolio - error cases', function(assert) {    
+	// Test using static data
+	// Test the unsupported cases:
+	// - Unsupported subsets generation method
+	// - Unsupported subsets aggregation method
+	// - Neither target return nor target volatility provided
+	// - Both target return and target volatility provided
+	// - Wrong size of subsets of assets to generate
+	// - No feasible portfolio generated
+	{
+		// Problem data
+		var covMat =[[0.0146, 0.0187, 0.0145],
+					[0.0187, 0.0854, 0.0104],
+					[0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		// Compute the target return
+		var targetReturn = returns[2];
+		
+		// Test an unsupported subsets generation method
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'unknown', constraints: {targetReturn: targetReturn}}) },
+			new Error('unsupported subsets generation method'),
+			"Random subspace mean variance portfolio - Unsupported subsets generation method");
+
+		// Test an unsupported subsets aggregation method
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsAggregationMethod: 'unknown', constraints: {targetReturn: targetReturn}}) },
+			new Error('unsupported aggregation method'),
+			"Random subspace mean variance portfolio - Unsupported aggregation method");
+
+		// Test neither target return nor target volatility provided
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat) },
+			new Error('missing target return or target volatility'),
+			"Random subspace mean variance portfolio - Neither target return nor target volatility provided");
+
+		// Test both target return and target volatility provided
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: {targetReturn: targetReturn, targetVolatility: 0.0854}}) },
+			new Error('both target return and target volatility provided'),
+			"Random subspace mean variance portfolio - Both target return and target volatility provided");
+
+		// Test wrong size of subsets of assets to generate: < 2
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { sizeSubsets: 1, constraints: {targetReturn: targetReturn}}) },
+			new Error('the size of the subsets of assets must be between 2 and 2'),
+			"Random subspace mean variance portfolio - Size of subsets of assets to generate < 2");
+
+		// Test wrong size of subsets of assets to generate: >= n
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { sizeSubsets: 3, constraints: {targetReturn: targetReturn}}) },
+			new Error('the size of the subsets of assets must be between 2 and 2'),
+			"Random subspace mean variance portfolio - Size of subsets of assets to generate >= n");
+			
+		// Test no feasible portfolio generated
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: {targetReturn: targetReturn + 1}}) },
+			new Error('no feasible portfolio generated'),
+			"Random subspace mean variance portfolio - No feasible portfolio generated");
+	}
+	
+	// Test using static data
+	// Test the unsupported case:
+	// - Less than 3 assets
+	{
+		// Problem data
+		var covMat =[[0.0146, 0.0187],
+					[0.0187, 0.0854]];
+		var returns = [0.062, 0.146];
+		
+		// Compute the target return
+		var targetReturn = returns[0];
+		
+		// Test less than 3 assets
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: {targetReturn: targetReturn}}) },
+			new Error('the number of assets must be equal to or greater than 3'),
+			"Random subspace mean variance portfolio - Less than 3 assets");
+	}
+});	
+
+
+QUnit.test('Random subspace mean variance portfolio', function(assert) {    
+	// Test using static data
+	// Test using the deterministic subset generation that the average aggregation method is the default method
+	{
+		// Problem data
+		var covMat =[[0.0146, 0.0187, 0.0145],
+					[0.0187, 0.0854, 0.0104],
+					[0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		// Compute the target return
+		var targetReturn = returns[2];
+		
+		// Test the deterministic subset generation with the average aggregation method
+		var expectedWeights = [0.10714285714285708, 0.3928571428571429, 0.5];
+		var defaultWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {targetReturn: targetReturn}});
+		var averageWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsAggregationMethod: 'average', constraints: {targetReturn: targetReturn}});
+		assert.deepEqual(defaultWeights, expectedWeights, 'Random subspace mean variance portfolio - Default aggregation method #1');
+		assert.deepEqual(averageWeights, expectedWeights, 'Random subspace mean variance portfolio - Default aggregation method #2');
+	}
+
+	// Test using static data
+	// Test using the deterministic subset generation that the average aggregation method is different from the median aggregation method
+	{
+		var covMat = [[0.40755159,0.03175842,0.05183923,0.05663904,0.0330226,0.00827775,0.02165938,0.01332419,0.0343476,0.02249903],
+					[0.03175842,0.9063047,0.03136385,0.02687256,0.01917172,0.00934384,0.02495043,0.00761036,0.02874874,0.01336866],
+					[0.05183923,0.03136385,0.19490901,0.04408485,0.03006772,0.01322738,0.03525971,0.0115493,0.0427563,0.02057303],
+					[0.05663904,0.02687256,0.04408485,0.19528471,0.02777345,0.00526665,0.01375808,0.00780878,0.02914176,0.01640377],
+					[0.0330226,0.01917172,0.03006772,0.02777345,0.34059105,0.00777055,0.02067844,0.00736409,0.02542657,0.01284075],
+					[0.00827775,0.00934384,0.01322738,0.00526665,0.00777055,0.15983874,0.02105575,0.00518686,0.01723737,0.00723779],
+					[0.02165938,0.02495043,0.03525971,0.01375808,0.02067844,0.02105575,0.68056711,0.01377882,0.04627027,0.01926088],
+					[0.01332419,0.00761036,0.0115493,0.00780878,0.00736409,0.00518686,0.01377882,0.95526918,0.0106553,0.00760955],
+					[0.0343476,0.02874874,0.0427563,0.02914176,0.02542657,0.01723737,0.04627027,0.0106553,0.31681584,0.01854318],
+					[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]];
+		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
+		
+		// Compute the target return
+		var targetReturn = 0.5;
+		
+		// Test the deterministic subset generation with the average aggregation method
+		var expectedAverageWeights = [0, 0, 0.22954091816367264, 0, 0.1996527777777778, 0, 0.11960478419136762, 0.4512015198671819, 0, 0];
+		var averageWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {targetReturn: targetReturn}});
+		assert.deepEqual(averageWeights, expectedAverageWeights, 'Random subspace mean variance portfolio - Average aggregation method #1');
+
+		// Test the deterministic subset generation with the median aggregation method
+		var expectedMedianWeights = [0, 0, 0.18183367651162094, 0, 0.19711840931357114, 0, 0.1459814085315246, 0.47506650564328323, 0, 0];
+		var medianWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsAggregationMethod: 'median', constraints: {targetReturn: targetReturn}});
+		assert.deepEqual(medianWeights, expectedMedianWeights, 'Random subspace mean variance portfolio - Median aggregation method #1');
+	}
+	
+});	
+
 QUnit.test('Rounded weights portfolio', function(assert) {    
 	// Example with static data
 	{
