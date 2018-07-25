@@ -47,28 +47,28 @@ I hope you will enjoy !
 - Global minimum variance (GMV)  
   The leftmost portfolio on the mean-variance efficient frontier, the GMV portfolio possesses the smallest attainable volatility among all the mean-variance efficient portfolios.
 
-- Maximum Sharpe ratio (MSR), a.k.a. (Lintner) tangency portfolio  
-  Introduced by John Lintner in the research paper (https://www.jstor.org/stable/1924119)[The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets], the MSR portfolio - when existing - possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
-
-- Random subspace mean-variance optimization (RSO-MVO)  (ON-GOING)  
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), RSO-MVO portfolios combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with mean-variance optimization.
-
 - Proportional minimum variance algorithm (MVA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MVA portfolio is meant to be an approximation of the GMV portfolio.
+
+- Maximum Sharpe ratio (MSR), a.k.a. (Lintner) tangency portfolio  
+  Introduced by John Lintner in the research paper [The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets](https://www.jstor.org/stable/1924119), the MSR portfolio possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
+
+- Random subspace mean-variance optimization (RSO-MVO)  
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), RSO-MVO portfolios combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with mean-variance optimization.
 
 - Minimax portfolio  
   Introduced by Martin Young in the research paper [A Minimax Portfolio Selection Rule with Linear Programming Solution](http://www.jstor.org/stable/2634472), the minimax portfolio uses the minimum return as a measure of risk instead of the variance as in the Markowitz framework.
 
 - Random portfolio  
-  Random portfolios, while not directly usable to allocate one's portfolio of assets, can be used to benchmark the performances of asset allocation strategies, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
+  A random portfolio, while maybe not directly usable to allocate assets, can be used to benchmark the performances of asset allocation strategies, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
  
   
 ## Helper algorithms
 - Portfolio weights rounding  
   The rounding algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al. allows to compute real-life portfolio weights from the theoretical portfolio weights obtained from a portfolio allocation algorithm.
 
-- Portfolio numerical optimization, through grid search algorithms  
-  Grid search algorithms allow to determine numerically the weights of the optimal portfolio(s) minimizing a given objective function.  
+- Portfolio numerical optimization  
+  Numerical optimization algorithms (grid search...) allow to determine numerically the weights of the optimal portfolio(s) minimizing a given objective function.  
 
 - Mean-variance efficient frontier and corner portfolios computation, through the Markowitz critical line algorithm  
   The set of all mean-variance efficient portfolios (the mean-variance efficient frontier), as well its generating discrete set (the set of corner portfolios) can be efficiently computed by a specialized algorithm developped by Harry M. Markowitz.
