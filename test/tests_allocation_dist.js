@@ -1524,6 +1524,7 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		assert.deepEqual(medianWeights, expectedMedianWeights, 'Random subspace mean variance portfolio - Median aggregation method');
 	}
 
+	
 	/*
 	// Test using static data
 	// Reference: http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html, 100 Portfolios Formed on Size and Book-to-Market (10 x 10)
@@ -1635,9 +1636,28 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		var maxVolatility = 0.10;
 		
 		// Compute the RSO-MVO weights
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { nbRandomSubsets: 16384*1, constraints: {maxVolatility: maxVolatility}});
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { nbRandomSubsets: 16384*4, constraints: {maxVolatility: maxVolatility}});
 	}
-	*/	
+	*/
+	
+
+	// Test using static data
+	// Test the algorithm when all returns are negative; the associated portfolio must be null.
+	{
+		// Problem data
+		var covMat = [[0.002533106361, 0.002161135405, 0.002605003686],
+                     [0.002161135405, 0.002252008852, 0.002439575054],
+                     [0.002605003686, 0.002439575054, 0.003315580611]];
+		var returns = [-0.0000244756209, -0.003612424187, -0.004045817996];
+		
+		// Compute the desired maximum volatility
+		var maxVolatility = 0.10/Math.sqrt(12);
+		
+		// Test that the algorithm is behaving properly
+		var expectedWeights = [0, 0, 0];
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
+		assert.deepEqual(weights, expectedWeights, 'Random subspace mean variance portfolio - Test negative returns');
+	}
 });	
 
 

@@ -85,8 +85,8 @@ QUnit.test('Next k-subset computation', function(assert) {
   // Reference: Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
   // Test with the static data examples of section 3
   {
-	  var expectedValues = [[true,[1,2,3]], [true,[1,2,4]], [true,[1,2,5]], [true,[1,3,4]], [true,[1,3,5]], 
-	                        [true,[1,4,5]], [true,[2,3,4]],[true,[2,3,5]], [true,[2,4,5]], [false,[3,4,5]]];
+	  var expectedValues = [[1,2,3], [1,2,4], [1,2,5], [1,3,4], [1,3,5], 
+	                        [1,4,5], [2,3,4],[2,3,5], [2,4,5], [3,4,5], -1];
 	  
 	  var nextKSubsetIterator = new PortfolioAllocation.kSubsetsIterator_(5, 3);
 	  for (var i = 0; i < expectedValues.length; ++i) {
@@ -103,9 +103,9 @@ QUnit.test('Next random k-subset computation', function(assert) {
   {
 	  // Setup static parameters of the random test
 	  var nbTests = 10;
-	  var nbSubTests = 10;
+	  var nbSubTests = 100;
 	  var minN = 1;
-	  var maxN = 50;
+	  var maxN = 1000;
 
 	  // Aim of these tests is to check that for any generated k-subset of a n-set, 
 	  // an array of k strictly increasing integers belonging to the n-set is returned

@@ -4064,7 +4064,7 @@ function compositionsIterator_(n, k) {
 * using the algorithm NEXKSB described in section 3 of the first reference.
 *
 * @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
-* @see <a href="*https://en.wikipedia.org/wiki/Power_set">Power set</a>
+* @see <a href="https://en.wikipedia.org/wiki/Power_set">Power set</a>
 *
 * @param {number} n the number of elements of the n-set {1,...,n} whose k-subsets are desired, a non-negative integer.
 * @param {number} k a non-negative integer, with 1 <= k <= n.
@@ -4074,7 +4074,7 @@ function compositionsIterator_(n, k) {
 * @example
 * var myIterator = new kSubsetsIterator_(5, 3);
 * myIterator.next(); myIterator.next();
-* // [true, [1, 2, 3]]; [true, [1, 2, 4]];
+* // [1, 2, 3]; [1, 2, 4]; ...; -1
 */
 function kSubsetsIterator_(n, k) {
 	// Initialize n and k
@@ -4087,10 +4087,11 @@ function kSubsetsIterator_(n, k) {
 	// Variables required for NEXKSB internal computations,
 	// initialized so as to generate the first subset upon
 	// the first call to .next() function.
+	this.firstcall = true;
 	this.mtc = false;
 	this.m2 = 0;
 	this.h = this.k;
-	this.endval = this.n - this.k + 1;
+	this.endval = this.n - this.k + 1;	
 	
 	/**
 	* @function next
@@ -4105,16 +4106,24 @@ function kSubsetsIterator_(n, k) {
 	* k-subset {n-k+1,...,n} is reached.
 	*
 	* A subsequent call to this function when the final k-subset has been reached will result in
-	* the recomputation of all the k-subsets, re-starting from the initial k-subset.
+	* the function returning -1.
 	*
 	* @memberof kSubsetsIterator_
-	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-subset
-	* of the n-set {1,...,n} remains to be computed and arr[1] an array containing the computed sorted k-subset
-	* of the n-set {1,...,n}.
-	*
+	* @return {Array.<number>|number} either an array containing a newly generated sorted k-subset
+	* of the n-set {1,...,n} or -1 to indicate that all the k-subsets have already been generated.
 	*/
 	this.next = function() {
-		if (this.mtc) { // There is still a k-subset to generate
+		if (!this.firstcall && !this.mtc) {
+			// No more k-subset to generate
+			return -1;
+		}
+		
+		if (this.firstcall) {		
+			// The first call has now been made
+			this.firstcall = false;
+		}
+		else {
+			// There is still a k-subset to generate
 			if (this.m2 < this.n - this.h) {
 				this.h = 0;
 			}
@@ -4122,22 +4131,17 @@ function kSubsetsIterator_(n, k) {
 			++this.h;
 			this.m2 = this.a[this.k - this.h];
 		}
-		else  { 
-		    // No more k-subset to generate, so, (re) generation of the first k-subset
-			this.m2 = 0;
-			this.h = this.k;
-		}
-
-		// Fill the k-subset array
+				
+		// Fill the k-subset array with the initial values {1,...,k}
 		for (var j = 1; j <= this.h; ++j) {
 			this.a[this.k + j - this.h - 1] = this.m2 + j;
 		}
-		
+
 		// End logic
 		this.mtc = (this.a[0] != this.endval);
-			
+
 		// Return a copy of the computed array
-		return [this.mtc, this.a.slice()];
+		return this.a.slice();
 	}
 }
 
@@ -4147,17 +4151,13 @@ function kSubsetsIterator_(n, k) {
 * @summary Returns an infinite iterator to compute random k-subsets of a n-set.
 *
 * @description This function constructs an iterator to compute random k-subsets of the n-set {1,...,n}, 
-* using both the algorithms RANKSB and RKS2 described in section 4 of the first reference.
+* as lists of k distinct increasing integers in {1,...,n}, using the method D of the references.
 *
-* From the discussion following the examples in the first reference, the random k-subsets could have been generated
-* uniformly, but this is not written in the first reference and the second reference actually proves that the algorithm
-* is actually biased.
+* From the references, the random k-subsets are generated uniformly at random, in O(k) time 
+* and O(1) additional space.
 *
-* The algorithm used to compute the random k-subsets is either RANKSB when k < n/2,
-* or RKS2 when k >= n/2, so that performances are in O(k).
-*
-* @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
-* @see <a href="https://doi.org/10.1109/ICSNC.2010.34">A. Bonnecaze and P. Liardet, "Efficient Uniform k-out-of-n Generators," 2010 Fifth International Conference on Systems and Networks Communications, Nice, 2010, pp. 177-182.</a>
+* @see J.S. Vitter. Faster Methods for Random Sampling. Communications of the ACM, 27, (July 1984), 703-718
+* @see J.S. Vitter. An efficient algorithm for sequential random sampling. RR-0624, INRIA. 1987. <inria-00075929>
 *
 * @param {number} n the number of elements of the n-set {1,...,n} whose k-subsets are desired, a non-negative integer.
 * @param {number} k a non-negative integer, with 1 <= k <= n.
@@ -4174,144 +4174,234 @@ function randomKSubsetIterator_(n, k) {
 	this.n = n;
 	this.k = k;
 	
-	// Initialize the array to hold the k-subsets
-	this.a = new Array(k);
+	// Initialize an array to hold the k-subsets
+	this.a = null;
 
-	/**
-	* @function next_ranksb
-	*
-	* @summary Returns a random k-subset of a n-set.
-	*
-	* @description This function computes a random k-subset of a n-set using the algorithm RANKSB of the first reference.
-	*
-	* @memberof randomKSubsetIterator_
-	* @return {Array.<number>} a random k-subset of the n-set {1,...,n}, a sorted array of k increasing strictly positive integers.
-	*
-	*/
-	this.next_ranksb = function() {
-		// Step A - Initialization of a
-		for (var i = 1; i <= this.k; ++i) {
-			this.a[i-1] = Math.floor((i - 1) * this.n / this.k);
-		}
-		
-		// Step B
-		// Note: in the first reference, the c variable is initialized to k and is decremented until 0
-		// each time a generated x is accepted: this is a reverse for loop in disguise.
-		var x;
-		var l;
-		for (var c = this.k; c > 0; --c) {
-			do {
-				var u = Math.random();
-				x = 1 + Math.floor(u * this.n);
-				l = 1 + Math.floor((x * this.k - 1) / this.n);
-			} while (x <= this.a[l-1]);
-			this.a[l-1] = this.a[l-1] + 1;
-		}
-		var p = 0;
-		var s = this.k;
-		
-		// Step C
-		// Note: in the first reference, the i variable is initialized to 0 and is incremented
-		// until k each time: this is a for loop in disguise.
-		for (var i = 1; i <= this.k; ++i) {
-			if (this.a[i-1] == Math.floor((i - 1) * this.n / this.k)) {
-				this.a[i-1] = 0;
-			}
-			else {
-				p = p + 1;
-				var m = this.a[i-1];
-				this.a[i-1] = 0;
-				this.a[p-1] = m;
-			}
-		}
-		
-		// Step D
-		// Note: in the first reference, the p variable is initialized to whatever value it has, and is decremented
-		// until 0 each time: this is a reverse for loop in disguise.
-		for (; p > 0; --p) {
-			l = 1 + Math.floor((this.a[p-1] * this.k - 1) / this.n);
-			var delta_s = this.a[p-1] - Math.floor((l - 1) * this.n / this.k);
-			this.a[p-1] = 0;
-			this.a[s-1] = l;
-			s = s - delta_s;			
-		}
-		l = k;
-		
-		// Steps E to H
-		// Note: in the first reference, the l variable is initialized at this step to k, and is decremented
-		// until 0 each time: this is a reverse for loop in disguise.
-		var r;
-		for (; l > 0; --l) {
-			// Step E
-			var m_0;
-			if (this.a[l-1] != 0) {
-				r = l;
-				m_0 = 1 + Math.floor((this.a[l-1] - 1) * this.n / this.k);
-				m = Math.floor(this.a[l-1] * this.n / this.k) - m_0 + 1;
-			}
-
-			// Step F
-			var u = Math.random();
-			x = m_0 + Math.floor(u * m);
-			i = l;
-			
-			// Step G
-			++i;
-			while (i <= r && x >= this.a[i-1]) {
-				this.a[i-2] = this.a[i-1];
-				x = x + 1;
-				++i;
-			}
-			
-			// Step H
-			this.a[i-2] = x;
-			m = m - 1;
-		}
-		
-		// Return a copy of the computed array
-		return this.a.slice();
-	}
+	// Initializations for the method D
+	// - N, the number of records that have not yet been processed
+	// - nn, the number of records remaining to be selected
+	// - idx_a, the array index used to write the selected records in the array a 
+	// - selected_record, the value of the selected record 
+	this.N;
+	this.nn;
+	this.idx_a;
+	this.selected_record;
+	
 	
 	/**
-	* @function next_rks2
+	* @function uniformrv
+	*
+	* @summary Returns a number generated uniformly at random in interval ]0,1[.
+	*
+	* @description This function computes a number uniformly at random in interval ]0,1[.
+	*
+	* @memberof randomKSubsetIterator_
+	* @return {number} a number generated uniformly at random in interval ]0,1[, a real number
+	*
+	*/
+	function uniformrv() {
+		// Generate a random number in the [0, 1[ interval
+		var rnd = Math.random();
+		
+		// While the generated random number is (exactly) equal to 0,
+		// reject it.
+		while (rnd === 0) {
+			rnd = Math.random();
+		}
+		
+		// Return the generated random number, which is then 
+		// generated uniformly at random in the ]0,1[ interval.
+		return rnd;
+	}
+
+	/**
+	* @function method_a
 	*
 	* @summary Returns a random k-subset of a n-set.
 	*
-	* @description This function computes a random k-subset of a n-set using the algorithm RKS2 of the first reference.
+	* @description This function computes a random k-subset of a n-set using the method A of the references,
+	* and is used by the method D to avoid its worst-case behaviour, c.f. the references.
 	*
 	* @memberof randomKSubsetIterator_
-	* @return {Array.<number>} a random k-subset of the n-set {1,...,n}, a sorted array of k increasing strictly positive integers.
 	*
 	*/
-	this.next_rks2 = function() {
+	this.method_a = function() {
 		// Initializations
-		var c_1 = this.k;
-		var c_2 = this.n;
-		var k_0 = 0;
-		var i = 0;
-
-		// Main loop of the RKS2 algorithm
-		while (c_1 > 0) {
-			++i;
-			var u = Math.random();
-			if (u <= c_1/c_2) {
-				c_1 = c_1 - 1;
-				this.a[k_0] = i;
-				k_0 = k_0 + 1; // this line is inversed compared to the first reference because of JavaScript arrays starting at index 0
+		var top = this.N - this.nn;
+		
+		// General case
+		while (this.nn >= 2) {
+			// Step A1
+			var V = uniformrv();
+			
+			// Step A2
+			var S = 0;
+			var quot = top / this.N;
+			
+			while (quot > V) {
+				++S;
+				--top;
+				--this.N;
+				quot = (quot * top) / this.N;
 			}
-			c_2 = c_2 - 1;
+			
+			// Step A3
+			// Skip over the next S records and select the following one for the sample
+			this.selected_record += S + 1;
+			this.a[this.idx_a++] = this.selected_record;
+			
+			--this.N;
+			--this.nn;
 		}
 		
-		// Return a copy of the computed array
-		return this.a.slice();
+		// Special case nn = 1
+		var S = Math.floor(this.N * uniformrv());
+		if (S === this.N) { // the out of range value S = N must never be generated (which could be in case of roundoff errors)
+			S = this.N - 1;
+		}
+		
+		// Skip over the next S records and select the following one for the sample
+		this.selected_record += S + 1;
+		this.a[this.idx_a++] = this.selected_record;
 	}
-	
-	// Initialize the appropriate iterator to keep the required labor to O(k) uniformly for 1 <= k <= n
-	if (k < n/2) {
-		this.next = this.next_ranksb;
+
+	/**
+	* @function method_d
+	*
+	* @summary Returns a random k-subset of a n-set.
+	*
+	* @description This function computes a random k-subset of a n-set using the method D of the references.
+	*
+	* @memberof randomKSubsetIterator_
+	*
+	*/
+	this.method_d = function() {
+		// Initializations
+		var ninv = 1/this.nn;
+		var Vprime = Math.pow(uniformrv(), ninv); // Math.exp(Math.log(a) * b) === Math.pow(a, b)
+		var qu1 = -this.nn + 1 + this.N;
+		var negalphainv = -13;
+		var threshold = -negalphainv * this.nn;
+		
+		while (this.nn > 1 && threshold < this.N) {
+			var nmin1inv = 1 / (-1 + this.nn);
+			
+			var X;
+			var S;
+			while (true) {
+				// Step D2: Generate U and X
+				while(true) {
+					X = this.N 	* (-Vprime + 1);
+					S = Math.floor(X);
+					if (S < qu1) {
+						break;
+					}
+					Vprime = Math.pow(uniformrv(), ninv); // Math.exp(Math.log(a) * b) === Math.pow(a, b)
+				}
+				var U = uniformrv();
+				
+				// Step D3: Accept ?
+				var y1 = Math.pow(U * this.N / qu1, nmin1inv); // Math.exp(Math.log(a) * b) === Math.pow(a, b)
+				Vprime = y1 * (-X/this.N + 1) * (qu1 / (-S + qu1));
+				if (Vprime <= 1) {
+					break;
+				}
+				
+				// Step D4: Accept ?
+				var y2 = 1;
+				var top = -1 + this.N;
+				
+				var bottom;
+				var limit;
+				if (-1 + this.nn > S) {
+					bottom = -this.nn + this.N;
+					limit = -S + this.N;
+				}
+				else {
+					bottom = -1 - S + this.N;
+					limit = qu1;
+				}
+				
+				for (var t = -1 + this.N; t >= limit; --t) {
+					y2 = y2 * top / bottom;
+					--top;
+					--bottom;
+				}
+				
+				if (this.N / (-X + this.N) >= y1 * Math.pow(y2, nmin1inv)) { // Math.exp(Math.log(a) * b) === Math.pow(a, b)
+					// Accept
+					Vprime = Math.pow(uniformrv(), nmin1inv); // Math.exp(Math.log(a) * b) === Math.pow(a, b)
+					break;
+				}
+				Vprime = Math.pow(uniformrv(), ninv); // Math.exp(Math.log(a) * b) === Math.pow(a, b)
+			}
+			
+			// Step D5: Select the (S + 1)st record
+			// Skip over the next S records and select the following one for the sample
+			this.selected_record += S + 1;
+			this.a[this.idx_a++] = this.selected_record;
+			
+			// Prepare for the next iteration
+			this.N = -S + (-1 + this.N);
+			--this.nn;
+			ninv = nmin1inv;
+			qu1 = -S + qu1;
+			threshold = threshold + negalphainv;
+		}
+		
+		// If nn > 1 (i.e., threshold < N), use method A to finish the sampling,
+		// otherwise, if nn == 1, deal with the special case nn = 1.
+		if (this.nn > 1) {
+			this.method_a();
+		}
+		else {
+			var S = Math.floor(this.N * Vprime);
+			if (S === this.N) { // the out of range value S = N must never be generated (which could be in case of roundoff errors)
+				S = this.N - 1;
+			}
+		
+			// Skip over the next S records and select the following one for the sample
+			this.selected_record += S + 1;
+			this.a[this.idx_a++] = this.selected_record;
+		}		
 	}
-	else {
-		this.next = this.next_rks2;
+   
+	/**
+	* @function next
+	*
+	* @summary Returns a random k-subset of a n-set.
+	*
+	* @description This function computes a random k-subset of a n-set using the method D of the references.
+	*
+	* @memberof randomKSubsetIterator_
+	* @return {Array.<number>|Uint32Array} a random k-subset of the n-set {1,...,n}, a sorted array of k increasing strictly positive integers.
+	*
+	*/
+	this.next = function() {
+		// Initializations
+		// Array holding the k-subset
+		if (typeof Uint32Array === 'function') {
+			this.a = new Uint32Array(this.k);
+		}
+		else {
+			this.a = new Array(this.k);
+			for (var i = 0; i < this.k; ++i) {
+				this.a[i] = 0;
+			}
+		}	
+
+		// Misc. internal variables required by the method D
+		this.N = this.n;
+		this.nn = this.k;
+		this.idx_a = 0;
+		this.selected_record = 0;
+			
+		// Call the method D, which will proceed with the effective
+		// generation of the k-subset.
+		this.method_d();
+		
+		// Return the computed array, which is not used anymore
+		return this.a;
 	}
 }
 
@@ -8156,7 +8246,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	if (opt.constraints === undefined) {
 		opt.constraints = {};
 	}
-	var targetReturn = opt.constraints.return;
+	var targetReturn = opt.constraints["return"]; // .return does not work within Google Script
 	var targetVolatility = opt.constraints.volatility;
 	
 	if (targetReturn === undefined && targetVolatility === undefined) {
@@ -8234,8 +8324,8 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * The algorithm used internally for the mean-variance optimization is the Markowitz critical
 * line algorithm, c.f. the fourth reference.
 *
-* The algorithm used internally for the uniform selection at random is the RANKSB/RKS2 algorithm
-* of Nijenhuis and Wilf, c.f. the seventh reference.
+* The algorithm used internally for the uniform selection at random is the method D
+* of J.S. Vitter, c.f. the seventh reference.
 *
 * @see <a href="https://cssanalytics.wordpress.com/2013/10/10/rso-mvo-vs-standard-mvo-backtest-comparison/">RSO MVO vs Standard MVO Backtest Comparison, OCTOBER 10, 2013</a>
 * @see <a href="https://aaai.org/ocs/index.php/AAAI/AAAI17/paper/view/14443">SHEN, W.; WANG, J.. Portfolio Selection via Subset Resampling. AAAI Conference on Artificial Intelligence, North America, feb. 2017.</a>
@@ -8243,7 +8333,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
 * @see <a href="https://doi.org/10.1007/978-3-642-31537-4_13">Oshiro T.M., Perez P.S., Baranauskas J.A. (2012) How Many Trees in a Random Forest?. In: Perner P. (eds) Machine Learning and Data Mining in Pattern Recognition. MLDM 2012. Lecture Notes in Computer Science, vol 7376. Springer, Berlin, Heidelberg</a>
 * @see <a href="https://www.stat.berkeley.edu/~breiman/Using_random_forests_V3.1.pdf">Breiman, L (2002), Manual On Setting Up, Using, And Understanding Random Forests V3.1</a>
-* @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
+* @see J.S. Vitter. An efficient algorithm for sequential random sampling. RR-0624, INRIA. 1987. <inria-00075929>
 *
 * @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
 * @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
@@ -8389,12 +8479,16 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	
     // The number of generated feasible portfolios
 	//
-	// Note: the algorithm below ensures that there are no
-	// infeasible portfolios.
+	// Note: the algorithm below ensures that there are no infeasible portfolios.
 	var nbFeasibleGeneratedPortfolios = 0;
 
 	// The storage space for the generated portfolios weights
 	var generatedPortfoliosWeights = new Array(nbSubsets); 
+	
+	// The storage space for the subsets returns vectors and the 
+	// subsets covariance matrices.
+	var subsetMu = Matrix_.zeros(sizeSubsets, 1);
+	var subsetSigma = Matrix_.zeros(sizeSubsets, sizeSubsets);
 	
 	// The options for the mean variance optimization algorithm
 	var opt_mv = { maxIter: opt.maxIter };
@@ -8409,127 +8503,39 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 		// c.f. the third reference.
 		//
 		// The "uniformness" of the random algorithm used is then very important.
-		var subsetAssetsIdx;
-		if (subsetsGenerationMethod === 'random') {
-			// Here, the algorithm RANKSB/RKS2 of Nijenhuis and Wilf is used, 
-			// c.f. the seventh reference, and is unfortunately known to be biased.
-			// 
-			// TODO: Use another algorithm.
-			subsetAssetsIdx = subsetAssetsIdxIterator.next();
-		}
-		else if (subsetsGenerationMethod === 'deterministic') {
-			subsetAssetsIdx = subsetAssetsIdxIterator.next()[1];
-		}
-		else {
-			throw new Error('internal error');
-		}
+		var subsetAssetsIdx = subsetAssetsIdxIterator.next();
 				
 		// Extract the returns of the selected assets
-		var subsetMu = mu.submatrix(subsetAssetsIdx, [1]);
+		subsetMu = mu.submatrix(subsetAssetsIdx, [1], subsetMu);
 
 		// Extract the covariance matrix of the selected assets
-		var subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx);
+		subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx, subsetSigma);
 		
 		// Compute the corner portfolios defining the efficient frontier
 		// for the selected assets.
-		var cornerPortfolios = computeCornerPortfolios_(subsetMu, subsetSigma, opt_mv);
+		var subsetCornerPortfolios = computeCornerPortfolios_(subsetMu, subsetSigma, opt_mv);
 
-		// Note: there is no need to check the feasibility of the following constraints,
-		// because they are always feasible:
-		// - Full investment
-		// - Long-only
+		// Note: the following constraints are enforced at this stage:
+		// - Long-only constraint
+		// - Full investment constraint
+		
+		// Compute the efficient portfolio with a volatility as close as possible (from below)
+		// to the desired maximum volatility.
+		var subsetWeights = computeMaxVolatilityEfficientPortfolio_(subsetMu, subsetSigma, targetMaxVolatility, subsetCornerPortfolios, opt_mv);
 
-		// Compute the efficient portfolio with a volatility equal to (or closest
-		// to) the desired maximum volatility:
-		//
-		// - If the desired maximum volatility is greater than the highest attainable
-		// volatility on the efficient frontier, the efficient portfolio is computed
-		// as the rightmost portfolio on the efficient frontier
-		//
-		// - If the desired maximum volatility is lower than the lowest attainable
-		// volatility on the efficient frontier, a new efficient frontier is computed
-		// including a risk free asset with (0,0,0) return/volatility/covariance, and
-		// the efficient portfolio is computed as the efficient portfolio with a target
-		// volatility strictly equal to desired maximum volatility using the new efficient 
-		// frontier
-		//
-		// - Othewise, the efficient portfolio is computed as the efficient portfolio 
-		// with a target volatility strictly equal to desired maximum volatility using
-		// the computed efficient frontier
-		var subsetMeanVarianceOptimizationWeights;
-		var eps = 1e-8; // the numerical accuracy for testing equality	
-
-		var maxAttainableVolWeights = cornerPortfolios[0][0];
-		var maxAttainableVol = computeVolatility_(subsetSigma, maxAttainableVolWeights);
-		if (targetMaxVolatility > maxAttainableVol + eps) {
-			subsetMeanVarianceOptimizationWeights = maxAttainableVolWeights;
-		}
-		else {
-			var minAttainableVolWeights = cornerPortfolios[cornerPortfolios.length - 1][0];
-			var minAttainableVol = computeVolatility_(subsetSigma, minAttainableVolWeights);
-			
-			if (targetMaxVolatility < minAttainableVol - eps) {
-				// Extend the returns/covariances of the selected assets with a risk free asset
-				var newSubsetMu = Matrix_.fill(sizeSubsets + 1, 1, 
-												function(i, j) { 
-													if (i <= sizeSubsets) {
-														return subsetMu.getValue(i, 1);
-													}
-													else {
-														return 0;
-													}
-												});
-				var newSubsetSigma = Matrix_.fill(sizeSubsets + 1, sizeSubsets + 1, 
-													function(i, j) { 
-														if (i <= sizeSubsets && j <= sizeSubsets) {
-															return subsetSigma.getValue(i, j);
-														}
-														else {
-															return 0;
-														}
-												});
-
-				// Compute the new corner portfolios defining the new efficient frontier
-				// for the selected assets with a risk free asset.
-				var newCornerPortfolios = computeCornerPortfolios_(newSubsetMu, newSubsetSigma, opt_mv);
-				
-				// Compute the efficient portfolio
-				var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(newSubsetSigma, targetMaxVolatility, newCornerPortfolios);
-				if (efficientPortfolio.length === 0) { // this case should never occur, since the new efficient frontier includes a 0 volatility portfolio
-					throw new Error('internal error');
-				}
-				else {
-					subsetMeanVarianceOptimizationWeights = efficientPortfolio[0];
-				}
-			}
-			else {
-				var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(subsetSigma, targetMaxVolatility, cornerPortfolios);
-				if (efficientPortfolio.length === 0) { // this case should never occur, since targetMaxVolatility belongs to [minAttainableVol, maxAttainableVol]
-					throw new Error('internal error');
-				}
-				else {
-					subsetMeanVarianceOptimizationWeights = efficientPortfolio[0];
-				}
-			}
-		}
-
-		// There is no need to check the feasibility of the following constraints,
-		// because they are feasible per process above:
+		// Note: the following constraints are enforced at this stage:
+		// - Long-only constraint
 		// - Maximum volatility constraint
+		// - Partial investment constraint
+		//  (Full investment constraint can only be satistifed in case the maximum volatility constraint can be satisfied with a full investment)
 
 		// Transform the computed weights for the selected assets into their equivalent 
 		// computed weights for the original assets (e.g. adding zero weights on non-selected
 		// assets).
-		//
-		// Note: it is mandatgory here to loop only on the first sizeSubsets
-		// elements of the computed weights, because they can include sizeSubsets + 1
-		// elements (case #2 above), in which case the sizeSubsets + 1 - th element is
-		// the weight of the risk free asset, which is already reflected in the
-		// partial allocation of the first sizeSubsets - th elements.
 		var weights = Matrix_.zeros(nbAssets, 1);
 		for (var i = 0; i < sizeSubsets; ++i) {
 			weights.setValueAt(subsetAssetsIdx[i], 1, 
-							   subsetMeanVarianceOptimizationWeights.getValue(i+1, 1));
+							   subsetWeights.getValue(i + 1, 1));
 		}
 
 		// Save the resulting original assets weights
@@ -8544,8 +8550,7 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	// In case there was no generated portfolios, because they were all
 	// infeasible, abort the process.
 	//
-	// Note: the algorithm above ensures that there are no
-	// infeasible portfolios.
+	// Note: the algorithm above ensures that there are no infeasible portfolios.
 	if (nbFeasibleGeneratedPortfolios === 0) {
 		throw new Error('internal error: no feasible portfolio generated');
 	}
@@ -8560,16 +8565,15 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	// both lie within the convex hull of these m points.
 	//
 	// As a consequence:
-	// - Full investment constraint
 	// - Long-only constraint
-	// (- Potential target return constraint)
 	// - Maximum volatility constraint
+	// - Partial investment constraint
 	// imposed on the subset portfolios are automatically satisfied by the 
 	// final portfolio.
 	//
 	// This would also be the case for minimum/maximum weights constraints,
 	// (and more generally for any convex and/or linear constraints), but supporting 
-	// minimum/maximum weights constraints would slightly complicate the subset generation, 
+	// minimum/maximum weights constraints would complicate the subset generation, 
 	// because infeasible subsets would need to be discarded.
 	var weights = null;
 	if (subsetsAggregationMethod == 'average') {
@@ -9283,13 +9287,13 @@ self.meanVarianceCornerPortfolios = function(mu, sigma, opt) {
 *
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
 *
-* @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
+* @param {Matrix_} mu the returns of the n assets in the considered universe, a n by 1 matrix of real numbers.
 * @param {number} targetReturn the desired return of the portfolio, a real number.
-* @param {Array.<Array.<Object>>} cornerPortfolios the corner portfolios defining the mean-variance efficient frontier, an array of m arrays of 2 elements:
-* - cornerPortfolios[0..m-1][0], the weights corresponding to the corner portfolio, an array of n real numbers
-* - cornerPortfolios[0..m-1][1], the risk aversion parameter associated to the corner portfolio, a positive real number
+* @param {Array<Array.<Object>} the list of all corner portfolios as well as their associated risk aversion parameter, an array made of arrays of two elements:
+* - The corner portfolio weights, a n by 1 Matrix_ of n real numbers
+* - The corner portfolio risk aversion parameter, a positive real number
 * @return {Array.<Object>} an array arr of either two or three elements:
-* - arr[0][0], the weights of the efficient portfolio with the desired return, an array of n real numbers
+* - arr[0][0], the weights of the efficient portfolio with the desired return, a n by 1 Matrix_ of n real numbers
 * - arr[0][1], the index of the corner portfolio with a return equal to (in case arr is made of two elements) or strictly lower than (in case arr is made of three elements)
 * the return of the efficient portfolio, a natural integer
 * - arr[0][2], the index of the corner portfolio with a return strictly greater than the return of the efficient portfolio (only in case arr is made of three elements), a natural integer
@@ -9438,13 +9442,13 @@ function computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfoli
 *
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
 *
-* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {Matrix_} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, a n by n matrix of real numbers.
 * @param {number} targetVolatility the desired volatility of the portfolio, a positive real number.
-* @param {Array.<Array.<Object>>} cornerPortfolios the corner portfolios defining the mean-variance efficient frontier, an array of m arrays of 2 elements:
-* - cornerPortfolios[0..m-1][0], the weights corresponding to the corner portfolio, an array of n real numbers
-* - cornerPortfolios[0..m-1][1], the risk aversion parameter associated to the corner portfolio, a positive real number
+* @param {Array<Array.<Object>} the list of all corner portfolios as well as their associated risk aversion parameter, an array made of arrays of two elements:
+* - The corner portfolio weights, a n by 1 Matrix_ of n real numbers
+* - The corner portfolio risk aversion parameter, a positive real number
 * @return {Array.<Object>} an array arr of either two or three elements:
-* - arr[0][0], the weights of the efficient portfolio with the desired volatility, an array of n real numbers
+* - arr[0][0], the weights of the efficient portfolio with the desired volatility, a n by 1 Matrix_ of n real numbers
 * - arr[0][1], the index of the corner portfolio with a volatility equal to (in case arr is made of two elements) or strictly lower than (in case arr is made of three elements)
 * the volatility of the efficient portfolio, a natural integer
 * - arr[0][2], the index of the corner portfolio with a volatility strictly greater than the volatility of the efficient portfolio (only in case arr is made of three elements), a natural integer
@@ -9612,6 +9616,156 @@ function computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cor
 
 
 /**
+* @function computeMaxVolatilityEfficientPortfolio_
+*
+* @summary Compute the weights of an efficient mean-variance portfolio subject to a maximum volatility
+* constraint.
+*
+* @description This function returns the weights w_1,...,w_n associated to the maximally invested and long-only mean-variance 
+* efficient portfolio of n assets subject to a maximum volatility constraint.
+*
+* The computed efficient portfolio is either:
+* - Fully invested in case its volatility is equal to or lower than the maximum desired volatility
+* - Maximally partially invested so that its volatility is equal to the maximum desired volatility, 
+* in case a full investment would result in its volatility being strictly greater than the desired maximum volatility
+*
+* @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
+*
+* @param {Matrix_} mu the returns of the n assets in the considered universe, a n by 1 matrix of real numbers.
+* @param {Matrix_} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, a n by n matrix of real numbers.
+* @param {number} maxVolatility the desired maximum volatility of the portfolio, a strictly positive real number.
+* @param {Array<Array.<Object>} the list of all corner portfolios as well as their associated risk aversion parameter, an array made of arrays of two elements:
+* - The corner portfolio weights, a n by 1 Matrix_ of n real numbers
+* - The corner portfolio risk aversion parameter, a positive real number
+* @param {object} opt optional and/or mandatory parameters for the algorithm.
+* @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
+* @return {Matrix_} the weights of the efficient portfolio with the desired maximum volatility, a n by 1 Matrix_ of n real numbers
+*/
+function computeMaxVolatilityEfficientPortfolio_(mu, sigma, maxVolatility, cornerPortfolios, opt) {
+	// Internal function to compute the volatility of a portfolio
+	function computeVolatility_(sigma, weights) {
+		return Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights));
+	}
+	
+	// ------	
+	
+	// Initializations
+	var eps = 1e-8; // the numerical accuracy for testing equality	
+	
+	var nbAssets = sigma.nbColumns;
+	
+	var weights; // the weights to be computed
+
+	
+	// 1 - If the desired maximum volatility is greater than the highest attainable
+	// volatility on the efficient frontier, the efficient portfolio is computed
+	// as the rightmost portfolio on the efficient frontier.
+	var highestVolatilityWeights = cornerPortfolios[0][0];
+	var highestVolatility = computeVolatility_(sigma, highestVolatilityWeights);
+	
+	if (maxVolatility > highestVolatility + eps) {
+		weights = highestVolatilityWeights;
+	}
+	else {
+		// 2 - Otherwise, if the desired maximum volatility is lower than the lowest attainable
+		// volatility on the efficient frontier, a new efficient frontier is computed
+		// including a risk free asset with (0,0,0) return/volatility/covariance, and
+		// the efficient portfolio is computed as the efficient portfolio with a target
+		// volatility strictly equal to desired maximum volatility using the new efficient 
+		// frontier.
+		var lowestVolatilityWeights = cornerPortfolios[cornerPortfolios.length - 1][0];
+		var lowestVolatility = computeVolatility_(sigma, lowestVolatilityWeights);
+		
+		if (maxVolatility < lowestVolatility - eps) {
+			// Extend the returns/covariances of the input assets with a risk free asset,
+			// of index (nbAssets + 1).
+			var newMu = Matrix_.fill(nbAssets + 1, 1, 
+									function(i, j) { 
+										if (i <= nbAssets) {
+											return mu.getValue(i, 1);
+										}
+										else {
+											return 0;
+										}
+									});
+			var newSigma = Matrix_.fill(nbAssets + 1, nbAssets + 1, 
+										function(i, j) { 
+											if (i <= nbAssets && j <= nbAssets) {
+												return sigma.getValue(i, j);
+											}
+											else {
+												return 0;
+											}
+										});
+
+			// Compute the new corner portfolios defining the new efficient frontier
+			// for the input assets with a risk free asset.
+			var newCornerPortfolios = computeCornerPortfolios_(newMu, newSigma, opt);
+			
+			// Compute the efficient portfolio with a target volatility strictly equal to
+			// desired maximum volatility.
+			var newWeights;
+			
+			// Limit case: in case there is only one portfolio located on the new efficient frontier,
+			// (for instance if all assets returns are negative), this portfolio must be the
+			// (0, 0) portfolio, with a 0 variance.
+			//
+			// In this case, the efficient portfolio is unique and is entirely made of the risk free asset,
+			// so that, in terms of original assets, this portfolio is not invested.
+			//
+			// (Otherwise, it means another portfolio with 0 variance possesses a strictly positive return,
+			// which is not possible since the lowest attainable volatility on the input
+			// efficient frontier was greater than the desired maximum volatility, and so
+			// greater than 0).
+			if (newCornerPortfolios.length === 1) { 
+				newWeights = newCornerPortfolios[0][0];
+				
+				if (newCornerPortfolios[0][0].getValue(nbAssets + 1, 1) != 1) { // this case should never occur, as per description above
+					throw new Error('internal error');
+				}
+			}
+			else {				
+				var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(newSigma, maxVolatility, newCornerPortfolios);
+				
+				if (efficientPortfolio.length === 0) { // this case should never occur, since the new efficient frontier includes a 0 volatility portfolio and at least 2 corner portfolios
+					throw new Error('internal error');
+				}
+				else {
+					newWeights = efficientPortfolio[0];
+				}
+			}
+			
+			// Transform the fully invested efficient portfolio with a risk free asset
+			// into the associated partially invested efficient portfolio without a
+			// risk free asset.
+			weights = Matrix_.fill(nbAssets, 1, 
+									function(i, j) { 
+										if (i <= nbAssets) {
+											return newWeights.getValue(i, 1);
+										}
+									});
+		}
+		
+		// 3 - Otherwise, the efficient portfolio is computed as the efficient portfolio 
+		// with a target volatility strictly equal to desired maximum volatility using
+		// the input efficient frontier.
+		else {
+			var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(sigma, maxVolatility, cornerPortfolios);
+			if (efficientPortfolio.length === 0) { // this case should never occur, since maxVolatility belongs to [lowestVolatility, highestVolatility]
+				throw new Error('internal error');
+			}
+			else {
+				weights = efficientPortfolio[0];
+			}
+		}
+	}
+	
+	// Return the computed weights
+	return weights;
+}
+
+
+/**
 * @function computeCornerPortfolios_
 *
 * @summary Compute all the corner portfolios belonging to the mean-variance efficient frontier.
@@ -9636,7 +9790,7 @@ function computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cor
 * @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolios with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
 * @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolios with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array<Array.<Object>} the list of all corner portfolios as well as their associated risk aversion parameter, an array made of arrays of two elements:
-* - The corner portfolio weights, a Matrix_ of n real numbers
+* - The corner portfolio weights, a n by 1 Matrix_ of n real numbers
 * - The corner portfolio risk aversion parameter, a positive real number
 *
 * @example
