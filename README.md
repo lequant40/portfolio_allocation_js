@@ -53,8 +53,8 @@ I hope you will enjoy !
 - Maximum Sharpe ratio (MSR), a.k.a. (Lintner) tangency portfolio  
   Introduced by John Lintner in the research paper [The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets](https://www.jstor.org/stable/1924119), the MSR portfolio possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
 
-- Random subspace mean-variance optimization (RSO-MVO)  
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), RSO-MVO portfolios combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with mean-variance optimization.
+- Random subspace mean-variance optimization (RS-MVO)  
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), RS-MVO portfolios combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with mean-variance optimization.
 
 - Minimax portfolio  
   Introduced by Martin Young in the research paper [A Minimax Portfolio Selection Rule with Linear Programming Solution](http://www.jstor.org/stable/2634472), the minimax portfolio uses the minimum return as a measure of risk instead of the variance as in the Markowitz framework.

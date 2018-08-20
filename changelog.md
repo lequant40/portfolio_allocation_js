@@ -7,9 +7,9 @@
 - Reorganized the bit set structure files
 - Misc. tests improvements
 - Added a FISTA-like optimization method for composite convex problems
-- Added the computation of geometric center and geometric median
+- Added the computation of geometric center and geometric median of m points in R^n
 - Added the computation of all the k-subsets of a n-set
-- Added the computation of the random subspace mean variance optimization portfolio
+- Added the computation of the random subspace mean variance optimization portfolio, with either standard mean-variance optimization and a given maximum volatility constraint or minimum variance optimization as subspaces optimization methods
 - Replaced the randomKSubsetIterator_ internal method RANKSB from A. Nijenhuis and ‎H.S. Wilf by the method D from J.S. Vitter, which is provably faster and uniform
 
 ### 0.0.6 - 10/06/2018
