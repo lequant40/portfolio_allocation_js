@@ -821,7 +821,7 @@ Matrix_.prototype = {
 	* @summary Returns a (possibly non contiguous) submatrix from the original matrix, keeping the elements whose row and column indexes are specified.
 	*
 	* @description This function computes a matrix (c_ij),i=1..p,j=1..q from the original matrix (a_ij),i=1..n,j=1..m and from the lists of row/column indexes to keep
-	* rindexes/cindexes, where p is equal to the length of rindexes and q is equal to the length of cindexes, with coefvectorDotProductficients satisfying c_ij = a_rindexes[i]cindexes[j].
+	* rindexes/cindexes, where p is equal to the length of rindexes and q is equal to the length of cindexes, with coefficients satisfying c_ij = a_rindexes[i]cindexes[j].
 	*
 	* @memberof Matrix_
 	* @param {Array.<number>|Uint32Array.<number>} rindexes the row indexes of the original matrix elements to keep, array of strictly increasing natural integers belonging to 1..n.
@@ -8096,7 +8096,7 @@ self.equalWeights = function (nbAssets, opt) {
 * 
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
-* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
+* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-08.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
 * @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
 * @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
@@ -8111,7 +8111,7 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	if (opt === undefined) {
 		opt = { constraints: {} };
 	}
-	var eps = opt.eps || 1e-04;
+	var eps = opt.eps || 1e-08;
 	var maxIterations = opt.maxIter || 10000;
 	var lowerBounds = opt.constraints.minWeights;
 	var upperBounds = opt.constraints.maxWeights;
@@ -8263,15 +8263,17 @@ self.computeCornerPortfolios_ = computeCornerPortfolios_;
 /**
 * @function meanVarianceOptimizationWeights
 *
-* @summary Compute the weights of an efficient mean-variance portfolio subject to a target return
-* constraint or to a target volatility constraint.
+* @summary Compute the weights of an efficient mean-variance portfolio subject to a return
+* constraint or to a volatility constraint.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and 
-* long-only mean-variance efficient portfolio of n assets subject to either a target return constraint 
-* (in which case this portfolio has the lowest attainable volatility among all the portfolios 
-* satisfying the target return constraint) or to a target volatility constraint (in which case this 
-* portfolio has the highest attainable return among all the portfolios satisfying the target 
-* volatility constraint).
+* long-only mean-variance efficient portfolio of n assets subject to either:
+* - a target return constraint (if subsetsOptimizationMethod is 'minimumVariance'), in which case this portfolio has the lowest attainable volatility 
+* among all the portfolios satisfying the return constraint
+* - a target volatility constraint, in which case this portfolio has the highest attainable return
+* among all the portfolios satisfying the volatility constraint
+* - a minimum variance constraint (if subsetsOptimizationMethod is 'minimumVariance'), in which case this portfolio has the lowest attainable volatility
+* among all the feasible portfolios
 *
 * Optionally, the following constraints can be added:
 * - Minimum weight of each asset to include in the portfolio
@@ -8285,14 +8287,18 @@ self.computeCornerPortfolios_ = computeCornerPortfolios_;
 * @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt optional and/or mandatory parameters for the algorithm.
 * @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
-* @param {number} opt.constraints.return the desired return of the portfolio, a real number; incompatible with opt.constraints.volatility.
-* @param {number} opt.constraints.volatility the desired volatility of the portfolio, a real number; incompatible with opt.constraints.return.
+* @param {number} opt.optimizationMethod the mean-variance optimization algorithm to use, a string either equal to:
+* - 'targetReturn', to compute the mean-variance efficient portfolio subject to a target return constraint
+* - 'targetVolatility', to compute the mean-variance efficient portfolio subject to a target volatility constraint
+* - 'minimumVariance', to compute the global minimum variance efficient portfolio
+* @param {number} opt.constraints.return in case opt.optimizationMethod is equal to 'return', the target return of the portfolio, a real number.
+* @param {number} opt.constraints.volatility in case opt.optimizationMethod is equal to 'volatility', the target volatility of the portfolio, a positive real number.
 * @param {number} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
 * @param {number} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array<Array.<number>} the weights corresponding to the mean-variance efficient portfolio, array of n real numbers.
 *
 * @example
-* meanVarianceOptimizationWeights([0.1, 0.2], [[1, 0.3], [0.3, 1]], { constraints: {return: 0.15}})
+* meanVarianceOptimizationWeights([0.1, 0.2], [[1, 0.3], [0.3, 1]], { optimizationMethod: 'targetReturn', constraints: {return: 0.15}})
 * // [0.5, 0.5] 
 */
 self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {	
@@ -8305,15 +8311,29 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	if (opt.constraints === undefined) {
 		opt.constraints = {};
 	}
-	var targetReturn = opt.constraints["return"]; // .return does not work within Google Script
-	var targetVolatility = opt.constraints.volatility;
 	
-	if (targetReturn === undefined && targetVolatility === undefined) {
-		throw new Error('missing return or volatility constraint');
+	// Decode the optimization method
+	var optimizationMethod = opt.optimizationMethod;
+	if (optimizationMethod === undefined) {
+		throw new Error('missing optimization method');
 	}
-	else if (targetReturn !== undefined && targetVolatility !== undefined) {
-		throw new Error('both return and volatility constraints provided');
+	if (optimizationMethod !== 'targetReturn' &&  
+	    optimizationMethod !== 'targetVolatility' &&
+		optimizationMethod !== 'minimumVariance') {
+		throw new Error('unsupported optimization method');
 	}
+	
+	// Decode the optimization method parameters
+	var targetReturn = opt.constraints["return"]; // .return does not work within Google Script
+	if (optimizationMethod === 'targetReturn' && targetReturn === undefined) {
+		throw new Error('missing return constraint');
+	}
+	
+	var targetVolatility = opt.constraints.volatility;
+	if (optimizationMethod === 'targetVolatility' && targetVolatility === undefined) {
+		throw new Error('missing volatility constraint');
+	}
+
 	
 	// Convert mu and sigma to matrix format
 	var mu = new Matrix_(mu);
@@ -8329,22 +8349,33 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	// Depending on the target function, proceed with a different algorithm
 	// to compute the requested efficient portfolio.
 	var efficientPortfolio;
-	if (targetReturn !== undefined) { // the target function is the portfolio return
+	if (optimizationMethod == 'targetReturn') {
 		efficientPortfolio = computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfolios);
 		if (efficientPortfolio.length == 0) {
-			throw new Error('desired return not reachable');
+			throw new Error('return not reachable');
+		}
+		else {
+			efficientPortfolio = efficientPortfolio[0];
 		}
 	}
-	else { // the target function is the portfolio volatility (i.e., standard deviation)
+	else if (optimizationMethod == 'targetVolatility') {
 		efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cornerPortfolios);
 		if (efficientPortfolio.length == 0) {
-			throw new Error('desired volatility not reachable');
+			throw new Error('volatility not reachable');
+		}
+		else {
+			efficientPortfolio = efficientPortfolio[0];
 		}
 	}
-
+	else if (optimizationMethod == 'minimumVariance') {
+		efficientPortfolio = computeMinimumVarianceEfficientPortfolio_(cornerPortfolios);
+	}
+	else {
+		throw new Error('internal error');
+	}
 	
 	// Return the computed portfolio weights
-	var weights = efficientPortfolio[0];
+	var weights = efficientPortfolio;
 	return weights.toArray();
 }
 
@@ -8352,27 +8383,26 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 /**
 * @function randomSubspaceMeanVarianceOptimizationWeights
 *
-* @summary Compute the weights of a portfolio subject to a maximum volatility
+* @summary Compute the weights of a portfolio subject to a volatility
 * constraint using random subspace mean-variance optimization.
 *
 * @description This function returns the weights w_1,...,w_n associated to a maximally invested and 
-* long-only portfolio of n assets subject to a maximum volatility constraint,
-* as computed by the random subspace mean-variance optimization
-* algorithm described informally in the first reference and more formally in the second and
-* third references.
+* long-only portfolio of n assets subject to a volatility constraint, as computed by the 
+* random subspace mean-variance optimization algorithm described informally in the first reference 
+* and more formally in the second and third references.
 *
 * This algorithm combines the use of a random subspace method with the Markowitz mean-variance
-* optimization the following informal way:
+* optimization the following way:
 * - If subsetsGenerationMethod is 'random', repeat nbRandomSubsets times
 * -- Select uniformly at random from the n assets a subset of size sizeSubsets
 * -- Compute the portfolio weights resulting from a mean-variance optimization on the selected subset,
 * either using a maximum volatility constraint (if subsetsOptimizationMethod is 'maximumVolatility'), 
-* or directly using the minimum variance portfolio (if subsetsOptimizationMethod is 'minimumVariance').
+* or using the minimum variance portfolio (if subsetsOptimizationMethod is 'minimumVariance').
 * - Else if subsetsGenerationMethod is 'deterministic', repeat Binomial(nbAssets, sizeSubsets) times
 * -- Select a subset of size sizeSubsets from the n assets, without replacement
 * -- Compute the portfolio weights resulting from a mean-variance optimization on the selected subset,
 * either using a maximum volatility constraint (if subsetsOptimizationMethod is 'maximumVolatility'), 
-* or directly using the minimum variance portfolio (if subsetsOptimizationMethod is 'minimumVariance').
+* or using the minimum variance portfolio (if subsetsOptimizationMethod is 'minimumVariance').
 * - Compute the final portfolio weights as, depending on the value of subsetsAggregationMethod
 * -- 'average': the arithmetic average of the computed portfolios weights, which is ex-ante optimal, 
 * c.f. the third reference 
@@ -8460,13 +8490,8 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	
 	// The desired maximum volatility constraint of the final portfolio
 	var targetMaxVolatility = opt.constraints.maxVolatility;
-	if (subsetsOptimizationMethod === 'maximumVolatility' && 
-	    targetMaxVolatility === undefined) {
+	if (subsetsOptimizationMethod === 'maximumVolatility' &&  targetMaxVolatility === undefined) {
 		throw new Error('missing maximum portfolio volatility constraint');
-	}
-	if (subsetsOptimizationMethod === 'minimumVariance' && 
-	    targetMaxVolatility !== undefined) {
-		throw new Error('minimum variance optimization method not compatible with maximum portfolio volatility constraint');
 	}
 
 	
@@ -8596,7 +8621,7 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 		// - Compute the efficient portfolio with a volatility as close as possible (from below)
 		// to the desired maximum volatility.
 		// - Compute the efficient portfolio with the lowest attainable volatility.		
-		var subsetWeights;
+		var subsetWeights = null;
 		if (subsetsOptimizationMethod === 'maximumVolatility') {
 			subsetWeights = computeTargetMaximumVolatilityEfficientPortfolio_(subsetMu, subsetSigma, targetMaxVolatility, subsetCornerPortfolios, opt_mv);
 		}
@@ -10430,7 +10455,8 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 				// Mi(NEW_IN,NEW_IN) -= Mi(NEW_IN, idx_out) * Mi(idx_out, NEW_IN) / Mi(idx_out, idx_out), with NEW_IN = IN \ {idx_out}				
 				var Mi_out_idx_out_idx = Mi.getValue(idx_out, idx_out);
 				if (Math.abs(Mi_out_idx_out_idx) <= eps) {
-					throw new Error('division by a numerical zero detected, the covariance matrix might not be positive semi-definite');
+					Mi_out_idx_out_idx = eps;
+					//throw new Error('division by a numerical zero detected, the covariance matrix might not be positive semi-definite');
 				}
 				for (var i = 1; i <= variablesInIdx.length; ++i) {
 					var in_idx_i = variablesInIdx[i-1];
@@ -10491,7 +10517,8 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 					xi_j -= M.getValue(idx_in, in_idx_i) * xi.getValue(in_idx_i, 1);
 				}
 				if (Math.abs(xi_j) <= eps) {
-					throw new Error('division by a numerical zero detected, the covariance matrix might not be positive semi-definite');
+					xi_j = eps;
+					//throw new Error('division by a numerical zero detected, the covariance matrix might not be positive semi-definite');
 				}
 				
 				// Update the matrix Mi

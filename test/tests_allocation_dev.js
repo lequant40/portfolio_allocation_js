@@ -167,7 +167,7 @@ QUnit.test('Mean variance portfolio - internal target return weights portfolio',
 		var targetReturn = generateRandomValue(minReturn, maxReturn);
 		
 		// Compute the associated portfolio weights
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: targetReturn}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {  optimizationMethod: 'targetReturn', constraints: {return: targetReturn}});
 		
 		// Compare the computed portfolio return with the target return
 		var portfolioReturn = PortfolioAllocation.Matrix.vectorDotProduct(new PortfolioAllocation.Matrix(returns), new PortfolioAllocation.Matrix(weights));
@@ -195,7 +195,7 @@ QUnit.test('Mean variance portfolio - internal target volatility weights portfol
 		var targetVolatility = generateRandomValue(minVolatility, maxVolatility);
 		
 		// Compute the associated portfolio weights
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {volatility: targetVolatility}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {  optimizationMethod: 'targetVolatility', constraints: {volatility: targetVolatility}});
 		
 		// Compare the computed portfolio volatility with the target volatility
 		var portfolioVolatility = Math.sqrt(PortfolioAllocation.Matrix.vectorDotProduct(PortfolioAllocation.Matrix.xy(new PortfolioAllocation.Matrix(covMat), new PortfolioAllocation.Matrix(weights)), 

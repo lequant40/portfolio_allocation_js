@@ -14,7 +14,7 @@
     "quantitative finance",
     "google sheets",
     "portfolio allocation",
-	"portfolio optimization"
+    "portfolio optimization"
   ],
   "repository": {
     "type": "git",
@@ -34,5 +34,8 @@
   "main": "dist/portfolio_allocation.dist.min.js",
   "scripts": {
     "test": "grunt test"
+  },
+  "dependencies": {
+    "request": "^2.81.0"
   }
 }

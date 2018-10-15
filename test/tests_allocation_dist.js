@@ -566,7 +566,6 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #3 ' + i);
 		}
 	}
-
 	{
 		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0418, 0.0437], [0.0418, 0.0484, 0.0481], [0.0437, 0.0481, 0.0529]]); 
 		var expectedWeights =  [1, 0, 0];
@@ -593,7 +592,7 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 					  [-0.0064081,-0.00480642,0.00690744,0.00169834,0.0116492]];
 		
 		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
-		var expectedWeights =  [0.22146166011081053, 0, 0.3167829128512612, 0.13743827218475788, 0.32431715485317053];
+		var expectedWeights =  [0.22372361188383866, 0, 0.308875157539891, 0.1338200074030125, 0.333581223173258];
 		for (var i = 0; i < expectedWeights.length; ++i) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #6 ' + i);
 		}
@@ -1041,6 +1040,24 @@ QUnit.test('Mean variance portfolio - corner portfolios computation', function(a
 
 
 
+
+QUnit.test('Mean variance portfolio - error cases', function(assert) {    
+	// Test using static data
+	// Test the unsupported cases:
+	// - Unsupported optimization method
+	{
+		var covMat = [[0.0146, 0.0187, 0.0145],
+					 [0.0187, 0.0854, 0.0104],
+					  [0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		assert.throws(function() { 
+		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'test', constraints: {return: 0.10}}) },
+			new Error('unsupported optimization method'),
+			"Mean variance portfolio - Target return weights portfolio, unreachable target return #1");
+	}
+});	
+
 QUnit.test('Mean variance portfolio - target return weights portfolio', function(assert) {    
 	// Test using random data
 	// Test unreachable cases
@@ -1053,15 +1070,15 @@ QUnit.test('Mean variance portfolio - target return weights portfolio', function
 		var maxReturn = returns[1];
 		var unreachableMaxReturn = maxReturn + (1 - Math.random()); // > maxReturn
 		assert.throws(function() { 
-		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: unreachableMaxReturn}}) },
-			new Error('desired return not reachable'),
+		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: unreachableMaxReturn}}) },
+			new Error('return not reachable'),
 			"Mean variance portfolio - Target return weights portfolio, unreachable target return #1");
 			
 		var minReturn = returns[0];
 		var unreachableMinReturn = minReturn - (1 - Math.random()); // < minReturn
 		assert.throws(function() { 
-		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: unreachableMinReturn}}) },
-			new Error('desired return not reachable'),
+		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: unreachableMinReturn}}) },
+			new Error('return not reachable'),
 			"Mean variance portfolio - Target return weights portfolio, unreachable target return #2");
 	}
 	
@@ -1072,12 +1089,12 @@ QUnit.test('Mean variance portfolio - target return weights portfolio', function
 		
 		var targetReturn = returns[1]; // the second asset
 		var expectedWeights = [0, 1]; 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: targetReturn}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: targetReturn}});
 		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - target return weights portfolio #0');
 		
 		var targetReturn = 0.15; // exact mix of the two assets
 		var expectedWeights = [0.5, 0.5];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: targetReturn}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: targetReturn}});
 		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - target return weights portfolio #0 bis');
 	}
 		
@@ -1097,22 +1114,22 @@ QUnit.test('Mean variance portfolio - target return weights portfolio', function
 		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
 		
 		var expectedRoundedWeights = [0, 0, 0.08, 0.015, 0.06, 0, 0.345, 0, 0, 0.5];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.07}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: 0.07}});
 		weights = PortfolioAllocation.roundedWeights(weights, 200);
 		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - target return weights portfolio #1');
 		
 		var expectedRoundedWeights = [0, 0, 0, 0.335, 0.455, 0, 0.21, 0, 0, 0]; // In Markowitz book, this is actually [0, 0, 0, 0.33, 0.455, 0, 0.215, 0, 0, 0], but this seems a wrong rounding 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.175}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: 0.175}});
 		weights = PortfolioAllocation.roundedWeights(weights, 200);
 		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - target return weights portfolio #2');
 		
 		var expectedRoundedWeights = [0, 0, 0, 0.3, 0.39, 0, 0.31, 0, 0, 0]; // In Markowitz book, this is actually [0, 0, 0, 0.29, 0.39, 0, 0.32, 0, 0, 0], but this seems a wrong rounding 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.169}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: 0.169}});
 		weights = PortfolioAllocation.roundedWeights(weights, 100);
 		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - target return weights portfolio #3');
 		
 		var expectedRoundedWeights = [0, 0, 0.09, 0.13, 0.21, 0, 0.57, 0, 0, 0];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.150}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetReturn', constraints: {return: 0.150}});
 		weights = PortfolioAllocation.roundedWeights(weights, 100);
 		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - target return weights portfolio #4');
 	}
@@ -1138,15 +1155,15 @@ QUnit.test('Mean variance portfolio - target volatility weights portfolio', func
 			var maxVolatility = Math.sqrt(covMat[1][1]);
 			var unreachableMaxVolatility = generateRandomValue(maxVolatility - 1e-6, 2 * maxVolatility); // > maxVolatility
 			assert.throws(function() { 
-			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {volatility: unreachableMaxVolatility}}) },
-				new Error('desired volatility not reachable'),
+			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetVolatility', constraints: {volatility: unreachableMaxVolatility}}) },
+				new Error('volatility not reachable'),
 				"Mean variance portfolio - Target volatility weights portfolio, unreachable target volatility #1 - " + k + "/" + nbSamples);
 		
 			var minVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
 			var unreachableMinVolatility = generateRandomValue(0, minVolatility - 1e-6); // < minVolatility
 			assert.throws(function() { 
-			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {volatility: unreachableMinVolatility}}) },
-				new Error('desired volatility not reachable'),
+			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetVolatility', constraints: {volatility: unreachableMinVolatility}}) },
+				new Error('volatility not reachable'),
 				"Mean variance portfolio - Target volatility weights portfolio, unreachable target volatility #2 - " + k + "/" + nbSamples);
 		}
 	}
@@ -1167,9 +1184,123 @@ QUnit.test('Mean variance portfolio - target volatility weights portfolio', func
 		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
 		
 		var expectedRoundedWeights = [0, 0, 0.08, 0.015, 0.055, 0, 0.335, 0, 0, 0.515]; // In Markowitz book, this is actually [0, 0, 0.08, 0.015, 0.06, 0, 0.345, 0, 0, 0.5], but this seems a wrong rounding 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {volatility: 0.08}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetVolatility', constraints: {volatility: 0.08}});
 		weights = PortfolioAllocation.roundedWeights(weights, 200);
 		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - target volatility weights portfolio #1');
+	}
+	
+});	
+
+
+QUnit.test('Mean variance portfolio - minimum variance weights portfolio', function(assert) {    
+	// As the solution of the GMV portfolio is unique when the covariance matrix is positive definite, fake returns data
+	// are used below.
+
+	// Reference: Portfolio Optimization versus Risk-Budgeting Allocation, Thierry Roncalli, WG RISK ESSEC, January 18, 2012
+	{
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02], 
+		                                                                  [[0.0396, 0.0398], [0.0398, 0.0400]], 
+																		  { optimizationMethod: 'minimumVariance'});
+		var expectedWeights =  [1, 0];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance #1 ' + i);
+		}
+	}
+	{
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02, 0.03], 
+		                                                                  [[0.0400, 0.0396, 0.0414], [0.0396, 0.0484, 0.0455], [0.0414, 0.0455, 0.0529]], 
+																		  { optimizationMethod: 'minimumVariance'});
+		var expectedWeights =  [0.9565217391304353, 0.04347826086956469, 0];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance #2 ' + i);
+		}
+	}
+	// Note: The volatility obtained by the computed portfolio is 0.019751470588235294, which is lower than the volatility of 0.2017 in the reference,
+	// associated with the commented weights !
+	{
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02, 0.03], 
+		                                                                 [[0.0400, 0.0374, 0.0391], [0.0374, 0.0484, 0.0430], [0.0391, 0.0430, 0.0529]],
+																		 { optimizationMethod: 'minimumVariance'}); 
+		//var expectedWeights =  [0.7009, 0.2378, 0.0613];//
+		var expectedWeights =  [0.8088235294117648, 0.19117647058823511, 0 ];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance #3 ' + i);
+		}
+	}
+	{
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02, 0.03], 
+		                                                                  [[0.0400, 0.0418, 0.0437], [0.0418, 0.0484, 0.0481], [0.0437, 0.0481, 0.0529]],
+																		  { optimizationMethod: 'minimumVariance'}); 
+		var expectedWeights =  [1, 0, 0];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance #4 ' + i);
+		}
+	}
+	
+	// Reference: Understanding the Impact of Weights Constraints in Portfolio Theory, Thierry Roncalli
+	{
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02, 0.03, 0.04], 
+		                                                                  [[0.0225,0.0030,0.0150,0.0225], [0.0030,0.0400,0.0350,0.0240], [0.0150,0.0350,0.0625,0.0600], [0.0225,0.0240,0.0600,0.0900]],
+																	      { optimizationMethod: 'minimumVariance'}); 
+		var expectedWeights =  [0.6548672566371683, 0.34513274336283173, 0, 0];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance #5 ' + i);
+		}
+	}
+	
+	// Reference: Private communication with TrendXplorer
+	{
+		var covMat = [[0.03401428,0.0333167,-0.00614739,0.00926415,-0.0064081],
+					  [0.0333167,0.06323421,-0.00855552,0.02245369,-0.00480642],
+					  [-0.00614739,-0.00855552,0.01444902,-0.00432445,0.00690744],
+					  [0.00926415,0.02245369,-0.00432445,0.02622712,0.0016983],
+					  [-0.0064081,-0.00480642,0.00690744,0.00169834,0.0116492]];
+		
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02, 0.03, 0.04, 0.05], 
+		                                                                  covMat,
+																		  { optimizationMethod: 'minimumVariance'}); 
+		//var expectedWeights = [0.22372361188383866, 0, 0.308875157539891, 0.1338200074030125, 0.333581223173258]; // these weights were obtained though the GMV method above, but are associated to a higher volatility: 0.004813123264651144 v.s. 0.004813123264643914 for the weights computed through MVO
+		var expectedWeights = [0.2237239682833401, 0, 0.30887475456633273, 0.13381893271287823, 0.33358234443744894];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance #6 ' + i);
+		}
+	}
+	
+	// Reference: Xi Bai, Katya Scheinberg, Reha Tutuncu, Least-squares approach to risk parity in portfolio selection
+	{
+		var covMat = [[94.868,33.750,12.325,-1.178,8.778],
+					  [33.750,445.642,98.955,-7.901,84.954],
+					  [12.325,98.955,117.265,0.503,45.184],
+					  [-1.178,-7.901,0.503,5.460,1.057],
+					  [8.778,84.954,45.184,1.057,34.126]];
+			
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02, 0.03, 0.04, 0.05], 
+		                                                                  covMat,
+																		  { optimizationMethod: 'minimumVariance'}); 
+		var expectedWeights =  [0.050, 0.006, 0, 0.862, 0.082];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'Mean variance portfolio - minimum variance #7 ' + i);
+		}
+	}
+	
+	// Reference: Xi Bai, Katya Scheinberg, Reha Tutuncu, Least-squares approach to risk parity in portfolio selection
+	// Constraints on assets weights
+	{
+		var covMat = [[94.868,33.750,12.325,-1.178,8.778],
+					  [33.750,445.642,98.955,-7.901,84.954],
+					  [12.325,98.955,117.265,0.503,45.184],
+					  [-1.178,-7.901,0.503,5.460,1.057],
+					  [8.778,84.954,45.184,1.057,34.126]];
+			
+		var minWeights = [0.05,0.05,0.05,0.05,0.05];
+		var maxWeights = [0.35,0.35,0.35,0.35,0.35];
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02, 0.03, 0.04, 0.05], 
+		                                                                  covMat, 
+																		  { optimizationMethod: 'minimumVariance', constraints: {minWeights: minWeights, maxWeights: maxWeights} }); 
+		var expectedWeights =  [0.200,0.050,0.050,0.350,0.350];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'Mean variance portfolio - minimum variance #8, constrained ' + i);
+		}
 	}
 });	
 
@@ -1440,12 +1571,6 @@ QUnit.test('Random subspace mean variance portfolio - error cases', function(ass
 			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsOptimizationMethod: 'unknown', constraints: {maxVolatility: maxVolatility}}) },
 			new Error('unsupported subsets optimization method'),
 			"Random subspace mean variance portfolio - Unsupported subsets optimization method");
-
-		// Test minimum variance subsets optimization method and maximum portfolio volatility constraint
-		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsOptimizationMethod: 'minimumVariance', constraints: {maxVolatility: maxVolatility}}) },
-			new Error('minimum variance optimization method not compatible with maximum portfolio volatility constraint'),
-			"Random subspace mean variance portfolio - Minimum variance subsets optimization method and maximum portfolio volatility constraint");
 	}
 	
 	// Test using static data
