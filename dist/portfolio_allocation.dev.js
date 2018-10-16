@@ -8264,16 +8264,18 @@ self.computeCornerPortfolios_ = computeCornerPortfolios_;
 * @function meanVarianceOptimizationWeights
 *
 * @summary Compute the weights of an efficient mean-variance portfolio subject to a return
-* constraint or to a volatility constraint.
+* constraint or to misc. volatility constraints.
 *
-* @description This function returns the weights w_1,...,w_n associated to the fully invested and 
+* @description This function returns the weights w_1,...,w_n associated to the 
 * long-only mean-variance efficient portfolio of n assets subject to either:
-* - a target return constraint (if subsetsOptimizationMethod is 'minimumVariance'), in which case this portfolio has the lowest attainable volatility 
-* among all the portfolios satisfying the return constraint
-* - a target volatility constraint, in which case this portfolio has the highest attainable return
-* among all the portfolios satisfying the volatility constraint
-* - a minimum variance constraint (if subsetsOptimizationMethod is 'minimumVariance'), in which case this portfolio has the lowest attainable volatility
-* among all the feasible portfolios
+* - a return constraint (if optimizationMethod is 'targetReturn'), in which case this portfolio, if it exists, is fully invested 
+* and has the lowest attainable volatility among all the feasible portfolios satisfying the return constraint
+* - a volatility constraint (if optimizationMethod is 'targetVolatility'), in which case this portfolio, if it exists, is fully invested
+* and has the highest attainable return among all the feasible portfolios satisfying the volatility constraint
+* - a maximum volatility constraint (if optimizationMethod is 'maximumTargetVolatility'), in which case this portfolio is potentially 
+* not fully invested and has the highest attainable return among all the feasible portfolios satisfying the maximum volatility constraint
+* - a minimum variance constraint (if optimizationMethod is 'minimumVariance'), in which case this portfolio is fully invested and 
+* has the lowest attainable volatility among all the feasible portfolios
 *
 * Optionally, the following constraints can be added:
 * - Minimum weight of each asset to include in the portfolio
@@ -8288,11 +8290,13 @@ self.computeCornerPortfolios_ = computeCornerPortfolios_;
 * @param {object} opt optional and/or mandatory parameters for the algorithm.
 * @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.optimizationMethod the mean-variance optimization algorithm to use, a string either equal to:
-* - 'targetReturn', to compute the mean-variance efficient portfolio subject to a target return constraint
-* - 'targetVolatility', to compute the mean-variance efficient portfolio subject to a target volatility constraint
+* - 'targetReturn', to compute the mean-variance efficient portfolio subject to a return constraint
+* - 'targetVolatility', to compute the mean-variance efficient portfolio subject to a volatility constraint
+* - 'maximumTargetVolatility', to compute the mean-variance efficient portfolio subject to a maximum volatility constraint
 * - 'minimumVariance', to compute the global minimum variance efficient portfolio
-* @param {number} opt.constraints.return in case opt.optimizationMethod is equal to 'return', the target return of the portfolio, a real number.
-* @param {number} opt.constraints.volatility in case opt.optimizationMethod is equal to 'volatility', the target volatility of the portfolio, a positive real number.
+* @param {number} opt.constraints.return in case opt.optimizationMethod is equal to 'targetReturn', the target return of the portfolio, a real number.
+* @param {number} opt.constraints.volatility in case opt.optimizationMethod is equal to 'targetVolatility', the target volatility of the portfolio, a positive real number.
+* @param {number} opt.constraints.maxVolatility in case opt.optimizationMethod is equal to 'maximumTargetVolatility', the maximum target volatility of the portfolio, a positive real number.
 * @param {number} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
 * @param {number} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array<Array.<number>} the weights corresponding to the mean-variance efficient portfolio, array of n real numbers.
@@ -8319,7 +8323,8 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	}
 	if (optimizationMethod !== 'targetReturn' &&  
 	    optimizationMethod !== 'targetVolatility' &&
-		optimizationMethod !== 'minimumVariance') {
+		optimizationMethod !== 'minimumVariance' &&
+		optimizationMethod !== 'maximumTargetVolatility') {
 		throw new Error('unsupported optimization method');
 	}
 	
@@ -8334,6 +8339,10 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 		throw new Error('missing volatility constraint');
 	}
 
+	var maxTargetVolatility = opt.constraints.maxVolatility;
+	if (optimizationMethod === 'maximumTargetVolatility' &&  maxTargetVolatility === undefined) {
+		throw new Error('missing maximum volatility constraint');
+	}
 	
 	// Convert mu and sigma to matrix format
 	var mu = new Matrix_(mu);
@@ -8370,6 +8379,12 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	else if (optimizationMethod == 'minimumVariance') {
 		efficientPortfolio = computeMinimumVarianceEfficientPortfolio_(cornerPortfolios);
 	}
+	else if (optimizationMethod == 'maximumTargetVolatility') {
+		// The options for the potential internal mean variance optimization algorithm
+		var opt_mv = { maxIter: opt.maxIter, constraints: opt.constraints };
+		
+		efficientPortfolio = computeMaximumTargetVolatilityEfficientPortfolio_(mu, sigma, maxTargetVolatility, cornerPortfolios, opt_mv);
+	}
 	else {
 		throw new Error('internal error');
 	}
@@ -8396,12 +8411,12 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * - If subsetsGenerationMethod is 'random', repeat nbRandomSubsets times
 * -- Select uniformly at random from the n assets a subset of size sizeSubsets
 * -- Compute the portfolio weights resulting from a mean-variance optimization on the selected subset,
-* either using a maximum volatility constraint (if subsetsOptimizationMethod is 'maximumVolatility'), 
+* either using a maximum volatility constraint (if subsetsOptimizationMethod is 'maximumTargetVolatility'), 
 * or using the minimum variance portfolio (if subsetsOptimizationMethod is 'minimumVariance').
 * - Else if subsetsGenerationMethod is 'deterministic', repeat Binomial(nbAssets, sizeSubsets) times
 * -- Select a subset of size sizeSubsets from the n assets, without replacement
 * -- Compute the portfolio weights resulting from a mean-variance optimization on the selected subset,
-* either using a maximum volatility constraint (if subsetsOptimizationMethod is 'maximumVolatility'), 
+* either using a maximum volatility constraint (if subsetsOptimizationMethod is 'maximumTargetVolatility'), 
 * or using the minimum variance portfolio (if subsetsOptimizationMethod is 'minimumVariance').
 * - Compute the final portfolio weights as, depending on the value of subsetsAggregationMethod
 * -- 'average': the arithmetic average of the computed portfolios weights, which is ex-ante optimal, 
@@ -8436,9 +8451,9 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * - 'random' in order to generate the subsets of assets uniformly at random
 * - 'deterministic' in order to generate the subsets of assets deterministically, through the enumeration of all the Binomial(nbAssets, sizeSubsets) subsets of assets
 * @param {number} opt.subsetsOptimizationMethod the mean-variance optimization algorithm to use on the generated subsets of assets, a string either equal to:
-* - 'maximumVolatility', to compute the mean-variance efficient portfolio with a desired maximum volatility
-* - 'minimumVariance', to compute the global minimum variance efficient portfolio; defaults to 'maximumVolatility'
-* @param {number} opt.constraints.maxVolatility the desired maximum volatility of the portfolio in case opt.subsetsOptimizationMethod is equal to 'maximumVolatility', a positive real number
+* - 'maximumTargetVolatility', to compute the mean-variance efficient portfolio with a maximum target volatility
+* - 'minimumVariance', to compute the global minimum variance efficient portfolio; defaults to 'maximumTargetVolatility'
+* @param {number} opt.constraints.maxVolatility the maximum target volatility of the portfolio in case opt.subsetsOptimizationMethod is equal to 'maximumTargetVolatility', a positive real number
 * @param {number} opt.nbRandomSubsets the number of subsets of assets to generate in case opt.subsetsGenerationMethod is set to 'random', a strictly positive natural integer; defaults to 128.
 * @param {string} opt.subsetsAggregationMethod the method used to compute the final portfolio weights from the generated portfolios weights,
 * a string equal to:
@@ -8480,17 +8495,17 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	// The subsets optimization method
 	var subsetsOptimizationMethod = opt.subsetsOptimizationMethod;
 	if (subsetsOptimizationMethod === undefined) {
-		subsetsOptimizationMethod = 'maximumVolatility';
+		subsetsOptimizationMethod = 'maximumTargetVolatility';
 	}
-	if (subsetsOptimizationMethod !== 'maximumVolatility' &&  
+	if (subsetsOptimizationMethod !== 'maximumTargetVolatility' &&  
 	    subsetsOptimizationMethod !== 'minimumVariance') {
 		throw new Error('unsupported subsets optimization method');
 	}
 
 	
-	// The desired maximum volatility constraint of the final portfolio
-	var targetMaxVolatility = opt.constraints.maxVolatility;
-	if (subsetsOptimizationMethod === 'maximumVolatility' &&  targetMaxVolatility === undefined) {
+	// The maximum target volatility constraint of the final portfolio
+	var maxTargetVolatility = opt.constraints.maxVolatility;
+	if (subsetsOptimizationMethod === 'maximumTargetVolatility' &&  maxTargetVolatility === undefined) {
 		throw new Error('missing maximum portfolio volatility constraint');
 	}
 
@@ -8622,8 +8637,8 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 		// to the desired maximum volatility.
 		// - Compute the efficient portfolio with the lowest attainable volatility.		
 		var subsetWeights = null;
-		if (subsetsOptimizationMethod === 'maximumVolatility') {
-			subsetWeights = computeTargetMaximumVolatilityEfficientPortfolio_(subsetMu, subsetSigma, targetMaxVolatility, subsetCornerPortfolios, opt_mv);
+		if (subsetsOptimizationMethod === 'maximumTargetVolatility') {
+			subsetWeights = computeMaximumTargetVolatilityEfficientPortfolio_(subsetMu, subsetSigma, maxTargetVolatility, subsetCornerPortfolios, opt_mv);
 		}
 		else if (subsetsOptimizationMethod === 'minimumVariance') {
 			subsetWeights = computeMinimumVarianceEfficientPortfolio_(subsetCornerPortfolios);
@@ -9755,7 +9770,7 @@ function computeMinimumVarianceEfficientPortfolio_(cornerPortfolios) {
 
 
 /**
-* @function computeTargetMaximumVolatilityEfficientPortfolio_
+* @function computeMaximumTargetVolatilityEfficientPortfolio_
 *
 * @summary Compute the weights of an efficient mean-variance portfolio subject to a maximum volatility
 * constraint.
@@ -9778,9 +9793,11 @@ function computeMinimumVarianceEfficientPortfolio_(cornerPortfolios) {
 * - The corner portfolio risk aversion parameter, a positive real number
 * @param {object} opt optional and/or mandatory parameters for the algorithm.
 * @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolios with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolios with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Matrix_} the weights of the efficient portfolio with the desired maximum volatility, a n by 1 Matrix_ of n real numbers
 */
-function computeTargetMaximumVolatilityEfficientPortfolio_(mu, sigma, maxVolatility, cornerPortfolios, opt) {
+function computeMaximumTargetVolatilityEfficientPortfolio_(mu, sigma, maxVolatility, cornerPortfolios, opt) {
 	// Internal function to compute the volatility of a portfolio
 	function computeVolatility_(sigma, weights) {
 		return Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights));

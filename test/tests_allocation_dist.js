@@ -1151,15 +1151,15 @@ QUnit.test('Mean variance portfolio - target volatility weights portfolio', func
 		
 		
 		var nbSamples = 10;
+		var minVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
+		var maxVolatility = Math.sqrt(covMat[1][1]);
 		for (var k = 0; k < nbSamples; ++k) {
-			var maxVolatility = Math.sqrt(covMat[1][1]);
 			var unreachableMaxVolatility = generateRandomValue(maxVolatility - 1e-6, 2 * maxVolatility); // > maxVolatility
 			assert.throws(function() { 
 			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetVolatility', constraints: {volatility: unreachableMaxVolatility}}) },
 				new Error('volatility not reachable'),
 				"Mean variance portfolio - Target volatility weights portfolio, unreachable target volatility #1 - " + k + "/" + nbSamples);
 		
-			var minVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
 			var unreachableMinVolatility = generateRandomValue(0, minVolatility - 1e-6); // < minVolatility
 			assert.throws(function() { 
 			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'targetVolatility', constraints: {volatility: unreachableMinVolatility}}) },
@@ -1192,10 +1192,87 @@ QUnit.test('Mean variance portfolio - target volatility weights portfolio', func
 });	
 
 
-QUnit.test('Mean variance portfolio - minimum variance weights portfolio', function(assert) {    
-	// As the solution of the GMV portfolio is unique when the covariance matrix is positive definite, fake returns data
-	// are used below.
+QUnit.test('Mean variance portfolio - maximum target volatility weights portfolio', function(assert) {    
+	function generateRandomValue(minVal, maxVal) {	
+		return Math.random() * (maxVal - minVal) + minVal;
+	}
+	
+	// Test using static data
+	{
+		var covMat = [[0.0146, 0.0187, 0.0145],
+					 [0.0187, 0.0854, 0.0104],
+					  [0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		var nbSamples = 100;
+		var minAttainableVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
+		var maxAttainableVolatility = Math.sqrt(covMat[1][1]);
+		for (var k = 0; k < nbSamples; ++k) {	
+			// In case the maximum target volatility is lower than the mimimum attainable volatility,
+			// the portfolio cannot be fully invested and must correspond to the efficient portfolio with cash
+			// and with a target volatility constaint 
+			var maxTargetVolatility = generateRandomValue(0, minAttainableVolatility - 1e-6); // < minAttainableVolatility
+			var weights_mtv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat,
+			                                                                      { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxTargetVolatility}});
+			
+			var investment = weights_mtv[0] + weights_mtv[1] + weights_mtv[2];
+			assert.equal(investment < 1, true, 'Mean variance portfolio - maximum target volatility weights portfolio #1/1');
+			
+			var weights_tv = PortfolioAllocation.meanVarianceOptimizationWeights([returns[0], returns[1], returns[2], 0], 
+			                                                                     [[covMat[0][0], covMat[0][1], covMat[0][2], 0],
+                                                             					 [covMat[1][0], covMat[1][1], covMat[1][2], 0],
+					                                                             [covMat[2][0], covMat[2][1], covMat[2][2], 0],
+					                                                             [0, 0, 0, 0]], 
+			                                                                     { optimizationMethod: 'targetVolatility', constraints: {volatility: maxTargetVolatility}});
+			for (var i = 0; i < weights_mtv.length; ++i) {
+				assert.equal(Math.abs(weights_mtv[i] - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio -maximum target volatility weights portfolio #1/2 ' + i);
+			}
+			assert.equal(Math.abs(1-investment - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio -maximum target volatility weights portfolio #1/2 ' + i);	
+			
+			// In case the maximum target volatility is greater than the maximum attainable volatility,
+			// the portfolio must be the efficient portfolio with the highest return
+			var maxTargetVolatility = generateRandomValue(maxAttainableVolatility - 1e-6, 2 * maxAttainableVolatility); // > maxAttainableVolatility
+			var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                  { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxTargetVolatility}});
+			assert.deepEqual(weights, [0, 1, 0], 'Mean variance portfolio - maximum target volatility weights portfolio #2');
+			
+			// Otherwise, the portfolio must correspond to the efficient portfolio with a target volatility constaint
+			var maxTargetVolatility = generateRandomValue(minAttainableVolatility + 1e-6, maxAttainableVolatility - 1e-6); // > minAttainableVolatility && < maxAttainableVolatility
+			var weights_mtv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                      { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxTargetVolatility}});
+			var weights_tv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                     { optimizationMethod: 'targetVolatility', constraints: {volatility: maxTargetVolatility}});
+			assert.deepEqual(weights_mtv, weights_tv, 'Mean variance portfolio - maximum target volatility weights portfolio #3');
+		}
+	}
+});	
 
+
+QUnit.test('Mean variance portfolio - minimum variance weights portfolio', function(assert) {    
+	// Test that the GMV portfolio as computed by MVO algorithm is efficient, 
+	// using a semi-definite positive covariance matrix
+	{
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02], 
+		                                                                  [[0.0400, 0.0400], [0.0400, 0.0400]], 
+																		  { optimizationMethod: 'minimumVariance'});
+		var expectedWeights =  [0, 1];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance, efficient portfolio #1 ' + i);
+		}
+
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.02, 0.01], 
+		                                                                  [[0.0400, 0.0400], [0.0400, 0.0400]], 
+																		  { optimizationMethod: 'minimumVariance'});
+		var expectedWeights =  [1, 0];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance, efficient portfolio #2 ' + i);
+		}
+	}
+
+	// Re-use the tests from the GMV portfolio
+	// As the solution of the GMV portfolio is unique when the covariance matrix is positive definite, 
+	// fake returns data are used below.
+	
 	// Reference: Portfolio Optimization versus Risk-Budgeting Allocation, Thierry Roncalli, WG RISK ESSEC, January 18, 2012
 	{
 		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02], 
@@ -1813,7 +1890,7 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		// Test the deterministic subset generation with the mean-variance/maximum volatility constraint subsets optimization method
 		var expectedWeights = [0.6620689655172421, 0.059375396144818106, 0.19810532833311822];
 		var defaultWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
-		var averageWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsOptimizationAlgorithm: 'maximumVolatility', constraints: {maxVolatility: maxVolatility}});
+		var averageWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsOptimizationAlgorithm: 'maximumTargetVolatility', constraints: {maxVolatility: maxVolatility}});
 		assert.deepEqual(defaultWeights, expectedWeights, 'Random subspace mean variance portfolio - Default subsets optimization method #1');
 		assert.deepEqual(averageWeights, expectedWeights, 'Random subspace mean variance portfolio - Default subsets optimization method #2');
 	}
