@@ -2495,7 +2495,7 @@ Matrix_.svdDecomposition = function(A, opt) {
 	var sss = Matrix_.zeros(n, n);
 	var vvv = Matrix_.zeros(n, n);
 	for (var j = 1; j <= n; ++j) {
-		// Extract singluar values information
+		// Extract singular values information
 		var sigma_j_col_idx = sigmas_idx[j-1];
 		var sigma_j = sigmas[sigma_j_col_idx-1];
 
@@ -2541,7 +2541,7 @@ Matrix_.svdDecomposition = function(A, opt) {
 	var uuuu = Matrix_.zeros(m, m);
 	var ssss = Matrix_.zeros(m, n);
 	for (var j = 1; j <= n; ++j) {
-		// Extract singluar values information
+		// Extract singular values information
 		var sigma_j_col_idx = sigmas_idx[j-1];
 		var sigma_j = sigmas[sigma_j_col_idx-1];
 		
@@ -4651,14 +4651,16 @@ function geometricCenter_(x) {
 *
 * y = argmin_x in R^n f(x) = sum ||y - x_i||_2, i = 1..m
 *
-* The algorithm implemented uses a serie of successive hyperbolic approximations of
-* the euclidian norms appearing in the function f above, c.f. the second reference,
+* The algorithm implemented uses a serie of successive converging hyperbolic approximations of
+* the euclidian norms appearing in the function f above, c.f. the second and third references,
 * which allows to compute the geometric median using a standard first-order convex
 * optimization algorithm.
 *
 * @see <a href="https://en.wikipedia.org/wiki/Geometric_median">Geometric median</a>
 * @see <a href="http://dx.doi.org/10.1287/opre.23.3.581">Robert F. Love, James G. Morris, (1975) Technical Note—Solving Constrained Multi-Facility Location Problems Involving lp Distances Using Convex Programming. Operations Research 23(3):581-587.</a>
+* @see <a href="https://dx.doi.org/10.4169%2Famer.math.monthly.121.02.095%23sthash.QTTb5Z6T.dpuf">Eric C. Chi and Kenneth Lange, A Look at the Generalized Heron Problem through the Lens of Majorization-Minimization. Am Math Mon. 2014 Feb; 121(2): 95–108.</a>
 * @see <a href="https://arxiv.org/abs/1606.05225">Michael B. Cohen, Yin Tat Lee, Gary Miller, Jakub Pachocki, Aaron Sidford. Geometric Median in Nearly Linear Time. arXiv:1606.05225 [cs.DS]</a>
+* @see <a href="https://doi.org/10.1007/BFb0083582">Ben-Tal A., Teboulle M. (1989) A smoothing technique for nondifferentiable optimization problems. In: Dolecki S. (eds) Optimization. Lecture Notes in Mathematics, vol 1405. Springer, Berlin, Heidelberg</a>
 *
 * @param {Array.<Matrix_>} x an array of m n by 1 matrices, corresponding to the coordinates 
 * of the m points belonging to R^n.
@@ -4676,30 +4678,14 @@ function geometricMedian_(x) {
 		var sum = 0.0;
 
 		for (var k = 0; k < m; ++k) {
-			// Compute Math.SQRT(||y - x_k||_2^2 + eps), using an inlined version
-			// of the vectorNorm('two') Matrix function and a stable way to
+			// Compute Math.SQRT(||y - x_k||_2^2 + eps^2), using a stable way to
 			// compute the square root of two numbers squared.
-			//var y_m_x_k = Matrix_.xmy(y, x[k], tmp_vec_n);
-			//var y_m_x_k_two_norm = y_m_x_k.vectorNorm('two');
-			var t = 0;
-			var s = 1;
-			for (var i = 1; i <= n; ++i) {
-				var val = y.getValue(i, 1) - x[k].getValue(i, 1); // y_i - (x_k)_i
-				var absVal = Math.abs(val);
-				if (absVal != 0) {
-					if (absVal > t) {
-						s = 1 + s * (t/val) * (t/val);
-						t = absVal;
-					}
-					else  {
-						s = s + (val/t) * (val/t);
-					}
-				}
-			}
-			var y_m_x_k_two_norm = t * Math.sqrt(s);
+			var y_m_x_k = Matrix_.xmy(y, x[k], tmp_vec_n);
+			var y_m_x_k_two_norm = y_m_x_k.vectorNorm('two');
 			
 			sum += hypot_(y_m_x_k_two_norm, eps_f);
 		}
+		
 		return sum;
 	}
 	
@@ -4710,38 +4696,18 @@ function geometricMedian_(x) {
 		var res = Matrix_.zeros(n, 1);
 		
 		for (var k = 0; k < m; ++k) {
-			// Compute (y - x_k)/||y - x_k||_2 and add it
-			// to the currently computed gradient, using an inlined version
-			// of the vectorNorm('two') Matrix function and a stable way to
+			// Compute (y - x_k)/Math.SQRT(||y - x_k||_2^2 + eps^2) and add it
+			// to the currently computed gradient, using a stable way to
 			// compute the square root of two numbers squared.
-			//var y_m_x_k = Matrix_.xmy(y, x[k-1], tmp_vec_n);
-			//var y_m_x_k_two_norm = y_m_x_k.vectorNorm('two');
-			var t = 0;
-			var s = 1;
-			for (var i = 1; i <= n; ++i) {
-				var val = y.getValue(i, 1) - x[k].getValue(i, 1);  // y_i - (x_k)_i
-				tmp_vec_n.setValue(i, 1, 
-				                   val);
-				
-				var absVal = Math.abs(val);
-				if (absVal != 0) {
-					if (absVal > t) {
-						s = 1 + s * (t/val) * (t/val);
-						t = absVal;
-					}
-					else  {
-						s = s + (val/t) * (val/t);
-					}
-				}
-			}
-			var y_m_x_k = tmp_vec_n;
-			var y_m_x_k_two_norm = t * Math.sqrt(s);
+			var y_m_x_k = Matrix_.xmy(y, x[k], tmp_vec_n);
+			var y_m_x_k_two_norm = y_m_x_k.vectorNorm('two');
 
 			res = Matrix_.axpby(1, res, 1/hypot_(y_m_x_k_two_norm, eps_f), y_m_x_k, res);
 		}
+		
 		return res;
 	}
-	
+
 	
 	// TODO: Checks
 	
@@ -4753,25 +4719,27 @@ function geometricMedian_(x) {
 	var tmp_vec_n = Matrix_.zeros(n, 1); // a temporary placeholder vector of dimension n
 	
 	
-	// The geometric median is computed using successive hyperbolic approximations of
-	// the euclidian norms appearing in its objective function, c.f. the second
-	// reference.
+	// The geometric median will be computed using successive epsilon-approximations of
+	// the euclidian norms appearing in its objective function, c.f. the second and the third
+	// references.
 	//
-	// Each hyperbolic approximation of the objective function of the geometric median
+	// - Each epsilon-approximation of the objective function of the geometric median
 	// problem is a smooth convex(/strictly convex) function, so that the associated
 	// minimization problem can be solved using a standard first-order convex optimization
-	// algorithm (here, FISTA-like).
-	
+	// algorithm (below, FISTA-like).
+	//
+	// - As the epsilon parameter defining these epsilon-approximations converges to zero, 
+	// the solution found by the convex optimization algorithm is proven to converge 
+	// to the true geometric median, c.f. the third reference.
 	
 	// Compute a proper starting point for the optimization algorithm.
 	//
-	// Per lemma 18 of the third reference, the geometric center is a 
+	// Per lemma 18 of the fourth reference, the geometric center is a 
 	// 2-approximation of the geometric median.
 	var x0 = geometricCenter_(x);
-	
+
 	
 	// Define additional functions used by the optimization algorithm
-	
 	// The projection on R^n
 	var g = function(x) {
 		return 0;
@@ -4784,32 +4752,17 @@ function geometricMedian_(x) {
 	}
 		
 			
+	// TODO: BETTER COMMENT + add 1e-2 as parametrized in input
 	// Compute the minimum of the function f_eps on R^n, for successive decreasing values
 	// of epsilon (which is actually squared in the computation of f_eps and gradf_eps).
 	//
-	// Precision in the early stages is not of paramount importance.
-	//
-	// Note: the associated loop has been unrolled.
-	var eps_f = 1e-3;
-	var sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, x0, {eps: 1e-2, maxIter: -1, maxLine: -1});
-
-	eps_f = 1e-4;
-	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-2, maxIter: -1, maxLine: -1});
-	
-	eps_f = 1e-5;
-	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-3, maxIter: -1, maxLine: -1});
-	
-	eps_f = 1e-6;
-	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-3, maxIter: -1, maxLine: -1});
-
-	eps_f = 1e-7;
-	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-4, maxIter: -1, maxLine: -1});
-
-	eps_f = 1e-8;
-	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-4, maxIter: -1, maxLine: -1});
+	// 0 <= G(x^*_eps) - G(x^*) <= eps*m  =>  G(x^*_eps) - eps*m <= G(x^*) <= G(x^*_eps)
+	// c.f. example 3.3 of the fifth reference 
+	var eps_f = 1e-2 / m;
+	var sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, x0, {eps: 1e-4, maxIter: -1, maxLine: -1});
 
 
-	// Return the computed optimal solution to the last hyperbolic approximation of the 
+	// Return the computed optimal solution to the hyperbolic approximation of the 
 	// geometric median.
 	return sol[0];
 }
@@ -4826,6 +4779,9 @@ self.select_ = select_;
 self.hypot_ = hypot_;
 self.rank_ = rank_;
 self.ftca_ = ftca_;
+self.normcdf_ = function(x) { return normcdf_(x); }
+self.norminv_ = norminv_;
+self.hypersphereRandomSampler_ = hypersphereRandomSampler_;
 /* End Wrapper private methods - Unit tests usage only */
 
 
@@ -5611,6 +5567,8 @@ function sampleStddev_(x) {
 	return Math.sqrt(sampleVariance_(x));
 }
 
+
+
 /**
 * @function normcdf_
 *
@@ -5622,8 +5580,8 @@ function sampleStddev_(x) {
 *
 * This function is also called Phi in the statistical litterature.
 *
-* The algorithm uses a Taylor expansion around 0 of a well chosen function of Phi.
-* The algorithm has an absolute error of less than 8e−16.
+* The algorithm uses a Taylor expansion around 0 of a well chosen function of Phi,
+* and has a theorical absolute error of less than 8e−16.
 *
 * @author George Marsaglia
 *
@@ -5638,19 +5596,186 @@ function sampleStddev_(x) {
 */
 function normcdf_(x) {
 	// Initialisations
-	var s=x;
-	var t=0;
-	var b=x;
-	var q=x*x;
-	var i=1;
+	var sum = x;
+	var term = 0;
+	var next_term = x;
+	var power = x*x;
+	var i = 1;
 
-	// The main loop corresponds to the computation of the Taylor serie of the function B around 0, c.f. page 5 of the reference.
-	while (s != t) {
-		s = (t = s) + (b *= q/(i += 2));
+	// Limit cases, as described in the reference.
+	if (x < -8.0) {
+		return 0.0;
+	}
+	else if (x > 8.0) {
+		return 1.0;
+	}
+	
+	// The main loop corresponds to the computation of the Taylor serie of the function B around 0, 
+	// c.f. page 5 of the reference.
+	//
+	// In a nutshell, the Taylor expansion is computed term by term until the addition of a new term 
+	// stops to produce a change (from a numerical accuracy perspective).
+	while (sum != term) {
+		sum = (term = sum) + (next_term *= power/(i += 2));
 	}
 
 	// The formula linking Phi and the Taylor expansion above if Phi = 1/2 + normal density * B, c.f. page 5 of the reference.
-	return 0.5 + s * Math.exp(-0.5 * q - 0.91893853320467274178)
+	return 0.5 + sum * Math.exp(-0.5 * power - 0.91893853320467274178)
+}
+
+
+/**
+* @function norminv_
+*
+* @summary Compute the inverse of the standard normal cumulative distribution function.
+*
+* @description This function returns an approximation of the inverse standard normal cumulative distribution function, i.e.
+* given p in [0,1] it returns an approximation to the x value satisfying p = Pr{Z <= x} where Z is a
+* random variable following a standard normal distribution law.
+*
+* x is also called a z-score.
+*
+* The algorithm uses the fact that if F^-1(p) is the inverse normal cumulative distribution function, then G^-1(p) = F^-1(p+1/2) is an odd function.
+* The algorithm uses two separate rational minimax approximations: one rational approximation is used for the central region and another one is used for the tails.
+* The algorithm has a relative error whose absolute value is less than 1.15e-9, but if needed, the approximation of the inverse normal cumulative distribution function can be refined better precision using Halley's method.
+*
+* @see <a href="https://www.jstor.org/stable/2347330">Michael Wichura, Algorithm AS 241: The Percentage Points of the Normal Distribution., Applied Statistics, Volume 37, Number 3, pages 477-484, 1988.</a>
+* 
+* @param {number} p a probability value, real number belonging to interval [0,1].
+* @return {number} an approximation to the x value satisfying p = Pr{Z <= x} where Z is a random variable following a standard normal distribution law.
+*
+* @example
+* norminv_(0.5);
+* // 0
+*/
+function norminv_(p) {
+    // Checks
+	if (p <= 0.0 || p >= 1.0) {
+		if (p == 0.0) {
+			return -Infinity;
+		}
+		else if (p == 1.0) {
+			return Infinity;
+		}
+		else {
+			throw "The probality p must be bigger than 0 and smaller than 1";
+		}
+	}
+
+    var q = p - 0.5;
+
+	var ppnd16;
+	
+    if (Math.abs(q) <= 0.425) { // P CLOSE TO 1/2
+        var r = 0.180625 - q * q;
+        var num_ppnd16 = ((((((r * 2.5090809287301226727E3 + 3.3430575583588128105E4) * r + 6.7265770927008700853E4) * r + 4.5921953931549871457E4) * r + 1.3731693765509461125E4) * r + 1.9715909503065514427E3) * r + 1.3314166789178437745E2) * r + 3.3871328727963666080E0;
+		var denom_ppnd16 = ((((((r * 5.2264952788528545610E3 + 2.8729085735721942674E4) * r + 3.9307895800092710610E4) * r + 2.1213794301586595867E4) * r + 5.3941960214247511077E3) * r + 6.8718700749205790830E2) * r + 4.2313330701600911252E1) * r + 1.0;
+		ppnd16 = q * num_ppnd16 / denom_ppnd16;
+    }
+    else {
+		var r;
+		if ( q < 0.0 ) {
+		  r = p;
+		}
+		else {
+		  r = 1.0 - p;
+		}
+
+		//if ( r <= 0.0 ) {
+		// No need for this check, as it has already been done at the beginning of the function
+		//}
+		
+        r = Math.sqrt(-Math.log(r));
+
+        if (r <= 5) { // P NEITHER CLOSE TO 1/2 NOR 0 OR 1
+            r = r - 1.6;
+			var num_ppnd16 = ((((((r * 7.74545014278341407640E-4 + 2.27238449892691845833E-2) * r + 2.41780725177450611770E-1) * r + 1.27045825245236838258E0) * r + 3.64784832476320460504E0) * r + 5.76949722146069140550E0) * r + 4.63033784615654529590E0) * r + 1.42343711074968357734E0;
+			var denom_ppnd16 = ((((((r * 1.05075007164441684324E-9 + 5.47593808499534494600E-4) * r + 1.51986665636164571966E-2) * r + 1.48103976427480074590E-1) * r + 6.89767334985100004550E-1) * r + 1.67638483018380384940E0) * r + 2.05319162663775882187E0) * r + 1.0;
+			ppnd16 = num_ppnd16 / denom_ppnd16;
+        }
+        else { // COEFFICIENTS FOR P NEAR 0 OR 1
+            r = r - 5.0;
+			var num_ppnd16 = (((((((r * 2.01033439929228813265E-7 + 2.71155556874348757815E-5) * r + 1.24266094738807843860E-3) * r + 2.65321895265761230930E-2) * r + 2.96560571828504891230E-1) * r + 1.78482653991729133580E0) * r + 5.46378491116411436990E0) * r + 6.65790464350110377720E0);
+			var denom_ppnd16 = (((((((r * 2.04426310338993978564E-15 + 1.42151175831644588870E-7) * r + 1.84631831751005468180E-5) * r + 7.86869131145613259100E-4) * r + 1.48753612908506148525E-2) * r + 1.36929880922735805310E-1) * r + 5.99832206555887937690E-1) * r + 1.0);
+			ppnd16 = num_ppnd16 / denom_ppnd16;
+        }
+
+        if (q < 0.0) {
+            ppnd16 = -ppnd16;
+        }
+    }
+
+	// Return the computed value
+    return ppnd16;
+}
+
+
+/**
+* @function hypersphereRandomSampler_
+*
+* @summary Returns a function to compute random points on the unit hypersphere of R^n.
+*
+* @description This function constructs a function to compute random points uniformly distributed on
+* the unit hypersphere of R^n, using the algorithm of the reference.
+* 
+* @see <a href="https://dl.acm.org/citation.cfm?id=377946">	Mervin E. Muller, A note on a method for generating points uniformly on n-dimensional spheres, Communications of the ACM CACM Homepage archive
+Volume 2 Issue 4, April 1959 Pages 19-20 </a>
+*
+* @param {number} n the dimension of the unit hypersphere of R^n, natural integer superior or equal to 1.
+* @return {function} a function to be used through its .sample() method, computing random  
+* points on the unit hypersphere of R^n.
+*
+* @example
+* var mySampler = new hypersphereRandomSampler_(3);
+* mySampler.sample();
+* // [1, 0, 0]
+*/
+function hypersphereRandomSampler_(n) {
+	// Initializations
+	this.n = n;
+	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
+	
+	/**
+	* @function sample
+	*
+	* @summary Returns a random point on the unit hypersphere of R^n.
+	*
+	* @description This function computes a point choosen uniformly at random on the unit hypersphere of R^n,
+	* using the algorithm of the reference.
+	*
+	* @memberof hypersphereRandomSampler_
+	* @return {Array.<number>|Float64Array} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
+	*
+	*/
+	this.sample = function() {
+		// Computation of n independent random variables from N(0,1), which will form the basis
+		// of the coordinates of the point being sampled.
+		var sum_sq = 0;
+		for (var i = 0; i < this.n; ++i) {
+			// Generate a random variable from N(0,1), using the inverse method
+			var u = Math.random(); // u ~ U[0,1[
+			while (u === 0.0) {
+				u = Math.random();
+			} // u ~ U]0,1[
+			var r = norminv_(u); // r ~ N(0,1)
+			
+			// Set the i-th coordinate of the point being sampled.
+			this.x[i] = r;
+			
+			// Compute the running sum of the squares of the normal variables, for the subsequent normalization step.
+			sum_sq += r * r;
+		}
+
+		// Normalization of the computed coordinates of the point being sampled, so that
+		// the 2-norm of the associated vector in R^n is equal to 1.
+		var x_two_norm = Math.sqrt(sum_sq);
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = this.x[i]/x_two_norm;
+		}
+		
+		// Return a copy of the point being sampled, so that callers can alter it.
+		return this.x.slice();
+	}
 }
 
 
@@ -7217,6 +7342,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 /* Start Wrapper private methods - Unit tests usage only */
 self.simplexRationalRounding_ = simplexRationalRounding_;
 self.simplexRandomSampler_ = simplexRandomSampler_;
+self.simplexDirectionSampler_ = simplexDirectionSampler_;
 self.simplexDeterministicRationalSampler_ = simplexDeterministicRationalSampler_;
 self.simplexRationalGirdSearch_ = simplexRationalGirdSearch_;
 self.simplexEuclidianProjection_ = simplexEuclidianProjection_;
@@ -7442,7 +7568,7 @@ function simplexDeterministicRationalSampler_(n, k) {
 function simplexRandomSampler_(n) {
 	// Initializations
 	this.n = n;
-	this.x = new Array(n); // the coordinates of a point being sampled
+	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
 	
 	/**
 	* @function sample
@@ -7453,18 +7579,18 @@ function simplexRandomSampler_(n) {
 	* using the O(n) algorithm 2 of the reference.
 	*
 	* @memberof simplexRandomSampler_
-	* @return {Array.<number>} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
+	* @return {Array.<number>|Float64Array} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
 	*
 	*/
 	this.sample = function() {
-		// Computation of n random variables from EXP(1), which will form the basis
+		// Computation of n independent random variables from EXP(1), which will form the basis
 		// of the coordinates of the point being sampled	
 		var sum = 0;
 		for (var i = 0; i < this.n; ++i) {
 			// Generate a random variable from EXP(1) using the inverse method, with no need for the minus sign
 			// as the negative sign would cancel out at the subsequent normalization step.
 			var u = 1 - Math.random(); // belongs to ]0,1], so that the logarithm below is properly defined
-			var e = Math.log(u);
+			var e = Math.log(u); // e ~ EXP(1)
 
 			// Set the i-th coordinate of the point being sampled.
 			this.x[i] = e;
@@ -7483,7 +7609,92 @@ function simplexRandomSampler_(n) {
 		return this.x.slice();
 	}
 }
- 
+
+
+/**
+* @function simplexDirectionSampler_
+*
+* @summary Returns a function to compute random directions to be used on the unit simplex of R^n.
+*
+* @description This function constructs a function to compute random unit directions uniformly distributed on
+* the intersection of the unit hypersphere of R^n and of the hyperplane defined by the equation <(1,1,...,1)/x> = 0,
+* using the algorithm 2 of the reference.
+* 
+* @see <a href="https://projecteuclid.org/euclid.ba/1488337478">Cong, Yulai; Chen, Bo; Zhou, Mingyuan. Fast Simulation of 
+* Hyperplane-Truncated Multivariate Normal Distributions. Bayesian Anal. 12 (2017), no. 4, 1017--1037. doi:10.1214/17-BA1052.</a>
+*
+* @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
+* @return {function} a function to be used through its .sample() method, computing random  
+* directions to be used on the unit simplex of R^n.
+*
+* @example
+* var mySampler = new simplexDirectionSampler_(3);
+* mySampler.sample();
+* // [-0.5856783494622358, -0.19984292686015526, 0.7855212763223908]
+*/
+function simplexDirectionSampler_(n) {
+	// Initializations
+	this.n = n;
+	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
+	
+	/**
+	* @function sample
+	*
+	* @summary Returns a random point belonging to the intersection of the unit hypersphere of R^n
+	* and of the hyperplane defined by the equation <(1,1,...,1)/x> = 0.
+	*
+	* @description This function computes a point choosen uniformly at random in the intersection of 
+	* the unit hypersphere of R^n and of the hyperplane defined by the equation <(1,1,...,1)/x> = 0,
+	* using the O(n) algorithm 2 of the reference.
+	*
+	* @memberof simplexDirectionSampler_
+	* @return {Array.<number>|Float64Array} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
+	*
+	*/
+	this.sample = function() {
+		// Computation of n independent random variables from N(0,1), which will form the basis
+		// of the coordinates of the point being sampled.
+		var sum = 0;
+		for (var i = 0; i < this.n; ++i) {
+			// Generate a random variable from N(0,1), using the inverse method
+			var u = Math.random(); // u ~ U[0,1[
+			while (u === 0.0) {
+				u = Math.random();
+			} // u ~ U]0,1[
+			var r = norminv_(u); // r ~ N(0,1)
+			
+			// Set the i-th coordinate of the point being sampled
+			this.x[i] = r;
+			
+			// Compute the running sum of the normal variables
+			sum += r;
+		}
+		
+		// Normalization of the computed coordinates of the point being sampled, so that
+		// the associated vector in R^n belongs to the hyperplane <(1,1,...,1)/x> = 0,
+		// i.e. sum x_i = 0.
+		// - The associated vector in R^n 
+		var sum_d_n = sum / this.n;
+		var sum_sq = 0;
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = this.x[i] - sum_d_n;
+			
+			// Compute the running sum of the squares of the coordinates, for the subsequent normalization step.
+			sum_sq += this.x[i] * this.x[i];
+		}
+		
+		// Final normalization of the computed coordinates of the point being sampled, so that
+		// the associated vector in R^n belongs to the n-hypersphere, i.e. its 2-norm 
+		// is equal to 1.
+		var x_two_norm = Math.sqrt(sum_sq);
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = this.x[i]/x_two_norm;
+		}
+	
+		// Return a copy of the point being sampled, so that callers can alter it.
+		return this.x.slice();
+	}
+}
  
 
 /**
@@ -11335,6 +11546,9 @@ self.randomWeights = function (nbAssets, opt) {
 * // [~0.45, ~0.55]
 */
 self.riskBudgetingWeights = function (sigma, rb, opt) {
+	// The numerical zero 
+	var eps_tol = 1e-12;
+	
 	// Decode options
 	if (opt === undefined) {
 		opt = {};
@@ -11369,6 +11583,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 	// Preparational computations
 	var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
 	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
+	var obj = 0.5 * s_x - Matrix_.vectorDotProduct(rb, x.elemMap(function(i,j,val) { return Math.log(val);})); // the objective function to be minimized, c.f. formula 3 of the second reference
 	
 	// Main loop until convergence, guaranteed as per hypotheses on sigma and b
 	var iter = 0;
@@ -11378,14 +11593,16 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
     	converged = true;
     	
     	for (var i = 1; i <= nbAssets; ++i) {
-    	    // Save the old asset weight i before any update
+			// Save the old asset weight i before any update
 			var xi_old = x.data[i-1];
 
+			
 			// Define the coefficients of the second order polynomial ax_i^2 + b_ix + c_i, c.f. the second reference
     	    var a = sigma.data[(i-1)*sigma.nbColumns + (i-1)]; // sigma_i^2, always > 0
     	    var b = sigma_x.data[i-1] - x.data[i-1] * a; // (SIGMA*x)_i - x_i*sigma_i^2, might be any sign
-    	    var c = -rb.data[i-1] * s_x; // -b_i * sigma(x), always < 0
-    	    
+    	    var c = -rb.data[i-1] * s_x; // -b_i * sigma(x), always <= 0 (== 0 iff the covariance matrix is semi-definite positive and sigma(x) == 0)
+
+			
     	    // Extract the strictly positive root x_i^* of the equation ax_i^2 + bx_i + c = 0, using a stable numerical formula
     	    var b_p = b/2; // reduced discriminant
 			var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
@@ -11398,9 +11615,11 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
     	    var r2 = c/q;
     	    var xi_star = r1 > 0 ? r1 : r2;
     	    
+			
 			// Update the asset weight i
 			x.data[i-1] = xi_star;
     	    
+			
     	    // Compute the updated SIGMA*x and x'*SIGMA*x elements for convergence condition evaluation,
 			// and next loop evaluation.
 			//
@@ -11411,32 +11630,66 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 			// To be noted that the update of the value x'*SIGMA*x does not use this procedure, 
 			// because it requires a dot product, which is then equivalent to the full recomputation
 			// of the volatility from SIGMA*x.
-			var delta_xi = xi_star - xi_old;
+			
+			// Compute the updated SIGMA*x
 			for (var j = 1; j <= nbAssets; ++j) {
-				sigma_x.data[j-1] += sigma.data[(j-1)*sigma.nbColumns + (i-1)] * delta_xi;
+				sigma_x.data[j-1] += sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_star;
+				sigma_x.data[j-1] -= sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_old;
 			}
-    	    s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x));
-    	    
-    	    // Update the convergence condition: |RC_i* - b_i| <= eps, i = 1..nbAssets
-    	    var rci_star = x.data[i-1] * sigma_x.data[i-1] / s_x;
-    	    if (Math.abs(rci_star - rb.data[i-1]) > eps) {
-    	        converged = false;
-    	    }
-        }
-		
+			
+			// Compute the updated x'*SIGMA*x
+			var sigma_x_x = Matrix_.vectorDotProduct(sigma_x, x);		
+			
+			// In case the variance is numerically negative zero, which can occur with 
+			// a semi-positive definite covariance matrice, it is replaced with zero
+			if (sigma_x_x < 0) {
+				if (-sigma_x_x < eps_tol) {
+					sigma_x_x = 0;
+				}
+				else {
+					throw new Error('Negative volatility during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
+				}
+			}
+			
+			// Compute the updated volatility SQRT(x'*SIGMA*x)
+			s_x = Math.sqrt(sigma_x_x);
+
+			
+    	    // Update the convergence condition: |RC_i* - b_i| <= eps, i = 1..nbAssets,
+			// used in case the risk contributions are properly defined (i.e., a strictly
+			// positive portfolio volatility).
+			if (s_x != 0) {
+				var rci_star = x.data[i-1] * sigma_x.data[i-1] / s_x;
+
+				if (Math.abs(rci_star - rb.data[i-1]) > eps) {
+					converged = false;
+				}
+			}
+		}
+
+		// Update the generic convergence condition: |obj - obj*| <= eps,
+		// used in all cases
+		var obj_star = 0.5 * s_x - Matrix_.vectorDotProduct(rb, x.elemMap(function(i,j,val) { return Math.log(val);}));		
+		if (Math.abs(obj_star - obj) > eps) {
+			converged = false;
+			obj = obj_star;
+		}
+
+
 		// Update the number of iterations
 		++iter;
-		
+
+
 		// Check the number of iterations
 		if (iter > maxIterations) {
 			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 	}
-	
+
 	// Normalize the computed weights, and compute the normalization constant
 	var sum_x = x.sum();
 	x = x.normalize(x);
-		
+
 	// Depending on what is requested in output, return the computed normalized weights
 	// and possibly the associated portfolio volatility.
 	if (outputPortfolioVolatility === true) {

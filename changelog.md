@@ -1,4 +1,4 @@
-### 0.0.7 - XX/YY/2018
+### 0.0.7 - XX/YY/2019
 - Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities.
 - Added the meanVarianceCornerPortfolios to compute the corner portfolios with their returns and volatilities.
 - Added the computation of the maximum Sharpe ratio portfolio, through the efficient frontier computation.
@@ -9,8 +9,15 @@
 - Added a FISTA-like optimization method for composite convex problems
 - Added the computation of geometric center and geometric median of m points in R^n
 - Added the computation of all the k-subsets of a n-set
-- Added the computation of the random subspace mean variance optimization portfolio, with either standard mean-variance optimization and a given maximum volatility constraint or minimum variance optimization as subspaces optimization methods
+- Added the computation of the random subspace mean variance optimization portfolio, with two subspaces optimization methods:
+-- Standard mean-variance optimization with a given maximum volatility constraint 
+-- Minimum variance optimization 
 - Replaced the randomKSubsetIterator_ internal method RANKSB from A. Nijenhuis and ‎H.S. Wilf by the method D from J.S. Vitter, which is provably faster and uniform
+- Added a method to approximately compute the inverse of the standard normal cumulative distribution function
+- Added a method to generate uniformly distributed vectors on the R^n unit hypersphere
+- Added a method to generate uniformly distributed vectors on the intersection of the R^n unit hypersphere and of the R^n hyperplane defined by the equation <(1,1,...,1)/x> = 0,
+in preparation for random optimization algorithms
+- Fix for issue https://github.com/lequant40/portfolio_allocation_js/issues/3 (proper management of semi-definite positive covariance matrices in the ERC/RB algorithm)
 
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights

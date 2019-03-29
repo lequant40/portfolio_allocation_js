@@ -77,12 +77,12 @@ QUnit.test('Simplex deterministic rational sampler point computation', function(
 });
 
 
-QUnit.test('Simplex random sampler point computation', function(assert) {    
+QUnit.test('Simplex random point computation', function(assert) {    
   // Test with random data
   {
 	  // Setup static parameters of the random test
 	  var nbTests = 10;
-	  var nbSubTests = 10;
+	  var nbSubTests = 20;
 	  var minDimension = 1;
 	  var maxDimension = 50;
 
@@ -124,6 +124,50 @@ QUnit.test('Simplex random sampler point computation', function(assert) {
   }
 
 });
+
+
+QUnit.test('Simplex random direction computation', function(assert) {    
+  // Test with random data
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var nbSubTests = 20;
+	  var minDimension = 3;
+	  var maxDimension = 3;
+
+	  // Aim of these tests is to check that for a sample of size n:
+	  // - An array of coordinates of size n is returned
+	  // - The coordinates sum to 0
+	  // - The 2-norm of the R^n vector associated to these coordinates is equal to 1
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random dimension size and the associated sampler
+		 var dimension = Math.floor(Math.random()*(maxDimension - minDimension + 1) + minDimension);
+		 var sampler = new PortfolioAllocation.simplexDirectionSampler_(dimension);
+		 
+		 for (var j = 0; j < nbSubTests; ++j) {
+			// Generate a random sample direction
+			var sampledDirection = sampler.sample();
+
+			// Check that the number of coordinates of the sampled direction corresponds to the requested dimension
+			var sampledDirectionDimension = sampledDirection.length;
+			assert.equal(sampledDirectionDimension, dimension, "Simplex random direction sampler computation, coordinates length - Test " + i + "," + j);
+		 
+			 // Check that the sum of the coordinates of the sampled point is 1, near to machine precision
+			 // Check that the coordinates 2-norm of the sampled point is 1, near to machine precision
+			 var sampledDirectionCoordinatesSum = 0;
+			 var sampledDirectionCoordinatesSumSq = 0;
+			 for (var k = 0; k < sampledDirection.length; ++k) {
+				sampledDirectionCoordinatesSum += sampledDirection[k];
+				sampledDirectionCoordinatesSumSq += sampledDirection[k] * sampledDirection[k];
+			}
+			assert.equal(Math.abs(sampledDirectionCoordinatesSum) <= 1e-14, true, "Simplex random direction sampler computation, coordinates sum to zero - Test " + i + "," + j);
+			assert.equal(Math.abs(Math.sqrt(sampledDirectionCoordinatesSumSq) - 1) <= 1e-14, true, "Simplex random direction sampler computation, coordinates 2-norm equal to one - Test " + i + "," + j);
+		}
+	  }
+  }
+
+});
+
 
 QUnit.test('Simplex rational grid search computation', function(assert) {    
 	// Test using static data

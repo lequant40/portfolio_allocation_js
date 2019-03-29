@@ -200,7 +200,7 @@ QUnit.test('Geometric median', function(assert) {
 	}
 
     // Test with random data
-	// Limit case: the geometric median of collinear points must be one of the points
+	// Limit case: the geometric median of collinear points must be one of these points
 	//
 	// As this condition is numerically difficult to test, this test validates that
 	// the optimal geometric median function value (which is attained at one of the input
@@ -252,10 +252,10 @@ QUnit.test('Geometric median', function(assert) {
 	// This allows testing using random data.
 	{
 		// Generate the dimension
-		var n = generateRandomDimension(1, 100);
+		var n = generateRandomDimension(10, 100);
 
         // Generate the points
-        var m = generateRandomDimension(10, 1000);
+        var m = generateRandomDimension(100, 10000);
 		var points = new Array(m);
 		for (var k = 0; k < m; ++k) {
 			points[k] = PortfolioAllocation.Matrix.fill(n, 1, 

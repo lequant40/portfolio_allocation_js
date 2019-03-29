@@ -129,12 +129,37 @@ QUnit.test('Equal risk contributions portfolio', function(assert) {
 					[8.778,84.954,45.184,1.057,34.126]];
 		
 		var weights = PortfolioAllocation.equalRiskContributionWeights(covMar, {outputPortfolioVolatility: true}); 
-		var expectedWeights =  [0.125, 0.047, 0.083, 0.613, 0.132];
+		var expectedWeights = [0.125, 0.047, 0.083, 0.613, 0.132];
 		var expectedVolatility = 3.0406150258182514;
 		for (var i = 0; i < expectedWeights.length; ++i) {
 			assert.equal(Math.abs(weights[0][i] - expectedWeights[i]) <= 1e-3, true, 'ERC - Values #4 ' + i);
 		}
 		assert.equal(Math.abs(weights[1] - expectedVolatility) <= 1e-3, true, 'ERC - Values #4, volatility');
+	}
+	
+	// Reference: https://github.com/lequant40/portfolio_allocation_js/issues/3
+	//
+	// This is a test of the ERC method wit a semi-positive definite covariance matrix
+	{
+		var cov = PortfolioAllocation.sampleCovarianceMatrix([-0.001697998787, 0.001427530069, -0.0005054947277, 0.0001213800916, -0.0001618204804],
+                                                   [-0.002961208738, 0.001640864801, -0.0001441519189, 0.0004640260466, 0.000206138145],
+                                                   [-0.001196934304, 0.0002291811055, -0.0004775812854, 0.001433428435, 0.0009680408618],
+                                                   [0.0007749231464, -0.0002552713534, 0.0003744935825, 0.00247583719, 0.002435774483],
+                                                   [-0.01361067487, -0.009173715734, -0.01167442776, -0.002090384233, -0.01495151011],
+                                                   [-0.02573117139, 0.002675293971, 0.003048918071, -0.01685867172, -0.008688999321],
+                                                   [-0.007799506409, 0.001570415597, -0.008377497996, -0.002298475244, -0.02687699473],
+                                                   [-0.009589945124, -0.02074629016, 0.001121818449, -0.003655601888, 0.01279545706],
+                                                   [-0.0001174153557, -0.0252073843, 0.008193945345, -0.006319268471, 0.002470726766],
+                                                   [0.01103327496, 0.003395115191, -0.003901529538, 0.002079722704, -0.005188516084]);
+		
+		var weights = PortfolioAllocation.equalRiskContributionWeights(cov, {outputPortfolioVolatility: true}); 
+		
+		var expectedWeights = [0.27653353547900505, 0.08992490010322292, 0.07660067915254527, 0.10281081303356884, 0.00627339817004538, 0.07548939567866735, 0.004543021673884871, 0.0858506918300374, 0.02204534860588049, 0.25992821627314233];
+		var expectedVolatility = 0;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[0][i] - expectedWeights[i]) <= 1e-8, true, 'ERC - Values #5 ' + i);
+		}
+		assert.equal(Math.abs(weights[1] - expectedVolatility) <= 1e-8, true, 'ERC - Values #5, volatility');
 	}
 });
 
@@ -1735,7 +1760,7 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		assert.deepEqual(averageWeights, expectedAverageWeights, 'Random subspace mean variance portfolio - Average aggregation method');
 
 		// Test the deterministic subset generation with the median aggregation method
-		var expectedMedianWeights = [0.1784945662477354,0.1625940283097692,0.05573432338925248,0.1509728583395466,0.038212113860531395,0.09460040373810695,0.027483255494159163,0.08586319995593711,0.07630692760669623,0.12675179228522335];
+		var expectedMedianWeights = [ 0.1784969272086642, 0.16259205477471955, 0.05573399239111082, 0.15097385631284607,  0.03821202596692463, 0.09459960500406696, 0.027483340427787176, 0.0858640477180723, 0.07630631309056779, 0.12675131788705216];
 		var medianWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsAggregationMethod: 'median', constraints: {maxVolatility: maxVolatility}});
 		assert.deepEqual(medianWeights, expectedMedianWeights, 'Random subspace mean variance portfolio - Median aggregation method');
 	}

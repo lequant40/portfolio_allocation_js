@@ -2,11 +2,13 @@
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
-PortfolioAllocation is a JavaScript library to allocate portfolios of fincancial assets, i.e. to compute the proportions of a given set of financial instruments (stocks, bonds, exchange traded funds - ETFs, mutual funds...) to hold in a portfolio so as to optimize specific quantitative criteria related to this portfolio.
+PortfolioAllocation is a JavaScript library designed to help allocating portfolios of financial instruments.
 
-PortfolioAllocation has been developed in JavaScript because I heavily use [Google Sheets](https://www.google.com/sheets/about/) to analyse trading strategies on my blog [Le Quant 40](http://www.lequant40.com/), as well as in my personal trading, and Google Sheets is easily extensible thanks to [Google Apps Script](https://developers.google.com/apps-script/), a JavaScript-based language.
+That is, the algorithms contained in the PortfolioAllocation library can be used to compute the proportions of financial instruments (stocks, bonds, exchange traded funds - ETFs...) to hold in a portfolio so as to optimize specific quantitative criteria related to this portfolio.
 
-I hope you will enjoy !
+PortfolioAllocation has been developed in JavaScript because I heavily use [Google Sheets](https://www.google.com/sheets/about/) to analyse trading strategies, and Google Sheets is easily extensible thanks to [Google Apps Script](https://developers.google.com/apps-script/), a JavaScript-based language.
+
+Hope you enjoy !
 
 
 ## Features
