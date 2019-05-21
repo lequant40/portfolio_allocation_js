@@ -18,6 +18,12 @@
 - Added a method to generate uniformly distributed vectors on the intersection of the R^n unit hypersphere and of the R^n hyperplane defined by the equation <(1,1,...,1)/x> = 0,
 in preparation for random optimization algorithms
 - Fix for issue https://github.com/lequant40/portfolio_allocation_js/issues/3 (proper management of semi-definite positive covariance matrices in the ERC/RB algorithm)
+- Added the computation of random compositions of an integer, using the algorithm RANCOM from A. Nijenhuis and ‎H.S. Wilf
+- Added the support of bounds contraints to the sampling of points uniformly at random on the simplex of R^n
+- Misc. rework of the simplex rational grid search function and associated functions
+- Fix for issue https://github.com/lequant40/portfolio_allocation_js/issues/4 (updated README, to be consistent between version displayed/published on third-party site) 
+- Reworked the generic numerical optimization portfolio algorithm, now called numericalOptimizationWeights, and added bound contraints
+- Renamed the MCA and MVA algorithms to minimumCorrelationWeights and proportionalMinimumVarianceWeights to be consistent with the other algorithms
 
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights

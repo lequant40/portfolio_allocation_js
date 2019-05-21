@@ -361,10 +361,10 @@ QUnit.test('Most diversified portfolio', function(assert) {
 				sumWeights += expectedWeights[i];
 			}
 			for (var i = 0; i < nbAssets; ++i) { 
-				expectedWeights[i] /= sumWeights; // correlation rescaled + normalized weights = expected weights
+				expectedWeights[i] /= sumWeights; // correlation rescaled + normalized weights = final expected weights
 			}
 			
-			// Compare MDP weights to expected weights
+			// Compare MDP weights to final expected weights
 			for (var i = 0; i < nbAssets; ++i) {
 				assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-4, true, 'MDP - Values #6 ' + i);
 			}
@@ -384,7 +384,7 @@ QUnit.test('Minimum correlation heuristic portfolio', function(assert) {
 		var nbAssets = sigma.length;
 
 		// Compute MinCorr weights
-		var weights = PortfolioAllocation.minCorrWeights(sigma);
+		var weights = PortfolioAllocation.minimumCorrelationWeights(sigma);
 		
 		// Compare MinCorr weights to expected weights
 		var expectedWeights = [0.21, 0.31, 0.48];
@@ -399,7 +399,7 @@ QUnit.test('Minimum correlation heuristic portfolio', function(assert) {
 		var covMat = this.randomCovarianceMatrix();
 		
 		// Compute MinCorr weights
-		var weights = PortfolioAllocation.minCorrWeights(covMat);
+		var weights = PortfolioAllocation.minimumCorrelationWeights(covMat);
 		
 		// Compute ERB weights
 		var var1 = covMat[0][0];
@@ -424,7 +424,7 @@ QUnit.test('Proportional minimum variance heuristic portfolio', function(assert)
 		var nbAssets = cov.length;
 
 		// Compute MVA weights
-		var weights = PortfolioAllocation.minVarWeights(cov);
+		var weights = PortfolioAllocation.proportionalMinimumVarianceWeights(cov);
 		
 		// Compare MVA weights to expected weights
 		var expectedWeights = [0.18, 0.07, 0.07, 0.68];
@@ -623,6 +623,29 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 		}
 	}
 	
+	// Reference: Private communication
+	{
+		var covMat = [[0.00008167944062,	0.00002381649417,	0.0000270928852,	0.00004867187199,	0.00003320921106],
+					[0.00002381649417,	0.00002359207427,	0.000005565882395,	0.0000188629976,	0.00001333414531],
+					[0.0000270928852,	0.000005565882395,	0.00001048947312,	0.0000168927258,	0.00001058070153],
+					[0.00004867187199,	0.0000188629976,	0.0000168927258,	0.00003645410697,	0.00002279528797],
+					[0.00003320921106,	0.00001333414531,	0.00001058070153,	0.00002279528797,	0.00001607412275]];
+					
+		// True expected values
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
+		var expectedWeights =  [0, 0.2145375758374286, 0.7854624241625715, 0, 0]
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #6 ' + i);
+		}
+		
+		// Wrong values, obtained by setting eps with a too big value
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {eps: 1e-4}); 
+		var expectedWeights =  [0.2, 0.2, 0.2, 0.2, 0.2]
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - (Wrong) Values #7 ' + i);
+		}
+	}
+	
 	// Reference: Xi Bai, Katya Scheinberg, Reha Tutuncu, Least-squares approach to risk parity in portfolio selection
 	{
 		var covMat = [[94.868,33.750,12.325,-1.178,8.778],
@@ -655,24 +678,25 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'GMV - Values #8, constrained ' + i);
 		}
 	}
+	
 });
 
 
 
-QUnit.test('Grid search portfolio', function(assert) {    
+QUnit.test('Numerical optimization portfolio', function(assert) {    
 	// Test unsupported optimisation method
 	{
-		
 		assert.throws(function() { 
-			PortfolioAllocation.gridSearchWeights(2,  function (arr) { return 1; }, {optimisationMethod: 'none'}) },
+			PortfolioAllocation.numericalOptimizationWeights(3,  function (arr) { return 1; }, {optimizationMethod: 'none'}) },
 			new Error('unsupported optimisation method'),
 			"Grid search portfolio - Unsupported optimisation method");
 	}
 	
-	// Test rational grid search using static data
+	// Test grid search using static data
 	{
 		// Objective function: portfolio variance, for three assets
 		// Covariance matrix taken from GMV test case #2
+		// From GMV test case #2, expected (exact) weights are [0.9565927119697761, 0.043407288030223846, 0];
 		function portfolio_variance_three_assets(arr) { 
 			var covMat = [[0.0400, 0.0396, 0.0414], [0.0396, 0.0484, 0.0455], [0.0414, 0.0455, 0.0529]];
 			
@@ -680,27 +704,102 @@ QUnit.test('Grid search portfolio', function(assert) {
 			2*arr[0]*arr[1]*covMat[0][1] + 2*arr[0]*arr[2]*covMat[0][2] + 2*arr[1]*arr[2]*covMat[1][2];
 		}
 		
-		// From GMV test case #2, expected (exact) weights are [0.9565927119697761, 0.043407288030223846, 0];
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets), 
-		PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 3}}), 
-		'Grid search portfolio - Default values');
+		// Test default values for the grid search
+		assert.deepEqual(PortfolioAllocation.numericalOptimizationWeights(3, portfolio_variance_three_assets), 
+		PortfolioAllocation.numericalOptimizationWeights(3, portfolio_variance_three_assets, {optimizationMethod: 'grid-search', optimizationMethodParams: {k: 3}}), 
+		'Numerical optimization portfolio - Default values');
 
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 3}}), 
-		[[1,0,0]], 
-		'Grid search portfolio - Values #1');
-
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 10}}), 
-		[[1,0,0]], 
-		'Grid search portfolio - Values #2');
+		// Test finer and finer rational grids
+		var expectedWeights = [[1,0,0]];
+		var weights = PortfolioAllocation.numericalOptimizationWeights(3, portfolio_variance_three_assets, {optimizationMethodParams: {k: 3}});
+		for (var i = 0; i < weights.length; ++i) {
+			var weightsOk = true;
+			for (var j = 0; j < 3; ++j) {
+			   if (expectedWeights[i][j] != weights[i][j]) {
+				 weightsOk = false;
+				 break;
+			   }
+			}	  
+			assert.equal(weightsOk, true, 'Numerical optimization portfolio - Values #1' + i);
+		}
 		
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 100}}), 
-		[[0.96,0.04,0]], 
-		'Grid search portfolio - Values #3');
+		var expectedWeights = [[1,0,0]];
+		var weights = PortfolioAllocation.numericalOptimizationWeights(3, portfolio_variance_three_assets, {optimizationMethodParams: {k: 10}});
+		for (var i = 0; i < weights.length; ++i) {
+			var weightsOk = true;
+			for (var j = 0; j < 3; ++j) {
+			   if (expectedWeights[i][j] != weights[i][j]) {
+				 weightsOk = false;
+				 break;
+			   }
+			}	  
+			assert.equal(weightsOk, true, 'Numerical optimization portfolio - Values #2' + i);
+		}
 		
-		assert.deepEqual(PortfolioAllocation.gridSearchWeights(3, portfolio_variance_three_assets, {optimisationMethod: 'deterministic', rationalGrid: {k: 1000}}), 
-		[[0.957,0.043,0]], 
-		'Grid search portfolio - Values #4');
+		var expectedWeights = [[0.96,0.04,0]];
+		var weights = PortfolioAllocation.numericalOptimizationWeights(3, portfolio_variance_three_assets, {optimizationMethodParams: {k: 100}});
+		for (var i = 0; i < weights.length; ++i) {
+			var weightsOk = true;
+			for (var j = 0; j < 3; ++j) {
+			   if (expectedWeights[i][j] != weights[i][j]) {
+				 weightsOk = false;
+				 break;
+			   }
+			}	  
+			assert.equal(weightsOk, true, 'Numerical optimization portfolio - Values #3' + i);
+		}
+		
+		var expectedWeights = [[0.957,0.043,0]];
+		var weights = PortfolioAllocation.numericalOptimizationWeights(3, portfolio_variance_three_assets, {optimizationMethodParams: {k: 1000}});
+		for (var i = 0; i < weights.length; ++i) {
+			var weightsOk = true;
+			for (var j = 0; j < 3; ++j) {
+			   if (expectedWeights[i][j] != weights[i][j]) {
+				 weightsOk = false;
+				 break;
+			   }
+			}	  
+			assert.equal(weightsOk, true, 'Numerical optimization portfolio - Values #4' + i);
+		}
 	}
+
+	// Test grid search with bounds contraints using static data
+	{
+		// Objective function: portfolio return, for three assets
+		function portfolio_return_three_assets(arr) { 
+			var ret = [-0.1, 0.3, .1];
+			
+			return -(arr[0]*ret[0] + arr[1]*ret[1] + arr[2]*ret[2]);
+		}
+		
+		var expectedWeights = [[0.5,0.5,0]];
+		var weights = PortfolioAllocation.numericalOptimizationWeights(3, portfolio_return_three_assets, {optimizationMethodParams: {k: 10}, constraints: {minWeights: [0.5, 0, 0]}});
+		for (var i = 0; i < weights.length; ++i) {
+			var weightsOk = true;
+			for (var j = 0; j < 3; ++j) {
+			   if (expectedWeights[i][j] != weights[i][j]) {
+				 weightsOk = false;
+				 break;
+			   }
+			}	  
+			assert.equal(weightsOk, true, 'Numerical optimization portfolio, bounds contraints - Values #5' + i);
+		}
+		
+		var expectedWeights = [[0,0.5,0.5]];
+		var weights = PortfolioAllocation.numericalOptimizationWeights(3, portfolio_return_three_assets, {optimizationMethodParams: {k: 10}, constraints: {maxWeights: [1, 0.5, 1]}});
+		for (var i = 0; i < weights.length; ++i) {
+			var weightsOk = true;
+			for (var j = 0; j < 3; ++j) {
+			   if (expectedWeights[i][j] != weights[i][j]) {
+				 weightsOk = false;
+				 break;
+			   }
+			}	  
+			assert.equal(weightsOk, true, 'Numerical optimization portfolio, bounds contraints - Values #6' + i);
+		}
+	}
+	
+	// TODO: Use random data with return as function + random contraints v.s. solving the same problem via linear programming
 });
 
 

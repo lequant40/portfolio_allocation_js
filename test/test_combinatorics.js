@@ -52,13 +52,58 @@ QUnit.test('Next composition computation', function(assert) {
   // Reference: Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
   // Test with the static data examples of section 5
   {
-	var expectedValues = [[true,[6,0,0]],[true, [5,1,0]],[true, [4,2,0]],[true, [3,3,0]],[true, [2,4,0]],[true, [1,5,0]],[true, [0,6,0]],[true, [5,0,1]],[true, [4,1,1]],[true, [3,2,1]],[true, [2,3,1]],[true, [1,4,1]],[true, [0,5,1]],[true, [4,0,2]],[true, [3,1,2]],[true, [2,2,2]],[true, [1,3,2]],[true, [0,4,2]],[true, [3,0,3]],[true, [2,1,3]],[true, [1,2,3]],[true, [0,3,3]],[true, [2,0,4]],[true, [1,1,4]],[true, [0,2,4]],[true, [1,0,5]],[true, [0,1,5]],[false, [0,0,6]]];
+	var expectedValues = [[6,0,0],[5,1,0],[4,2,0],[3,3,0],[2,4,0],[1,5,0], [0,6,0], [5,0,1], [4,1,1], [3,2,1], [2,3,1], [1,4,1], [0,5,1], [4,0,2], [3,1,2], [2,2,2], [1,3,2], [0,4,2], [3,0,3], [2,1,3], [1,2,3], [0,3,3], [2,0,4], [1,1,4], [0,2,4], [1,0,5], [0,1,5], [0,0,6], -1];
 
 	var nextCompositionIterator = new PortfolioAllocation.compositionsIterator_(6, 3);
 	  for (var i = 0; i < expectedValues.length; ++i) {
 		var nextComposition = nextCompositionIterator.next();
-		assert.deepEqual(nextComposition, expectedValues[i], 'Next composition - Test 1 #' + i);
+		
+		var compositionOk = true;
+		for (var j = 0; j < 3; ++j) {
+		   if (expectedValues[i][j] != nextComposition[j]) {
+		     compositionOk = false;
+		     break;
+		   }
+		}	  
+		assert.equal(compositionOk, true, 'Next composition - Test 1 #' + i);
 	  }  
+  }
+
+});
+
+QUnit.test('Next random composition computation', function(assert) {    
+  // Test with random data
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var nbCompositions = 10;
+	  var minN = 1;
+	  var maxN = 1000;
+
+	  // Aim of these tests is to check that for any generated k-composition of an integer, 
+	  // an array of k integers summing to n is returned
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random integer, and an associated random k-composition iterator
+		 var n = Math.floor(Math.random()*(maxN - minN + 1) + minN);
+		 var k  = Math.floor(Math.random()*(n - 1 + 1) + 1);
+		 var nextRandomCompositionIterator = new PortfolioAllocation.randomCompositionsIterator_(n, k);
+		 
+		 for (var j = 0; j < nbCompositions; ++j) {
+			 // Generate a random k-composition
+			 var generatedComposition = nextRandomCompositionIterator.next();
+			 
+			 // Compute the length of the generated composition
+			 var generatedCompositionLength = generatedComposition.length;
+			 assert.equal(generatedCompositionLength, k, "Next random composition computation, k-composition length - Test " + i + "," + j);
+			 
+			 // Check that the generated composition elements sum to n
+			 var generatedCompositionSum = 0;
+			 for (var k = 0; k < generatedComposition.length; ++k) {
+				generatedCompositionSum += generatedComposition[k];
+			 }
+			 assert.equal(generatedCompositionSum, n, "Next random composition computation, k-composition elements sum to n - Test " + i + "," + j);
+		  }
+	  }
   }
 
 });
@@ -68,13 +113,24 @@ QUnit.test('Next subset computation', function(assert) {
   // Reference: Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
   // Test with the static data examples of section 1
   {
-	  var expectedValues = [[true,[]], [true,[1]], [true,[1,2]], [true,[2]], [true,[2,3]], [true,[1,2,3]], [true,[1,3]],[true,[3]], [true,[3,4]], [true,[1,3,4]], [true,[1,2,3,4]], [true,[2,3,4]], [true,[2,4]], [true,[1,2,4]], [true,[1,4]], [true,[4]], [true,[4,5]], [true,[1,4,5]], [true,[1,2,4,5]], [true,[2,4,5]], [true,[2,3,4,5]], [true,[1,2,3,4,5]], [true,[1,3,4,5]], [true,[3,4,5]], [true,[3,5]], [true,[1,3,5]], [true,[1,2,3,5]], [true,[2,3,5]], [true,[2,5]], [true,[1,2,5]], [true,[1,5]], [false,[5]]];
+	  var expectedValues = [[],[1],[1,2],[2],[2,3],[1,2,3],[1,3],[3],[3,4],[1,3,4],[1,2,3,4],[2,3,4],[2,4],[1,2,4],[1,4],[4],[4,5],[1,4,5],[1,2,4,5],[2,4,5],[2,3,4,5],[1,2,3,4,5],[1,3,4,5],[3,4,5],[3,5],[1,3,5],[1,2,3,5],[2,3,5],[2,5],[1,2,5],[1,5], [5]];
 	  
 	  var nextSubsetIterator = new PortfolioAllocation.subsetsIterator_(5);
 	  for (var i = 0; i < expectedValues.length; ++i) {
 		var nextSubset = nextSubsetIterator.next();
-		assert.deepEqual(nextSubset, expectedValues[i], 'Next subset - Test 1 #' + i);
-	  }  
+		
+		var subsetOk = true;
+		for (var j = 0; j < nextSubset.length; ++j) {
+		   if (expectedValues[i][j] != nextSubset[j]) {
+		     subsetOk = false;
+		     break;
+		   }
+		}	  
+		assert.equal(subsetOk, true, 'Next subset - Test 1 #' + i);
+	  }
+	  
+	  var nextSubset = nextSubsetIterator.next();
+	  assert.equal(nextSubset, -1, 'Next subset - End value');
   }
 
 });
@@ -86,13 +142,24 @@ QUnit.test('Next k-subset computation', function(assert) {
   // Test with the static data examples of section 3
   {
 	  var expectedValues = [[1,2,3], [1,2,4], [1,2,5], [1,3,4], [1,3,5], 
-	                        [1,4,5], [2,3,4],[2,3,5], [2,4,5], [3,4,5], -1];
+	                        [1,4,5], [2,3,4],[2,3,5], [2,4,5], [3,4,5]];
 	  
 	  var nextKSubsetIterator = new PortfolioAllocation.kSubsetsIterator_(5, 3);
 	  for (var i = 0; i < expectedValues.length; ++i) {
 		var nextKSubset = nextKSubsetIterator.next();
-		assert.deepEqual(nextKSubset, expectedValues[i], 'Next k-subset - Test 1 #' + i);
-	  }  
+		
+		var subsetOk = true;
+		for (var j = 0; j < nextKSubset.length; ++j) {
+		   if (expectedValues[i][j] != nextKSubset[j]) {
+		     subsetOk = false;
+		     break;
+		   }
+		}	  
+		assert.equal(subsetOk, true, 'Next k-subset - Test 1 #' + i);
+	  }
+
+	  var nextKSubset = nextKSubsetIterator.next();
+	  assert.equal(nextKSubset, -1, 'Next k-subset - End value');
   }
 
 });

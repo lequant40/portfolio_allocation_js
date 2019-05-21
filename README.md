@@ -20,7 +20,7 @@ Hope you enjoy !
 - Code heavily documented using [JSDoc](http://usejsdoc.org/)
 
 
-## Portfolio allocation algorithms
+## Portfolio allocation core algorithms
 
 - Equal weights (EW)  
   Analyzed by Victor DeMiguel and al. in their research paper [Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?](https://doi.org/10.1093/rfs/hhm075).
@@ -38,7 +38,7 @@ Hope you enjoy !
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and [Michael Kapler](http://systematicinvestor.wordpress.com/), the CRP portfolio combines the usage of a clustering algorithm (for instance, the Fast Threshold Clustering Algorithm - FTCA - of David Varadi) with the ERC portfolio.
 
 - Most diversified portfolio (MDP)  
-  Introduced in the research paper [Toward Maximum Diversification](https://doi.org/10.3905/JPM.2008.35.1.40) by [Yves Choueifaty](http://www.tobam.fr/yves-choueifaty/) and al.
+  Introduced in the research paper [Toward Maximum Diversification](https://doi.org/10.3905/JPM.2008.35.1.40) by [Yves Choueifaty](http://www.tobam.fr/yves-choueifaty/) and al., it maximizes what the authors call the diversification ratio, which is the weighted average of the assets volatilities divided by the portfolio total volatility.
 
 - Minimum correlation algorithm (MCA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA portfolio is meant to be an approximation of the MDP portfolio.
@@ -52,25 +52,19 @@ Hope you enjoy !
 - Proportional minimum variance algorithm (MVA)  
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MVA portfolio is meant to be an approximation of the GMV portfolio.
 
-- Maximum Sharpe ratio (MSR), a.k.a. (Lintner) tangency portfolio  
-  Introduced by John Lintner in the research paper [The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets](https://www.jstor.org/stable/1924119), the MSR portfolio possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
-
-- Random subspace mean-variance optimization (RS-MVO)  
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), RS-MVO portfolios combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with mean-variance optimization.
-
 - Minimax portfolio  
   Introduced by Martin Young in the research paper [A Minimax Portfolio Selection Rule with Linear Programming Solution](http://www.jstor.org/stable/2634472), the minimax portfolio uses the minimum return as a measure of risk instead of the variance as in the Markowitz framework.
 
 - Random portfolio  
-  A random portfolio, while maybe not directly usable to allocate assets, can be used to benchmark the performances of asset allocation strategies, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
- 
-  
-## Helper algorithms
-- Portfolio weights rounding  
-  The rounding algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al. allows to compute real-life portfolio weights from the theoretical portfolio weights obtained from a portfolio allocation algorithm.
+  A random portfolio, while not directly usable to allocate assets in real-life, can be used to benchmark the performances of portfolio allocation strategies, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
 
-- Portfolio numerical optimization  
-  Numerical optimization algorithms (grid search...) allow to determine numerically the weights of the optimal portfolio(s) minimizing a given objective function.  
+- Numerical optimization portfolio  
+  When no specific numerical algorithm exist to solve a particular portfolio allocation problem, it is always possible to use generic numerical optimization algorithms instead (e.g., grid search on the simplex).
+
+
+## Portfolio allocation support algorithms
+- Portfolio weights rounding  
+  The rounding algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al. allows to compute real-life portfolio weights from the theoretical portfolio weights obtained from any portfolio allocation algorithm.
 
 - Mean-variance efficient frontier and corner portfolios computation, through the Markowitz critical line algorithm  
   The set of all mean-variance efficient portfolios (the mean-variance efficient frontier), as well its generating discrete set (the set of corner portfolios) can be efficiently computed by a specialized algorithm developped by Harry M. Markowitz.
@@ -162,26 +156,10 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 ```
 
 
-### Examples
+## Documentation
 
-#### Risk-based portfolio allocations
+A complete documentation, including code examples, can be found ([on the GitHub Pages of the repository](docs/README.md))
 
-```js
-PortfolioAllocation.equalWeights(5); 
-// EW portfolio
-
-PortfolioAllocation.equalRiskContributionWeights([[0.1, 0], [0, 0.2]]); 
-// ERC portfolio
-
-PortfolioAllocation.mostDiversifiedWeights([[0.1, 0], [0, 0.2]], {eps: 1e-10, maxIter: 10000});
-// MDP portfolio
-
-PortfolioAllocation.minCorrWeights([[0.1, 0], [0, 0.2]]);
-// MCA portfolio
-
-PortfolioAllocation.clusterRiskParityWeights([[0.1,0], [0,0.2]], {clusteringMode: 'ftca'});
-// CRP portfolio
-```
 
 
 ## How to contribute ?

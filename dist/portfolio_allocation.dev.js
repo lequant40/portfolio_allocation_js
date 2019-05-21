@@ -3854,6 +3854,7 @@ BitSet_.prototype = {
 
 /* Start Wrapper private methods - Unit tests usage only */
 self.aliasMethodSampler_ = aliasMethodSampler_;
+self.randomCompositionsIterator_ = randomCompositionsIterator_;
 self.compositionsIterator_ = compositionsIterator_;
 self.subsetsIterator_ = subsetsIterator_;
 self.kSubsetsIterator_ = kSubsetsIterator_;
@@ -3991,7 +3992,7 @@ function aliasMethodSampler_(p) {
 }
 
 	
- /**
+/**
 * @function compositionsIterator_
 *
 * @summary Returns an iterator to compute all the compositions of a non negative integer.
@@ -4004,24 +4005,30 @@ function aliasMethodSampler_(p) {
 *
 * @param {number} n a non-negative integer whose composition are desired.
 * @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
+* @param {boolean} useArrayCopy an optional boolean that can be set to false to re-use the same output array throughout
+* all the computations(this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
 * @return {function} a function to be used as an iterator through its .next() method, computing all 
-* the k-compositions of n.
+* the k-compositions of n until they all have been exhausted, in which case -1 is returned..
 *
 * @example
 * var myIterator = new compositionsIterator_(6, 3);
 * myIterator.next(); myIterator.next();
-* // [true, [6,0,0]]; [true, [5,1,0]];
+* // [6,0,0]; [5,1,0];
 */
-function compositionsIterator_(n, k) {
+function compositionsIterator_(n, k, useArrayCopy) {
 	// Initialize n and k
 	this.n = n;
 	this.k = k;
 	
+	// Initialize the copy array variable
+	this.useArrayCopy = useArrayCopy;
+	
 	// Variables required for NEXTCOM internal computations,
 	// initialized so as to generate the first composition upon
 	// the first call to .next() function.
+	this.firstcall = true;
 	this.mtc = false;
-	this.r = new Array(k);
+	this.r = typeof Uint32Array === 'function' ? new Uint32Array(k) : new Array(k);
 	this.t = this.n;
 	this.h = 0;
 
@@ -4036,15 +4043,30 @@ function compositionsIterator_(n, k) {
 	* this function will result in a new k-composition until the final k-composition 00...0n is reached.
 	*
 	* A subsequent call to this function when the final k-composition has been reached will result in
-	* the recomputation of all the k-compositions of n, starting from the initial k-composition.
+	* the function returning -1.
 	*
 	* @memberof compositionsIterator_
-	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one k-composition of n remains to be computed
-	* and arr[1] an array of k elements containing the computed k-composition of n.
-	*
+	* @return {Array.<number>|number} either an array containing a newly generated k-composition
+	* of the integer n or -1 to indicate that all the k-compositions have already been generated.
 	*/
 	this.next = function() {
-		if (this.mtc) { // There is still a composition to generate
+		if (!this.firstcall && !this.mtc) {
+			// No more k-compositions to generate
+			return -1;
+		}
+		
+		if (this.firstcall) {		
+			// The first call has now been made
+			this.firstcall = false;
+			
+			// Fill the k-compositions array with the first composition equals to n00...0
+			this.r[0] = this.n;
+			for (var i = 1; i <= this.k - 1; ++i) {
+				this.r[i] = 0;
+			}	
+		}
+		else {
+			// There is still a composition to generate
 			if (this.t > 1) {
 				this.h = 0;
 			}
@@ -4054,19 +4076,90 @@ function compositionsIterator_(n, k) {
 			this.r[0] = this.t - 1;
 			++this.r[this.h];
 		}
-		else  { 
-		    // No more composition to generate, so, (re) generation of the first composition, equals to n00...0
-			this.r[0] = this.n;
-			for (var i = 1; i <= this.k - 1; ++i) {
-				this.r[i] = 0;
-			}
-		}
 		
 		// End logic
 		this.mtc = (this.r[this.k - 1] != this.n);
 		
-		// Return a copy of the r array, so that callers can alter it
-		return [this.mtc, this.r.slice()];
+		// Return either the r array, or a copy of the r array, so that callers can alter it
+		if (this.useArrayCopy) {
+			return this.r.slice(0);
+		}
+		else {
+			return this.r;
+		}
+	}
+}
+
+
+/**
+* @function randomCompositionsIterator_
+*
+* @summary Returns an infinite iterator to compute random compositions of a non negative integer.
+*
+* @description This function constructs an infinite iterator to compute random k-compositions of a non-negative integer n, 
+* using the algorithm RANCOM described in section 6 of the first reference.
+*
+* Since the algorithm used internally to generate random k-subsets is uniform, the random k-compositions
+* are most probably generated uniformly at random, but this is not proven in the reference.
+*
+* @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
+* @see <a href="https://en.wikipedia.org/wiki/Composition_(combinatorics)">Composition (combinatorics)</a>
+*
+* @param {number} n a non-negative integer whose composition are desired.
+* @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
+* @return {function} a function to be used as an infinite iterator through its .next() method, computing  
+* random k-compositions of n.
+*
+* @example
+* var myIterator = new randomCompositionsIterator_(6, 3);
+* myIterator.next();
+* // [2,1,3]
+*/
+function randomCompositionsIterator_(n, k) {
+	// Initialize n and k
+	this.n = n;
+	this.k = k;
+	
+	// Initialize the uniform random k-subset iterator
+	this.ranksb = new randomKSubsetIterator_(n+k-1, k-1);
+	
+	// Initialize the array holding the k-compositions
+	this.r = typeof Uint32Array === 'function' ? new Uint32Array(k) : new Array(k);
+
+	/*
+	* @function next
+	*
+	* @summary Returns a random composition of a non negative integer.
+	*
+	* @description This function computes a random k-composition of a non negative integer n, using
+	* the algorithm RANCOM described in section 5 of the first reference, with the call to RANKSB
+	* replaced with a call to the method D of Vitter.
+	*
+	* @memberof randomCompositionsIterator_
+	* @return {Array.<number>|Uint32Array} an array of k elements containing the computed random k-composition of n.
+	*/
+	this.next = function() {
+		// Call to RANKSB
+		var rr = this.ranksb.next();
+		
+		// Copy of the generated random (k-1)-subset into the array r
+		for (var i = 0; i < this.k-1; ++i) {
+			this.r[i] = rr[i];
+		}
+		
+		// Initialization of the k-th element of r
+		this.r[this.k-1] = this.n + this.k;
+		
+		// Filling of the array r
+		var l = 0;
+		for (var i = 1; i <= this.k; ++i) {
+			var m = this.r[i-1];
+			this.r[i-1] = m - l - 1;
+			l = m;
+		}
+		
+		// Return a copy of the r array, so that the caller can alter it
+		return this.r.slice(0);
 	}
 }
 
@@ -4084,21 +4177,27 @@ function compositionsIterator_(n, k) {
 *
 * @param {number} n the number of elements of the n-set {1,...,n} whose k-subsets are desired, a non-negative integer.
 * @param {number} k a non-negative integer, with 1 <= k <= n.
+* @param {boolean} useArrayCopy an optional boolean that can be set to false to re-use the same output array throughout
+* all the computations(this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
 * @return {function} a function to be used as an iterator through its .next() method, computing all the 
-* k-subsets of the n-set {1,...,n} in lexicographic order.
+* k-subsets of the n-set {1,...,n} in lexicographic order, until they all have been exhausted, in which case
+* -1 is returned.
 *
 * @example
 * var myIterator = new kSubsetsIterator_(5, 3);
 * myIterator.next(); myIterator.next();
 * // [1, 2, 3]; [1, 2, 4]; ...; -1
 */
-function kSubsetsIterator_(n, k) {
+function kSubsetsIterator_(n, k, useArrayCopy) {
 	// Initialize n and k
 	this.n = n;
 	this.k = k;
+
+	// Initialize the copy array variable
+	this.useArrayCopy = useArrayCopy;
 	
 	// Initialize the array to hold the k-subsets
-	this.a = new Array(k);
+	this.a = typeof Uint32Array === 'function' ? new Uint32Array(k) : new Array(k);
 	
 	// Variables required for NEXKSB internal computations,
 	// initialized so as to generate the first subset upon
@@ -4125,8 +4224,8 @@ function kSubsetsIterator_(n, k) {
 	* the function returning -1.
 	*
 	* @memberof kSubsetsIterator_
-	* @return {Array.<number>|number} either an array containing a newly generated sorted k-subset
-	* of the n-set {1,...,n} or -1 to indicate that all the k-subsets have already been generated.
+	* @return {Array.<number>|number} either an array containing a newly computed sorted k-subset
+	* of the n-set {1,...,n} or -1 to indicate that all the k-subsets have already been computed.
 	*/
 	this.next = function() {
 		if (!this.firstcall && !this.mtc) {
@@ -4148,7 +4247,7 @@ function kSubsetsIterator_(n, k) {
 			this.m2 = this.a[this.k - this.h];
 		}
 				
-		// Fill the k-subset array with the initial values {1,...,k}
+		// Fill the k-subset array
 		for (var j = 1; j <= this.h; ++j) {
 			this.a[this.k + j - this.h - 1] = this.m2 + j;
 		}
@@ -4156,8 +4255,13 @@ function kSubsetsIterator_(n, k) {
 		// End logic
 		this.mtc = (this.a[0] != this.endval);
 
-		// Return a copy of the computed array
-		return this.a.slice();
+		// Return either the array holding the k-subset, or a copy of this array, so that callers can alter it
+		if (this.useArrayCopy) {
+			return this.a.slice(0);
+		}
+		else {
+			return this.a;
+		}
 	}
 }
 
@@ -4177,6 +4281,8 @@ function kSubsetsIterator_(n, k) {
 *
 * @param {number} n the number of elements of the n-set {1,...,n} whose k-subsets are desired, a non-negative integer.
 * @param {number} k a non-negative integer, with 1 <= k <= n.
+* @param {boolean} useArrayCopy an optional boolean that can be set to false to re-use the same output array throughout
+* all the computations(this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
 * @return {function} a function to be used as an iterator through its .next() method, computing random 
 * k-subsets of the n-set {1,...,n}.
 *
@@ -4185,13 +4291,16 @@ function kSubsetsIterator_(n, k) {
 * myIterator.next();
 * // [1, 2, 5];
 */
-function randomKSubsetIterator_(n, k) {
+function randomKSubsetIterator_(n, k, useArrayCopy) {
 	// Initialize n and k
 	this.n = n;
 	this.k = k;
-	
+
+	// Initialize the copy array variable
+	this.useArrayCopy = useArrayCopy;
+
 	// Initialize an array to hold the k-subsets
-	this.a = null;
+	this.a = typeof Uint32Array === 'function' ? new Uint32Array(k) : new Array(k);
 
 	// Initializations for the method D
 	// - N, the number of records that have not yet been processed
@@ -4394,17 +4503,10 @@ function randomKSubsetIterator_(n, k) {
 	*
 	*/
 	this.next = function() {
-		// Initializations
-		// Array holding the k-subset
-		if (typeof Uint32Array === 'function') {
-			this.a = new Uint32Array(this.k);
+		// (Re) Initialization of the array holding the k-subset to 0 
+		for (var i = 0; i < this.k; ++i) {
+			this.a[i] = 0;
 		}
-		else {
-			this.a = new Array(this.k);
-			for (var i = 0; i < this.k; ++i) {
-				this.a[i] = 0;
-			}
-		}	
 
 		// Misc. internal variables required by the method D
 		this.N = this.n;
@@ -4416,8 +4518,13 @@ function randomKSubsetIterator_(n, k) {
 		// generation of the k-subset.
 		this.method_d();
 		
-		// Return the computed array, which is not used anymore
-		return this.a;
+		// Return either the array holding the k-subset, or a copy of this array, so that callers can alter it
+		if (this.useArrayCopy) {
+			return this.a.slice(0);
+		}
+		else {
+			return this.a;
+		}
 	}
 }
 
@@ -4435,12 +4542,13 @@ function randomKSubsetIterator_(n, k) {
 *
 * @param {number} n the number of elements of the n-set {1,...,n} whose subsets are desired, a non-negative integer.
 * @return {function} a function to be used as an iterator through its .next() method, computing all 
-* the subsets of the n-set {1,...,n}.
+* the subsets of the n-set {1,...,n}, until they all have been exhausted, in which case
+* -1 is returned.
 *
 * @example
 * var myIterator = new subsetsIterator_(5);
 * myIterator.next(); myIterator.next();
-* // [true, []]; [true, [1]];
+* // []; [1];
 */
 function subsetsIterator_(n) {
 	// Initialize n
@@ -4449,8 +4557,9 @@ function subsetsIterator_(n) {
 	// Variables required for NEXSUB internal computations,
 	// initialized so as to generate the first subset upon
 	// the first call to .next() function.
+	this.firstcall = true;
 	this.mtc = false;
-	this.iin = new Array(n);
+	this.iin = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
 	this.ncard = 0;
 	
 	/**
@@ -4464,19 +4573,37 @@ function subsetsIterator_(n) {
 	* this function will result in a new subset until the final subset {1,...,n} is reached.
 	*
 	* A subsequent call to this function when the final subset {1,...,n} has been reached will result in
-	* the recomputation of all the subsets, re-starting from the initial subset.
+	* the function returning -1.
 	*
 	* @memberof subsetsIterator_
-	* @return {Array} an array arr of 2 elements, with arr[0] a boolean indicating whether at least one subset
-	* of the n-set {1,...,n} remains to be computed and arr[1] an array containing the computed sorted subset
-	* of the n-set {1,...,n}.
-	*
+	* @return {Array.<number>|number} either an array containing a newly computed sorted subset
+	* of the n-set {1,...,n} or -1 to indicate that all the subsets have already been computed.
 	*/
 	this.next = function() {
 		// The output array containing the computed subset
-		var nextSubset = new Array(0);
+		var nextSubset = [];
 		
-		if (this.mtc) { // There is still a subset to generate
+		if (!this.firstcall && !this.mtc) {
+			// No more subset to generate
+			return -1;
+		}
+		
+		if (this.firstcall) {
+			// The first call has now been made
+			this.firstcall = false;
+			
+		    // Generation of the first subset, equals to {}
+			for (var i = 0; i <= this.n - 1; ++i) {
+				this.iin[i] = 0;
+			}
+			
+			// The output array is already built in this case (empty)
+			
+			// Specific end logic
+			this.mtc = true;
+		}
+		else {
+			// There is still a subset to generate
 			var j = 0;
 			if (this.ncard % 2 != 0) {
 				++j;
@@ -4488,7 +4615,7 @@ function subsetsIterator_(n) {
 			this.ncard = this.ncard + 2*this.iin[j] - 1;
 
 			// Build the output array
-			nextSubset = new Array(this.ncard);
+			nextSubset = typeof Uint32Array === 'function' ? new Uint32Array(this.ncard) : new Array(this.ncard);
 			var idx = 0;
 			for (var i = 0; i <= this.n - 1; ++i) {
 				if (this.iin[i] == 1) {
@@ -4499,20 +4626,9 @@ function subsetsIterator_(n) {
 			// End logic
 			this.mtc = (this.ncard != this.iin[this.n -1]);
 		}
-		else  { 
-		    // No more subset to generate, so, (re) generation of the first subset, equals to {}
-			for (var i = 0; i <= this.n - 1; ++i) {
-				this.iin[i] = 0;
-			}
-			
-			// The output array is already built in this case (empty)
-			
-			// Specific end logic
-			this.mtc = true;
-		}
 
 		// Return the computed array, not used anymore by this function
-		return [this.mtc, nextSubset];
+		return nextSubset;
 	}
 }
 
@@ -5635,9 +5751,8 @@ function normcdf_(x) {
 *
 * x is also called a z-score.
 *
-* The algorithm uses the fact that if F^-1(p) is the inverse normal cumulative distribution function, then G^-1(p) = F^-1(p+1/2) is an odd function.
-* The algorithm uses two separate rational minimax approximations: one rational approximation is used for the central region and another one is used for the tails.
-* The algorithm has a relative error whose absolute value is less than 1.15e-9, but if needed, the approximation of the inverse normal cumulative distribution function can be refined better precision using Halley's method.
+* The algorithm uses three separate rational minimax approximations: one rational approximation is used for the central region and the outer region is split into two sub-regions.
+* The algorithm has a relative error whose absolute value is in the order of 1e-15.
 *
 * @see <a href="https://www.jstor.org/stable/2347330">Michael Wichura, Algorithm AS 241: The Percentage Points of the Normal Distribution., Applied Statistics, Volume 37, Number 3, pages 477-484, 1988.</a>
 * 
@@ -5941,7 +6056,7 @@ self.ccpsolveFISTA_ = ccpsolveFISTA_;
 *                                  return 0;
 *	                           }
 *			                 }, // g is the usual indicator function of a convex set, here [0,1]
-*                function(x, mu) { return new PortfolioAllocation.Matrix([Math.max(0, Math.min(x.getValue(1, 1), 1))]); }, // proxg(x, mu) = orthogonal projection of x on [0,1]
+*                function(x, mu) { return new Matrix_([Math.max(0, Math.min(x.getValue(1, 1), 1))]); }, // proxg(x, mu) = orthogonal projection of x on [0,1]
 *                new Matrix_([0]) // the starting point of the algorithm
 *               )
 * // new Matrix_([~0.7])
@@ -7342,9 +7457,9 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 /* Start Wrapper private methods - Unit tests usage only */
 self.simplexRationalRounding_ = simplexRationalRounding_;
 self.simplexRandomSampler_ = simplexRandomSampler_;
-self.simplexDirectionSampler_ = simplexDirectionSampler_;
-self.simplexDeterministicRationalSampler_ = simplexDeterministicRationalSampler_;
-self.simplexRationalGirdSearch_ = simplexRationalGirdSearch_;
+self.simplexDirectionRandomSampler_ = simplexDirectionRandomSampler_;
+self.simplexGridSampler_ = simplexGridSampler_;
+self.simplexGridSearch_ = simplexGridSearch_;
 self.simplexEuclidianProjection_ = simplexEuclidianProjection_;
 self.simplexSparseEuclidianProjection_ = simplexSparseEuclidianProjection_;
 /* End Wrapper private methods - Unit tests usage only */
@@ -7414,7 +7529,7 @@ function simplexSparseEuclidianProjection_(x, k) {
 	
 	// Compute the final projection by reconciliating the support of the
 	// projection above and its complementary set.
-	var y = new Array(n);
+	var y = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
 	for (var i = 0; i < k;  ++i) {
 		y[idx[i]] = proj_x_k[i];
 	}
@@ -7440,7 +7555,8 @@ function simplexSparseEuclidianProjection_(x, k) {
 *
 * Internally, the algorithm used is an O(n) algorithm, c.f. the reference.
 *
-* @see <a href="https://link.springer.com/article/10.1007/s10107-006-0050-z">Kiwiel, K.C., Breakpoint searching algorithms for the continuous quadratic knapsack problem, Math. Program. (2008) 112: 473</a>
+* @see <a href="https://link.springer.com/article/10.1007/s10107-006-0050-z">Kiwiel, K.C., Breakpoint searching algorithms 
+* for the continuous quadratic knapsack problem, Math. Program. (2008) 112: 473</a>
 *
 * @param {Array.<number>} x a point belonging to R^n, array of n real numbers.
 * @return {Array.<number>} the computed closest point to x, array of n real numbers.
@@ -7474,7 +7590,7 @@ function simplexEuclidianProjection_(x) {
 
 
 /**
-* @function simplexDeterministicRationalSampler_
+* @function simplexGridSampler_
 *
 * @summary Returns a function to generate all the points on a rational grid of the unit simplex of R^n.
 *
@@ -7490,20 +7606,25 @@ function simplexEuclidianProjection_(x) {
 * @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
 * @param {number} k the indice of the rational grid of the unit simplex of R^n on which to generate points, 
 * a natural integer superior or equal to 1.
+* @param {boolean} useArrayCopy an optional boolean that can be set to false to re-use the same output array throughout
+* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
 * @return {function} a function to be used through its .sample() method, computing all 
 * the points on the k-th rational grid of the unit simplex of R^n.
 *
 * @example
-* var mySampler = new simplexDeterministicRationalSampler_(3, 10);
+* var mySampler = new simplexGridSampler_(3, 10);
 * mySampler.sample(); mySampler.sample(); ...; mySampler.sample();
-* // [1, 0, 0]; [0.9, 0.1, 0]; ...; null
+* // [1, 0, 0]; [0.9, 0.1, 0]; ...; -1
 */
-function simplexDeterministicRationalSampler_(n, k) {
+function simplexGridSampler_(n, k, useArrayCopy) {
 	// Initializations
 	this.n = n;
 	this.k = k;
-	this.compositionIterator = new compositionsIterator_(k, n);
-	this.compositionIteratorStatus = true;
+	
+	this.useArrayCopy = useArrayCopy;
+	
+	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
+	this.compositionIterator = new compositionsIterator_(k, n, false); // use no array copy in the compositions generation to improve performances
 	
 	/**
 	* @function sample
@@ -7517,72 +7638,211 @@ function simplexDeterministicRationalSampler_(n, k) {
 	*
 	* @memberof simplexDeterministicRationalSampler_
 	* @return {Array.<number>|null} an array of n real numbers corresponding to the coordinates of the generated point in R^n,
-	* or null in case all such points have been generated.
-	*
+	* or -1 in case all such points have been generated.
 	*/
 	this.sample = function() {
-		// Return null in case there is no more samples to draw
-		if (!this.compositionIteratorStatus) {
-			return null;
+		// Generate a new k-composition of n
+		var x = this.compositionIterator.next();
+
+		// Return -1 in case there is no more samples to draw
+		if (x == -1) {
+			return -1;
 		}
 		
-		// Generate a new k-composition of n
-		var nextComposition = this.compositionIterator.next();
-		
-		// Compute the current rational grid point by normalizing the generated k-composition
-		var x = nextComposition[1];
+		// Otherwise, compute the current rational grid point by normalizing the generated k-composition
 		var n = x.length;
 		for (var i = 0; i < n; ++i) {
-			x[i] = x[i] / this.k;
+			this.x[i] = x[i] / this.k;
 		}
 
-		// Update the internal iterator status
-		this.compositionIteratorStatus = nextComposition[0];	
-		
-		// Return the point being sampled
-		return x;
+		// Return either the point being sampled, or a copy of the point being sampled so that callers can alter it
+		if (this.useArrayCopy) {
+			return this.x.slice(0);
+		}
+		else {
+			return this.x;
+		}
 	}
 }
  
  
+
 /**
 * @function simplexRandomSampler_
 *
-* @summary Returns a function to compute random points on the unit simplex of R^n.
+* @summary Returns a function to compute random points on the unit simplex of R^n,
+* possibly subject to additional lower bounds and upper bounds constraints on their coordinates.
 *
-* @description This function constructs a function to compute random points uniformly distributed on
-* the unit simplex of R^n, using the algorithm 2 of the reference.
+* @description This function constructs a function to compute random points uniformly distributed on either:
+* - the unit simplex of R^n, using the algorithm 2 of the first reference
+* - the unit simplex of R^n subject to additional lower bounds and upper bounds constraints, i.e. 
+* {(x_1,...,x_n), sum x_i = 1 and 0 <= l_i <= x_i <= u_i <= 1, i = 1..n}, where l_i and u_i, i = 1..n are real numbers, 
+* using the theorem 1 of the second reference
 * 
 * @see <a href="https://doi.org/10.1016/0377-2217(82)90161-8">R.Y. Rubinstein, Generating random vectors uniformly distributed inside and on 
 * the surface of different regions, In European Journal of Operational Research, Volume 10, Issue 2, 1982, Pages 205-209</a>
+* @see <a href="https://doi.org/10.1016/S0167-7152(99)00095-4">Kai-Tai Fang, Zhen-Hai Yang, On uniform design of experiments with restricted
+* mixtures and generation of uniform distribution on some domains, Statistics & Probability Letters, Volume 46, Issue 2, 
+* 15 January 2000, Pages 113-120</a>
 *
 * @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
-* @return {function} a function to be used through its .sample() method, computing random  
-* points on the unit simplex of R^n.
+* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {function} rnd an optional random vector generator in the unit hypercube of R^n-1, a function taking no input argument and
+* returning an array of n-1 points each belonging to the interval (0, 1).
+* @return {function} a function computing the random points to be used through its .sample() method.
 *
 * @example
 * var mySampler = new simplexRandomSampler_(3);
 * mySampler.sample();
 * // [0.25, 0, 0.75]
+*
+* var mySampler = new simplexRandomSampler_(3, [0.1, 0.2, 0.3], [1,1,1]);
+* mySampler.sample();
+* // [0.20, 0.20, 0.60]
 */
-function simplexRandomSampler_(n) {
+function simplexRandomSampler_(n, l, u, rnd) {
 	// Initializations
 	this.n = n;
 	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
+	this.u = typeof Float64Array === 'function' ? new Float64Array(n-1) : new Array(n-1); // the coordinates of a random point in the unit hypercube of R^n-1
+
+	// Initialization of the random number generator
+	//
+	// By default, it generates points uniformly at random in the unit hypercube of R^n-1
+	this.randomGenerator = function(arr) {
+		for (var i = 0; i < this.n; ++i) {
+			arr[i] = Math.random();
+		}
+	}
+	if (rnd) {
+		if (typeof rnd !== "function") {
+			throw new Error('the random number generator must be a function');
+		}
+		this.randomGenerator = rnd;
+	}
+
+	// Misc. checks on the optional lower and upper bounds
+	if (l) {
+		this.lowerBounds = l; // no input checks
+		
+		if (!u) {
+			this.upperBounds = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+			
+			// Initialization to an array of ones
+			for (var i = 0; i < this.n; ++i) {
+				this.upperBounds[i] = 1;
+			}
+		}
+	}
+	if (u) {
+		this.upperBounds = u; // no input checks
+		
+		if (!l) {
+			this.lowerBounds = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+
+			// Initialization to an array of zeros
+			for (var i = 0; i < this.n; ++i) {
+				this.lowerBounds[i] = 0;
+			}
+		}
+	}
 	
+	// Misc. computations in case the simplex is being sampled through the theorem 1
+	// of the second reference:
+	//
+	// - Feasibility checks on the restricted simplex:
+	// -- Lower bounds and upper bounds must satisfy 0 <= l_i <= u_i <= 1, i = 1..n
+	// -- Lower bounds and upper bounds must satisfy sum l_i < 1 < sum u_i, c.f. formula 2.2 of the second reference
+	//    (In case sum l_i == 1 or sum u_i == 1, the computations are prematurly stopped, because the restricted
+	//    simplex is then equal to a point)
+	//
+	// - Deletion of possible superflous constraints, as described in formula 2.3 of the second reference
+	//
+	// - Computation of the upper bounds*, as defined after formula 2.3' of the second reference
+	//
+	// - In parallel of the three steps above, computation of lower, upper and upper* bounds sums, 
+	// as well as the upper* bounds running sum
+	if (this.lowerBounds || this.upperBounds) {
+		// Feasibility checks
+		var sumLowerBounds = 0;
+		var sumUpperBounds = 0;
+		for (var i = 0; i < this.n; ++i) {
+			var lowerBound = this.lowerBounds[i];
+			var upperBound = this.upperBounds[i];
+			
+			// Check on lower and upper bounds l_i and u_i
+			if (lowerBound > upperBound) {
+				throw new Error('infeasible problem detected: lower bound strictly greater than upper bound');
+			}
+			if (lowerBound < 0) {
+				throw new Error('incorrect problem detected: lower bound strictly lower than 0');
+			}
+			if (upperBound > 1) {
+				throw new Error('incorrect problem detected: upper bound strictly greater than 1');
+			}
+
+			// Compute the running sum of lower and upper bounds, for subsequent feasibility check
+			sumLowerBounds += lowerBound;
+			sumUpperBounds += upperBound;
+		}
+		this.sumLowerBounds = sumLowerBounds;
+		this.sumUpperBounds = sumUpperBounds;
+		
+		if (this.sumLowerBounds > 1 || this.sumUpperBounds < 1) {
+			throw new Error('infeasible problem detected: the restricted simplex is empty');
+		}
+		else if (this.sumLowerBounds == 1 || this.sumUpperBounds == 1) {
+			// Nothing to do
+		}
+		else {
+			// Deletion of possible superflous constraints, replacing the lower and upper bounds
+			var updatedSumLowerBounds = 0;
+			var updatedSumUpperBounds = 0;
+			for (var i = 0; i < this.n; ++i) {
+				var lowerBound = this.lowerBounds[i];
+				var upperBound = this.upperBounds[i];
+				
+				var updatedLowerBound = Math.max(lowerBound, upperBound + 1 - this.sumUpperBounds);
+				var updatedUpperBound = Math.min(upperBound, lowerBound + 1 - this.sumLowerBounds);
+				
+				this.lowerBounds[i] = updatedLowerBound;
+				this.upperBounds[i] = updatedUpperBound;
+
+				updatedSumLowerBounds += updatedLowerBound;
+				updatedSumUpperBounds += updatedUpperBound;
+			}
+			this.sumLowerBounds = updatedSumLowerBounds;
+			this.sumUpperBounds = updatedSumUpperBounds;
+			
+			// Computation of upper* bounds
+			this.upperStarBounds = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+			this.runningSumUpperStarBounds = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+			
+			var sumUpperStarBounds = 0;
+			for (var i = 0; i < this.n; ++i) {
+				this.upperStarBounds[i] = (this.upperBounds[i] - this.lowerBounds[i]) / (1-this.sumLowerBounds);
+				
+				sumUpperStarBounds += this.upperStarBounds[i];
+				this.runningSumUpperStarBounds[i] = sumUpperStarBounds;
+			}
+		}
+	}
+
+
 	/**
-	* @function sample
+	* @function sample_no_bounds
 	*
 	* @summary Returns a random point on the unit simplex of R^n.
 	*
 	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
-	* using the O(n) algorithm 2 of the reference.
+	* using the O(n) algorithm 2 of the first reference.
 	*
 	* @memberof simplexRandomSampler_
 	* @return {Array.<number>|Float64Array} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
 	*
 	*/
-	this.sample = function() {
+	this.sample_no_bounds = function() {
 		// Computation of n independent random variables from EXP(1), which will form the basis
 		// of the coordinates of the point being sampled	
 		var sum = 0;
@@ -7606,13 +7866,123 @@ function simplexRandomSampler_(n) {
 		}
 		
 		// Return a copy of the point being sampled, so that callers can alter it.
-		return this.x.slice();
+		return this.x.slice(0);
+	}
+
+	/**
+	* @function sample_binding_bounds
+	*
+	* @summary Returns a random point on the unit simplex of R^n subject to exact bounds
+	* on its coordinates.
+	*
+	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
+	* subject to an exact bounds constaints on its coordinates, which makes the point unique and non random.
+	*
+	* @memberof simplexRandomSampler_
+	* @return {Array.<number>|Float64Array} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
+	*
+	*/
+	this.sample_binding_bounds = function() {
+		// Determination of the binding bounds
+		var bindingBounds = null;
+		if (this.sumLowerBounds == 1) {
+			bindingBounds = this.lowerBounds;
+		}
+		else if (this.sumUpperBounds == 1) {
+			bindingBounds = this.upperBounds;
+		}
+		else {
+			throw new Error('internal error');
+		}
+
+		// Generation of a point on the restricted simplex, with its coordinates equal to the binding bounds
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = bindingBounds[i];
+		}
+		
+		// Return a copy of the point being sampled, so that callers can alter it.
+		return this.x.slice(0);
+	}
+	
+	/**
+	* @function sample_with_bounds
+	*
+	* @summary Returns a random point on the unit simplex of R^n subject to additional 
+	* lower bounds and upper bounds constraints on its coordinates.
+	*
+	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
+	* subject to additional lower bounds and upper bounds constraints on its coordinates, using the algorithm
+    * adapted from the theorem 1 of the second reference.
+	*
+	* @memberof simplexRandomSampler_
+	* @return {Array.<number>|Float64Array} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
+	*
+	*/
+	this.sample_with_bounds = function() {
+		// Generate a point in the unit hypercube of R^n-1
+		this.randomGenerator(this.u);
+		var u = this.u;
+
+		// Use the theorem 1 of the second reference to generate a random point on T_n(0,upperStarBounds)
+		var delta_k = 1;
+		for (var k = n; k >= 2; --k) {
+			// In case delta_k is numerically null, it means all the remaining coordinates
+			// of the random point being genetared on T_n(0,upperStarBounds) must be set to zero.
+			//
+			// The main loop can then be prematurly stopped.
+			if (Math.abs(delta_k) <= 1e-14) {
+				for (var kk = k; kk >= 1; --kk) {
+					this.x[kk-1] = 0;
+				}
+				break;
+			}
+
+			// Retrieve the k-1th coordinate of the random vector u
+			var u_k = u[k-2];
+
+			// Compute the function G of theorem 1 of the second reference
+			var d_k = Math.max(0, 1 - this.runningSumUpperStarBounds[k-2]/delta_k);			
+			var phi_k = Math.min(1, this.upperStarBounds[k-1]/delta_k);			
+			var y_k = delta_k * (1 - Math.pow(u_k*Math.pow(1-phi_k, k-1) + (1-u_k)*Math.pow(1-d_k, k-1), 1/(k-1)));
+			
+			// Update the k-th coordinate of the generated random point
+			this.x[k-1] = y_k;
+			
+			// Prepare for the next iteration
+			delta_k -= y_k;			
+		}
+		if (k == 1) { // In case the main loop above exited with delta not numerically null
+			this.x[0] = delta_k; // Update the 1st coordinate of the generated random point
+		}
+
+		// Use the linear mapping described after formula 2.3' of the second reference to map
+		// the random point above from T_n(0,upperStarBounds) to T_n(lowerBounds,upperBounds).
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = (1-this.sumLowerBounds)*this.x[i] + this.lowerBounds[i];
+		}
+
+		// Return a copy of the point being sampled, so that callers can alter it.
+		return this.x.slice(0);
+	}
+	
+
+	// Definition of the sampling method
+	if (this.lowerBounds || this.upperBounds) {
+		if (this.sumLowerBounds == 1 || this.sumUpperBounds == 1) {
+			this.sample = this.sample_binding_bounds;
+		}
+		else {
+			this.sample = this.sample_with_bounds;
+		}
+	}
+	else {
+		this.sample = this.sample_no_bounds;
 	}
 }
 
 
 /**
-* @function simplexDirectionSampler_
+* @function simplexDirectionRandomSampler_
 *
 * @summary Returns a function to compute random directions to be used on the unit simplex of R^n.
 *
@@ -7632,7 +8002,7 @@ function simplexRandomSampler_(n) {
 * mySampler.sample();
 * // [-0.5856783494622358, -0.19984292686015526, 0.7855212763223908]
 */
-function simplexDirectionSampler_(n) {
+function simplexDirectionRandomSampler_(n) {
 	// Initializations
 	this.n = n;
 	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
@@ -7692,7 +8062,7 @@ function simplexDirectionSampler_(n) {
 		}
 	
 		// Return a copy of the point being sampled, so that callers can alter it.
-		return this.x.slice();
+		return this.x.slice(0);
 	}
 }
  
@@ -7707,7 +8077,8 @@ function simplexDirectionSampler_(n) {
 * statisfying sum m_i = r with r a strictly positive natural integer, so that the computed proximal point xr is one of the closest points to x 
 * on this grid with respect to any norm in a large class, c.f. the first reference.
 *
-* @see <a href="https://doi.org/10.1007/s10898-013-0126-2">M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258</a>
+* @see <a href="https://doi.org/10.1007/s10898-013-0126-2">M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: 
+* Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258</a>
 * @see <a href="https://arxiv.org/abs/1501.00014">Rama Cont, Massoud Heidari, Optimal rounding under integer constraints</a>
 * 
 * @param {Array.<number>} x a point belonging to the standard simplex of R^n, array of n real numbers.
@@ -7772,57 +8143,165 @@ function simplexRationalRounding_(x, r) {
 }
 
 /**
-* @function simplexRationalGirdSearch_
+* @function simplexGridSearch_
 *
-* @summary Compute the point(s) minimizing a real-valued arbitrary function of several real variables
-* defined on the unit simplex, using an exhaustive search algorithm on a grid made of rational points belonging to the unit simplex.
+* @summary Compute the point(s) minimizing a real-valued function of several real variables
+* defined on the unit simplex using a grid search algorithm.
 *
 * @description This function returns the list of points x = (x_1,...,x_n) belonging to the unit simplex of R^n which 
-* minimize an arbitrary real-valued function fct of n real variables defined on the unit simplex of R^n, 
-* using an exhaustive search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the reference.
-
-* To be noted that per lemma 1 of the reference, the number of points on such a rational grid is equal to
+* minimize a real-valued function fct of n real variables defined on the unit simplex of R^n, 
+* using a grid search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), 
+* c.f. the reference.
+*
+* Optionally, lower bounds and upper bounds constraints can be added to the problem, in which case k
+* must be chosen so that some of the k-th rational grid points belong to the restricted simplex.
+*
+* To be noted that per lemma 1 of the reference, the number of points on such a grid is equal to
 * factorial(n + k - 1) / (factorial(k - 1) * factorial(n)), i.e., binomial(n+k-1, n-1), 
 * so that this method can be of limited use, even for small n.
 *
 * For instance, n=5 and k=100 already result in 4598126 points on which to evaluate f.
 *
-* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
+* To also be noted that as the optional lower bounds and upper bounds contraints become tigter,
+* the volume of the restricted simplex becomes smaller, so that this method can also be of limited use
+* because most of the grid points will fall outside of the restricted simplex. 
+*
+* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and 
+* quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
+* @see <a href="https://doi.org/10.1016/S0167-7152(99)00095-4">Kai-Tai Fang, Zhen-Hai Yang, On uniform design of experiments with restricted
+* mixtures and generation of uniform distribution on some domains, Statistics & Probability Letters, Volume 46, Issue 2, 
+* 15 January 2000, Pages 113-120</a>
 *
 * @param {function} f, a function which must take as input argument
 * an array of n real numbers corresponding to a point on the unit simplex of R^n and which must return as output a real number 
 * corresponding to f(x).
 * @param {number} n the number of variables of the function f, natural integer superior or equal to 1.
-* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function f, a natural integer superior or equal to 1.
-* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to a point of R^n 
-* minimizing the function f on the k-th rational grid of the unit simplex of R^n.
+* @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function f, 
+* a natural integer superior or equal to 1.
+* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers
+* corresponding to a point of R^n minimizing the function f on the k-th rational grid of the unit simplex of R^n.
 *
+* @example
+* // Minimize f(x,y) = x on the unit simplex of R^2, using the 10-th rational grid
+* simplexGridSearch_(function(arr) { return arr[0]; }, 2, 10); 
+* // [[0,1]]
 */
-function simplexRationalGirdSearch_(f, n, k) {
+function simplexGridSearch_(f, n, k, l, u) {
+	// Misc. checks on the optional lower and upper bounds
+	var lowerBounds = null;
+	var upperBounds = null;
+	if (l) {
+		lowerBounds = l; // no input checks
+		
+		if (!u) {
+			upperBounds = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+			
+			// Initialization to an array of ones
+			for (var i = 0; i < n; ++i) {
+				upperBounds[i] = 1;
+			}
+		}
+	}
+	if (u) {
+		upperBounds = u; // no input checks
+		
+		if (!l) {
+			lowerBounds = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+
+			// Initialization to an array of zeros
+			for (var i = 0; i < n; ++i) {
+				lowerBounds[i] = 0;
+			}
+		}
+	}
+	
+	// - Optional feasibility checks on the restricted simplex:
+	// -- Lower bounds and upper bounds must satisfy 0 <= l_i <= u_i <= 1, i = 1..n
+	// -- Lower bounds and upper bounds must satisfy sum l_i <= 1 <= sum u_i, c.f. formula 2.2 of the second reference
+	//    (In case sum l_i == 1 or sum u_i == 1, the computations are prematurly stopped, because the restricted
+	//    simplex is then equal to a point)
+	if (lowerBounds || upperBounds) {
+		// Feasibility checks
+		var sumLowerBounds = 0;
+		var sumUpperBounds = 0;
+		for (var i = 0; i < n; ++i) {
+			var lowerBound = lowerBounds[i];
+			var upperBound = upperBounds[i];
+			
+			// Check on lower and upper bounds l_i and u_i
+			if (lowerBound > upperBound) {
+				throw new Error('infeasible problem detected: lower bound strictly greater than upper bound');
+			}
+			if (lowerBound < 0) {
+				throw new Error('incorrect problem detected: lower bound strictly lower than 0');
+			}
+			if (upperBound > 1) {
+				throw new Error('incorrect problem detected: upper bound strictly greater than 1');
+			}
+
+			// Compute the running sum of lower and upper bounds, for subsequent feasibility check
+			sumLowerBounds += lowerBound;
+			sumUpperBounds += upperBound;
+		}
+		
+		if (sumLowerBounds > 1 || sumUpperBounds < 1) {
+			throw new Error('infeasible problem detected: the restricted simplex is empty');
+		}
+	}
+	
 	// Initialize the current minimum value and the current list of associated grid points
 	var minValue = Number.POSITIVE_INFINITY;
 	var minValueGridPoints = [];
 
 	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference.
-	var sampler = new simplexDeterministicRationalSampler_(n, k);
+	var sampler = new simplexGridSampler_(n, k, false); // use no array copy in the simplex grid sampler to improve performances
 	var weights = sampler.sample();
-	while (weights !== null) {  
+	while (weights !== -1) {  
+		// Optionally reject the current grid point if it does not belong to the restricted simplex,
+		// and generate a new grid point
+		var withinBounds = true;
+		if (lowerBounds) {
+			for (var i = 0; i < n; ++i) {
+				if (lowerBounds[i] > weights[i]) {
+					withinBounds = false;
+					break;
+				}
+			}
+		}
+		if (upperBounds) {
+			for (var i = 0; i < n; ++i) {
+				if (weights[i] > upperBounds[i]) {
+					withinBounds = false;
+					break;
+				}
+			}
+		}
+		if (!withinBounds) {
+			weights = sampler.sample();
+			continue;
+		}
+		
+		
 		// Evaluate the function f at the current grid point
 		var fctValue = f(weights);
+	  
 	  
 		// If the function value at the current grid point is lower than the current minimum value, this value
 		// becomes the new minimum value and the current grid point becomes the new (unique for now) associated grid point.
 		if (fctValue < minValue) {
 			minValue = fctValue;
-			minValueGridPoints = [weights];
+			minValueGridPoints = [weights.slice(0)];
 		}
 		// In case of equality of the function value at the current grid point with the current minimum value, 
 		// the current grid point is added to the list of grid points associated to the current minimum value.
 		else if (fctValue == minValue) {
-			minValueGridPoints.push(weights);
+			minValueGridPoints.push(weights.slice(0));
 		}
 		// Otherwise, nothing needs to be done
 		
+
 		// Generate a new grid point
 		weights = sampler.sample();
 	}
@@ -8077,13 +8556,11 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 	//
 	// The empty set is skipped.
 	var nextSubsetIterator = new subsetsIterator_(nbAssets);
-	var nextSubset = nextSubsetIterator.next();
-	do {
-		// Generate a new subset	
-		var nextSubset = nextSubsetIterator.next();
-		
+	var nextSubset = nextSubsetIterator.next(); // emtpy set
+	var nextSubset = nextSubsetIterator.next(); // "true" first set
+	while (nextSubset != -1) {	
 		// Extract the selected assets indexes
-		var assetsIndexes = nextSubset[1];
+		var assetsIndexes = nextSubset;
 		
 		// Extract the covariance matrix of the selected assets
 		var subsetSigma = sigma.submatrix(assetsIndexes, assetsIndexes);
@@ -8104,8 +8581,10 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 			minRCAssetsWeights = assetsWeights;
 		}
 		// Otherwise, nothing needs to be done
+	
+		// Generate a new subset	
+		var nextSubset = nextSubsetIterator.next();
 	}
-	while (nextSubset[0]);
 	
 	// Compute the original assets weights, following formula 22 of the reference
 	var weights = Matrix_.zeros(nbAssets, 1);
@@ -8309,21 +8788,34 @@ self.equalWeights = function (nbAssets, opt) {
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-08.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
-* @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
-* @param {number} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array.<number>} the weights corresponding to the global minimum variance portfolio, array of n real numbers.
 *
 * @example
 * globalMinimumVarianceWeights([[0.0400, 0.0100], [0.0100, 0.0100]], {eps: 1e-10, maxIter: 10000});
-* // XX
+* // [0, 1]
 */
 self.globalMinimumVarianceWeights = function (sigma, opt) {
-	// Decode options
+	// Initialize the options structure
 	if (opt === undefined) {
-		opt = { constraints: {} };
+		opt = {};
 	}
-	var eps = opt.eps || 1e-08;
-	var maxIterations = opt.maxIter || 10000;
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
+	
+	// Initialize the options default values
+	if (opt.eps === undefined) {
+		opt.eps = 1e-08;
+	}
+	if (opt.maxIter === undefined) {
+		opt.maxIter = 10000;
+	}
+
+	// Decode the options
+	var eps = opt.eps;
+	var maxIterations = opt.maxIter;
 	var lowerBounds = opt.constraints.minWeights;
 	var upperBounds = opt.constraints.maxWeights;
 	
@@ -8383,80 +8875,6 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	// Return the computed weights
 	return weights.toArray();
 }
-
-
-/**
- * @file Functions related to grid search portfolios.
- * @author Roman Rubsamen <roman.rubsamen@gmail.com>
- */
-
- 
-/* Start Wrapper private methods - Unit tests usage only */
-/* End Wrapper private methods - Unit tests usage only */
-
-
-/**
-* @function gridSearchWeights
-*
-* @summary Compute the weights of a portfolio minimizing an arbitrary objective function.
-*
-* @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only portfolio
-* of n assets minimizing an arbitrary real-valued objective function fct of n real variables defined on the unit simplex of R^n, 
-* which is the n-1 dimensional set of R^n containing the points x = (x_1,...,x_n) statisfying sum x_i = 1 and x_i >= 0, i = 1..n, 
-* c.f. the first reference.
-*
-* Since such a portfolio might not be unique, all the weights corresponding to the same minimum value of the function fct 
-* are provided in output.
-*
-* The minimization of the function fct is achieved through one of the following optimisation methods:
-* - Deterministic search on a grid of rational points belonging to the unit simplex of R^n
-*
-* To be noted that finding the minimum value(s) of an arbitrary objective function on the unit simplex
-* is an NP-hard problem, c.f. the second reference, so that all the optimisation algorithms above are expected to
-* be non-polynomial in n.
-* 
-* @see <a href="https://en.wikipedia.org/wiki/Simplex">Simplex</a>
-* @see <a href="http://www.sciencedirect.com/science/article/pii/S0377221707004262">De Klerk, E., Den Hertog, D., Elabwabi, G.: On the complexity of optimization over the standard simplex. Eur. J Oper. Res. 191, 773–785 (2008)</a>
-* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
-*
-* @param {number} nbAssets the number of assets in the considered universe, natural integer superior or equal to 1.
-* @param {function} fct a real-valued objective function of n real variables to minimize on the unit simplex of R^n,
-* which must take as first input argument an array of n real numbers corresponding to the weights w1,...,wn of the n assets 
-* in the considered universe and which must return as output a real number.
-* @param {Object} opt the optional parameters for the algorithms used by the function.
-* @param {string} opt.optimisationMethod the optimisation method to use in order to minimize the function fct, a string either equals to:
-* - 'deterministic': usage of a deterministic grid search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the third reference, where k is defined through the parameter opt.rationalGrid.k
-* -
-* ; defaults to 'deterministic'.
-* @param {number} opt.rationalGrid.k the indice k of the k-th rational grid of the unit simplex of R^n to use in case opt.optimisationMethod is equal to 'deterministic', a natural integer greater than or equal to 1; defaults to n.
-* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to
-* the weights of a portfolio minimizing the function fct.
-*
-* @example
-* gridSearchWeights(3, function(arr) { return arr[0];}, {optimisationMethod: 'deterministic', rationalGrid: {k: 2}});
-* // [[0,1,0],[0,0.5,0.5],[0,0,1]]
-*/
-self.gridSearchWeights = function (nbAssets, fct, opt) {
-	// Decode options
-	if (opt === undefined) {
-		opt = {};
-	}
-	opt.optimisationMethod = opt.optimisationMethod || 'deterministic';
-	
-	// Select the proper optimisation method
-	if (opt.optimisationMethod === 'deterministic') {
-		// Decode options for the deterministic grid search method
-		opt.rationalGrid = opt.rationalGrid || { k: nbAssets };
-		var k = opt.rationalGrid.k;
-		
-		// Call the rational grid search method
-		return simplexRationalGirdSearch_(fct, nbAssets, k);
-	}
-	else {
-	    throw new Error('unsupported optimisation method');
-	}
-}
-
 
 
 /**
@@ -8654,7 +9072,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 *
 * @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
 * @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
-* @param {object} opt optional and/or mandatory parameters for the algorithm.
+* @param {object} opt optional parameters for the algorithm.
 * @param {number} opt.maxIter the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.sizeSubsets the number of assets to include in the generated subsets of assets, a positive natural integer satisfying 2 <= sizeSubsets < n; 
 * defaults to the positive solution of the equation x^2 + 3x - SQRT(2*n*(n+3)) = 0.
@@ -8792,10 +9210,10 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	// The assets subsets generator
 	var subsetAssetsIdxIterator; 
 	if (subsetsGenerationMethod === 'random') {
-		subsetAssetsIdxIterator = new randomKSubsetIterator_(nbAssets, sizeSubsets); 
+		subsetAssetsIdxIterator = new randomKSubsetIterator_(nbAssets, sizeSubsets, false); // use no array copy in the subsets generation to improve performances
 	}
 	else if (subsetsGenerationMethod === 'deterministic') {
-		subsetAssetsIdxIterator = new kSubsetsIterator_(nbAssets, sizeSubsets);
+		subsetAssetsIdxIterator = new kSubsetsIterator_(nbAssets, sizeSubsets, false); // use no array copy in the subsets generation to improve performances
 	}
 	else {
 		throw new Error('unsupported subsets generation method');
@@ -10378,7 +10796,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 		//
 		// In this case, this asset is IN, all the assets with a return strictly higher than 
 		// this asset are UP, and all the assets with a return strictly lower than this asset
-		// are LOW, plus the linear program is is not generate
+		// are LOW, plus the linear program is is not degenerate
 		//
 		//
 		// - The loop above has stopped on an asset because the sum of the weights of 
@@ -10970,16 +11388,16 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 		var cornerPortfolio_i = cornerPortfoliosWeights[i][0];
 		var lambda_i = cornerPortfoliosWeights[i][1];
 		
-		if (Matrix_.areEqual(cornerPortfolio_i, cornerPortfolio, eps)) {
-			finalCornerPortfoliosWeights[idx] = [cornerPortfolio_i, lambda_i];
-		}
-		else {
-			cornerPortfolio = cornerPortfolio_i;
-			lambda = lambda_i;
-			
+		if (!Matrix_.areEqual(cornerPortfolio_i, cornerPortfolio, eps)) {
 			++idx;
-			finalCornerPortfoliosWeights[idx] = [cornerPortfolio, lambda];
 		}
+		
+		// Either replace a current portfolio or add a new one
+		finalCornerPortfoliosWeights[idx] = [cornerPortfolio_i, lambda_i];
+		
+		// Prepare for the next iteration
+		cornerPortfolio = cornerPortfolio_i;
+		lambda = lambda_i;
 	}
 	
 	// Resize the output efficient frontier array as required
@@ -11137,7 +11555,7 @@ self.minimaxWeights = function (assetsReturns, opt) {
 
 
 /**
-* @function minCorrWeights
+* @function minimumCorrelationWeights
 *
 * @summary Compute the weights of the minimum correlation (heuristic) portfolio.
 *
@@ -11160,10 +11578,10 @@ self.minimaxWeights = function (assetsReturns, opt) {
 * @return {Array.<number>} the weights corresponding to theminimum correlation (heuristic) portfolio, array of n real numbers.
 *
 * @example
-* minCorrWeights([[0.1, 0], [0, 0.2]]);
+* minimumCorrelationWeights([[0.1, 0], [0, 0.2]]);
 * // ~[0.59, 0.41]
 */
-self.minCorrWeights = function (sigma, opt) {
+self.minimumCorrelationWeights = function (sigma, opt) {
 	// Convert sigma to covariance matrix format
 	var sigma = new Matrix_(sigma).toCovarianceMatrix();
 	
@@ -11331,6 +11749,96 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 
 
 /**
+ * @file Functions related to grid search portfolios.
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function numericalOptimizationWeights
+*
+* @summary Compute the weights of a portfolio minimizing an arbitrary objective function.
+*
+* @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only portfolio
+* of n assets minimizing an arbitrary real-valued objective function fct of n real variables defined on the unit simplex of R^n, 
+* which is the n-1 dimensional set of R^n containing the points x = (x_1,...,x_n) statisfying sum x_i = 1 and x_i >= 0, i = 1..n, 
+* c.f. the first reference.
+*
+* Optionally, the following constraints can be added:
+* - Minimum weight of each asset to include in the portfolio
+* - Maximum weight of each asset to include in the portfolio
+*
+* Since such a portfolio might not be unique, all the weights corresponding to the same minimum value of the function fct 
+* are provided in output.
+*
+* The minimization of the function fct is achieved through one of the following optimisation methods:
+* - Grid search on a grid of rational points belonging to the unit simplex of R^n
+*
+* To be noted that finding the minimum value(s) of an arbitrary real-valued objective function on the unit simplex
+* is an NP-hard problem, c.f. the second reference, so that all exact optimisation algorithms for this problem 
+* are expected to be non-polynomial in n.
+* 
+* @see <a href="https://en.wikipedia.org/wiki/Simplex">Simplex</a>
+* @see <a href="http://www.sciencedirect.com/science/article/pii/S0377221707004262">De Klerk, E., Den Hertog, D., Elabwabi, G.: On the complexity of optimization over the standard simplex. Eur. J Oper. Res. 191, 773–785 (2008)</a>
+* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and quadratic optimization over convex polytopes. CORE Discussion Papers ; 2003/71 (2003)</a>
+*
+* @param {number} nbAssets the number of assets in the considered universe, natural integer superior or equal to 1.
+* @param {function} fct a real-valued objective function of n real variables to minimize on the unit simplex of R^n,
+* which must take as first input argument an array of n real numbers corresponding to the weights w1,...,wn of the n assets 
+* in the considered universe and which must return as output a real number.
+* @param {Object} opt optional parameters for the algorithm.
+* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @param {string} opt.optimizationMethod the optimisation method to use in order to minimize the function fct, a string either equals to:
+* - 'grid-search': usage of a grid search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the third reference, where k is defined through the parameter opt.optimizationMethodParams.k
+; defaults to 'grid-search'.
+* @param {number} opt.optimizationMethodParams.k the indice k of the k-th rational grid of the unit simplex of R^n to use in case opt.optimizationMethod is equal to 'grid-search', a natural integer greater than or equal to 1; defaults to n.
+* @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers corresponding to
+* the weights of a portfolio minimizing the function fct.
+*
+* @example
+* numericalOptimizationWeights(3, function(arr) { return arr[0];}, {optimizationMethodParams: {k: 2}});
+* // [[0,1,0],[0,0.5,0.5],[0,0,1]]
+*/
+self.numericalOptimizationWeights = function (nbAssets, fct, opt) {
+	// Initialize the options structure
+	if (opt === undefined) {
+		opt = {};
+	}
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
+	if (opt.optimizationMethodParams === undefined) {
+		opt.optimizationMethodParams = {};
+	}
+
+	// Initialize the options default values
+	if (opt.optimizationMethod === undefined) {
+		opt.optimizationMethod = 'grid-search';
+	}
+	if (opt.optimizationMethod === 'grid-search') {
+		if (opt.optimizationMethodParams.k === undefined) {
+			opt.optimizationMethodParams.k = nbAssets;
+		}
+	}
+	
+	// Select the proper optimisation method
+	if (opt.optimizationMethod === 'grid-search') {
+		// Call the rational grid search method
+		return simplexGridSearch_(fct, nbAssets, opt.optimizationMethodParams.k, opt.constraints.minWeights, opt.constraints.maxWeights);
+	}
+	else {
+	    throw new Error('unsupported optimisation method');
+	}
+}
+
+
+
+/**
  * @file Functions related to proportional minimum variance (heuristic) portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -11341,7 +11849,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 
 
 /**
-* @function minVarWeights
+* @function proportionalMinimumVarianceWeights
 *
 * @summary Compute the weights of the proportional minimum variance (heuristic) portfolio.
 *
@@ -11364,10 +11872,10 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 * @return {Array.<number>} the weights corresponding to theminimum variance (heuristic) portfolio, array of n real numbers.
 *
 * @example
-* minVarWeights([[0.1, 0], [0, 0.2]]);
+* proportionalMinimumVarianceWeights([[0.1, 0], [0, 0.2]]);
 * // ~[0.86, 0.14] 
 */
-self.minVarWeights = function (sigma, opt) {
+self.proportionalMinimumVarianceWeights = function (sigma, opt) {
 	// Convert sigma to matrix format
 	var sigma = new Matrix_(sigma);
 	
