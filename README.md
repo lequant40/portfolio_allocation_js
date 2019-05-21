@@ -158,7 +158,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 
 ## Documentation
 
-A complete documentation, including code examples, can be found ([on the GitHub Pages of the repository](docs/README.md))
+A complete documentation, including code examples, can be found ([on the GitHub Pages of the repository](https://lequant40.github.io/portfolio_allocation_js/))
 
 
 
