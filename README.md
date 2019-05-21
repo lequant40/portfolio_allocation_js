@@ -2,13 +2,13 @@
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
-PortfolioAllocation is a JavaScript library designed to help allocating portfolios of financial instruments.
+PortfolioAllocation is a JavaScript library designed to help solving the mathematical problem of financial portfolio allocation.
 
-That is, the algorithms contained in the PortfolioAllocation library can be used to compute the proportions of financial instruments (stocks, bonds, exchange traded funds - ETFs...) to hold in a portfolio so as to optimize specific quantitative criteria related to this portfolio.
+In layman's terms, imagine you are faced with the problem of deciding how to invest some of your available funds into different financial instruments: stocks, bonds, mutual funds, exchange traded funds (ETFs), cryptocurrencies...
 
-PortfolioAllocation has been developed in JavaScript because I heavily use [Google Sheets](https://www.google.com/sheets/about/) to analyse trading strategies, and Google Sheets is easily extensible thanks to [Google Apps Script](https://developers.google.com/apps-script/), a JavaScript-based language.
+You can then use the PortfolioAllocation library to compute which proportion of which instrument you need to hold so that your total holdings (your portfolio) is optimal (the best possible among all the possible portfolios you could hold).
 
-Hope you enjoy !
+Please do not hesitate to report any bug / request additional features !
 
 
 ## Features
@@ -17,10 +17,13 @@ Hope you enjoy !
 - Compatible with any browser supporting ECMAScript 5 for front-end development
 - Compatible with [Node.js](https://nodejs.org/) for back-end development
 - Code continuously tested and integrated by [Travis CI](https://travis-ci.org/)
-- Code heavily documented using [JSDoc](http://usejsdoc.org/)
+- Code heavily documented for internal developers using [JSDoc](http://usejsdoc.org/)
+- Code heavily documented for users using [GitHub Pages](https://lequant40.github.io/portfolio_allocation_js/)
 
 
-## Portfolio allocation core algorithms
+## Included algorithms
+
+### Portfolio allocation algorithms
 
 - Equal weights (EW)  
   Analyzed by Victor DeMiguel and al. in their research paper [Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?](https://doi.org/10.1093/rfs/hhm075).
@@ -59,10 +62,10 @@ Hope you enjoy !
   A random portfolio, while not directly usable to allocate assets in real-life, can be used to benchmark the performances of portfolio allocation strategies, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
 
 - Numerical optimization portfolio  
-  When no specific numerical algorithm exist to solve a particular portfolio allocation problem, it is always possible to use generic numerical optimization algorithms instead (e.g., grid search on the simplex).
+  When no specific numerical algorithm exist to solve a particular portfolio allocation problem, generic numerical optimization algorithms must be used instead (e.g., grid search on the simplex).
 
 
-## Portfolio allocation support algorithms
+### Misc. helper algorithms
 - Portfolio weights rounding  
   The rounding algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al. allows to compute real-life portfolio weights from the theoretical portfolio weights obtained from any portfolio allocation algorithm.
 
@@ -158,7 +161,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 
 ## Documentation
 
-A complete documentation, including code examples, can be found ([on the GitHub Pages of the repository](https://lequant40.github.io/portfolio_allocation_js/))
+A complete documentation, including code examples, can be found [on the GitHub Pages associated to this repository](https://lequant40.github.io/portfolio_allocation_js/).
 
 
 
