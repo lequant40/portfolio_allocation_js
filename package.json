@@ -4,7 +4,7 @@
   "date": "2018-06-10",
   "author": "Roman Rubsamen <roman.rubsamen@gmail.com>",
   "contributors": [],
-  "description": "A JavaScript library to allocate portfolios of financial assets.",
+  "description": "A JavaScript library to allocate and optimize portfolios of financial instruments.",
   "license": "MIT",
   "directories": {
     "lib": "lib",
@@ -21,12 +21,12 @@
     "url": "https://github.com/lequant40/portfolio_allocation_js.git"
   },
   "devDependencies": {
-    "grunt": "^1.0.0",
+    "grunt": "^1.0.4",
     "grunt-contrib-concat": "^1.0.1",
-    "grunt-contrib-qunit": "^1.2.0",
-    "grunt-contrib-uglify": "^1.0.2",
+    "grunt-contrib-qunit": "^3.1.0",
+    "grunt-contrib-uglify": "^4.0.1",
     "grunt-replace": "^1.0.1",
-    "grunt-strip-code": "^1.0.4"
+    "grunt-strip-code": "^1.0.6"
   },
   "bugs": {
     "url": "https://github.com/lequant40/portfolio_allocation_js/issues"

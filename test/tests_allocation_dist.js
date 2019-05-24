@@ -1168,7 +1168,8 @@ QUnit.test('Mean variance portfolio - corner portfolios computation', function(a
 QUnit.test('Mean variance portfolio - error cases', function(assert) {    
 	// Test using static data
 	// Test the unsupported cases:
-	// - Unsupported optimization method
+	// - Missing mean-variance optimization method
+	// - Unsupported mean-variance optimization method
 	{
 		var covMat = [[0.0146, 0.0187, 0.0145],
 					 [0.0187, 0.0854, 0.0104],
@@ -1176,9 +1177,14 @@ QUnit.test('Mean variance portfolio - error cases', function(assert) {
 		var returns = [0.062, 0.146, 0.128];
 		
 		assert.throws(function() { 
+		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat) },
+			new Error('missing mean-variance optimization method'),
+			"Mean variance portfolio - Missing mean-variance optimization method");
+
+		assert.throws(function() { 
 		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'test', constraints: {return: 0.10}}) },
-			new Error('unsupported optimization method'),
-			"Mean variance portfolio - Target return weights portfolio, unreachable target return #1");
+			new Error('unsupported mean-variance optimization method'),
+			"Mean variance portfolio - Unsupported mean-variance optimization method");
 	}
 });	
 
@@ -1349,9 +1355,9 @@ QUnit.test('Mean variance portfolio - maximum target volatility weights portfoli
 					                                                             [0, 0, 0, 0]], 
 			                                                                     { optimizationMethod: 'targetVolatility', constraints: {volatility: maxTargetVolatility}});
 			for (var i = 0; i < weights_mtv.length; ++i) {
-				assert.equal(Math.abs(weights_mtv[i] - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio -maximum target volatility weights portfolio #1/2 ' + i);
+				assert.equal(Math.abs(weights_mtv[i] - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio - maximum target volatility weights portfolio #1/2 ' + i);
 			}
-			assert.equal(Math.abs(1-investment - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio -maximum target volatility weights portfolio #1/2 ' + i);	
+			assert.equal(Math.abs(1-investment - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio - maximum target volatility weights portfolio #1/2 ' + i);	
 			
 			// In case the maximum target volatility is greater than the maximum attainable volatility,
 			// the portfolio must be the efficient portfolio with the highest return
@@ -1368,6 +1374,43 @@ QUnit.test('Mean variance portfolio - maximum target volatility weights portfoli
 			                                                                     { optimizationMethod: 'targetVolatility', constraints: {volatility: maxTargetVolatility}});
 			assert.deepEqual(weights_mtv, weights_tv, 'Mean variance portfolio - maximum target volatility weights portfolio #3');
 		}
+	}
+	
+	// Test using static data
+	// Test that a target maximum volatility of zero produces a zero-weights portfolio
+	{
+		// Problem data
+		var covMat =[[0.0146, 0.0187, 0.0145],
+					[0.0187, 0.0854, 0.0104],
+					[0.0145, 0.0104, 0.0289]];
+		var returns = [0.062, 0.146, 0.128];
+		
+		// Compute the desired maximum volatility
+		var maxVolatility = 0;
+		
+		// Test that a 0 maximum volatility target is properly supported
+		var expectedWeights = [0, 0, 0];
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxVolatility}});
+		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - maximum target volatility weights portfolio #4');
+	}
+	
+	
+	// Test using static data
+	// Test the algorithm when all returns are negative; the associated portfolio must be null.
+	{
+		// Problem data
+		var covMat = [[0.002533106361, 0.002161135405, 0.002605003686],
+                     [0.002161135405, 0.002252008852, 0.002439575054],
+                     [0.002605003686, 0.002439575054, 0.003315580611]];
+		var returns = [-0.0000244756209, -0.003612424187, -0.004045817996];
+		
+		// Compute the desired maximum volatility
+		var maxVolatility = 0.10/Math.sqrt(12);
+		
+		// Test that the algorithm is behaving properly
+		var expectedWeights = [0, 0, 0];
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxVolatility}});
+		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - Test negative returns');
 	}
 });	
 
@@ -1716,17 +1759,306 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 });
 
 
-QUnit.test('Random subspace mean variance portfolio - error cases', function(assert) {    
+QUnit.test('Random subspace optimization method - error and limit cases', function(assert) {    
 	// Test using static data
 	// Test the unsupported cases:
 	// - Unsupported subsets generation method
 	// - Unsupported subsets aggregation method
-	// - Neither target return nor target volatility provided
-	// - Both target return and target volatility provided
 	// - Wrong size of subsets of assets to generate
 	// - No feasible portfolio generated
-	// - Unsupported subsets optimization method
-	// - Minimum variance subsets optimization method and maximum portfolio volatility constraint
+	// - Number of infeasible portfolios generated greater than the admissible ratio
+	// - Wrong number of weights returned by the portfolio optimization method
+	{
+		// Problem data
+		var nbAssets = 3;
+
+		// Test an unsupported subsets generation method
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, null, { subsetsGenerationMethod: 'unknown' })},
+			new Error('unsupported subsets of assets generation method'),
+			"Random subspace optimization method - Unsupported subsets generation method");
+
+		// Test an unsupported subsets aggregation method
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, null, { subsetsAggregationMethod: 'unknown' }) },
+			new Error('unsupported aggregation method'),
+			"Random subspace optimization method - Unsupported aggregation method");
+
+		// Test wrong size of subsets of assets to generate: < 2
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, null, { sizeSubsets: 1 }) },
+			new Error('the size of the subsets of assets must be between 2 and 3'),
+			"Random subspace optimization method - Size of subsets of assets to generate < 2");
+
+		// Test wrong size of subsets of assets to generate: > n
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, null, { sizeSubsets: 4 }) },
+			new Error('the size of the subsets of assets must be between 2 and 3'),
+			"Random subspace optimization method - Size of subsets of assets to generate > n");
+		
+		// Test no feasible portfolio generated
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, 
+			                                                      function(idx, opt) { throw new Error('infeasible portfolio optimization problem'); }) },
+			new Error('no feasible portfolio generated'),
+			"Random subspace optimization method - No feasible portfolio generated");	
+		
+		// Test number of feasible portfolios generated less than the admissible ratio
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, 
+			                                                      function(idx, opt) { if (idx[0] == 1) { throw new Error('infeasible portfolio optimization problem'); } else { return [0, 1]; } }, 
+																  { subsetsGenerationMethod: 'deterministic',
+                                                                    maxInfeasibleSubsetsRatio: 2/3}) },
+			new Error('too many infeasible portfolios generated'),
+			"Random subspace optimization method - Too many infeasible portfolios generated");
+		
+		// Test wrong number of weights returned by the portfolio optimization method
+		assert.throws(function() { 
+			PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, 
+			                                                      function(idx, opt) { return [0, 0, 0, 1]; }) },
+			new Error('internal error: the portfolio optimization method did not return the expected number of weights'),
+			"Random subspace optimization method - Wrong number of weights returned by the portfolio optimization method");	
+	}
+	
+	// Test using random data
+	// Test the limit cases:
+	// - 1 asset
+	// - Number of assets equal to the size of the subsets to generate
+	{
+		// Test 1 asset
+		{
+			var expectedWeights = [1];
+			var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(1, null);
+			assert.deepEqual(weights, expectedWeights, 'Random subspace optimization method - 1 asset');	
+		}
+		
+		// Test number of assets equal to the size of the subsets to generate
+		//
+		// For performances reasons, it must be tested that only one call to the portfolio optimization method takes place
+		{
+			// Generate a random number of assets
+			var nbAssets = Math.floor(Math.random()*(50-2+1) + 2); // max 50 min 2
+			
+			// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
+			function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+				// Count the number of function calls
+				subsetEqualWeightsOptimization.called++;
+				
+				return PortfolioAllocation.equalWeights(subsetAssetsIdx.length);
+			}
+			subsetEqualWeightsOptimization.called = 0;
+			
+			// Compute the RSO equally weighted portfolio
+			var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization, {sizeSubsets: nbAssets});
+			
+			// Compare the weights as well as the number of calls of the portfolio optimization method
+			var expectedWeights = PortfolioAllocation.equalWeights(nbAssets);
+			assert.deepEqual(weights, expectedWeights, 'Random subspace optimization method -  Number of assets equal to the size of the subsets to generate, #1');	
+			
+			var expectedFunctionCalls = 1;
+			assert.equal(subsetEqualWeightsOptimization.called, expectedFunctionCalls, 'Random subspace optimization method - Number of assets equal to the size of the subsets to generate, #2');	
+		}
+	}
+});	
+
+QUnit.test('Random subspace optimization method', function(assert) {    
+	// Tests the properties of the number of subsets to generate in case of random subsets generation, using random data 
+	{
+		// Generate a random number of assets
+		var nbAssets = Math.floor(Math.random()*(25-2+1) + 2); // max 25 min 2
+			
+		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
+		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+			// Count the number of function calls
+			subsetEqualWeightsOptimization.called++;
+			
+			return PortfolioAllocation.equalWeights(subsetAssetsIdx.length);
+		}
+		
+		// Compute the RSO equally weighted portfolio
+		// The default number of subsets in case of random subsets generation method to generate must be equal to 128
+		var expectedFunctionCalls = 128;
+		subsetEqualWeightsOptimization.called = 0;
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization);
+		assert.equal(subsetEqualWeightsOptimization.called, expectedFunctionCalls, 'Random subspace optimization method - Default number of random subsets to generate');
+		
+		// Compute the RSO equally weighted portfolio
+		// The number of subsets to generate in case of random subsets generation method must be equal to the specified one
+		var nbSubsetsToGenerate = Math.floor(Math.random()*(1000-1+1) + 1); // max 1000 min 1
+		var expectedFunctionCalls = nbSubsetsToGenerate;
+		subsetEqualWeightsOptimization.called = 0;
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization, {nbRandomSubsets: nbSubsetsToGenerate});
+		assert.equal(subsetEqualWeightsOptimization.called, expectedFunctionCalls, 'Random subspace optimization method - Specified number of random subsets to generate');					
+	}
+
+	// Test the properties of the size of the generated subsets in case of random subsets generation, using random data  
+	{
+		// Generate a random number of assets
+		var nbAssets = Math.floor(Math.random()*(50-2+1) + 2); // max 50 min 2
+			
+		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
+		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+			// In case the size of the generated subsets is not correct, throw
+			assert.equal(subsetAssetsIdx.length, expectedSizeSubsets, 'Random subspace optimization method - Size of random subsets to generate');
+			
+			return PortfolioAllocation.equalWeights(subsetAssetsIdx.length);
+		}
+		
+		// Compute the RSO equally weighted portfolio
+		// The default size of the subsets to generate must be FLOOR(SQRT(nbAssets))
+		var expectedSizeSubsets = Math.max(2, Math.floor(Math.sqrt(nbAssets)));
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization);	
+		
+		// Compute the RSO equally weighted portfolio
+		// The size of the generated subsets must be equal to the specified one
+		var sizeSubsetsToGenerate = Math.floor(Math.random()*(nbAssets-2+1) + 2); // max nbAssets min 2
+		var expectedSizeSubsets = sizeSubsetsToGenerate;
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization, {sizeSubsets: sizeSubsetsToGenerate});			
+	}
+	
+	// Tests the properties of the number of the subsets to generate in case of deterministic subsets generation, using random data 
+	{
+		function binomial(n, k) { if (k === 0) return 1; return (n * binomial(n-1, k-1)) / k; }
+		
+		// Generate a random number of assets
+		var nbAssets = Math.floor(Math.random()*(25-2+1) + 2); // max 25 min 2
+			
+		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
+		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+			// Count the number of function calls
+			subsetEqualWeightsOptimization.called++;
+			
+			return PortfolioAllocation.equalWeights(subsetAssetsIdx.length);
+		}
+
+		// Compute the RSO equally weighted portfolio
+		// The number of subsets to generate in case of deterministic subsets generation method must be equal to Binomial(nbAssets, sizeSubsets)
+		var sizeSubsetsToGenerate = Math.floor(Math.random()*(nbAssets-2+1) + 2); // max nbAssets min 2		
+		var expectedFunctionCalls = binomial(nbAssets, sizeSubsetsToGenerate);
+		subsetEqualWeightsOptimization.called = 0;
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization, {subsetsGenerationMethod: 'deterministic', sizeSubsets: sizeSubsetsToGenerate});
+		assert.equal(subsetEqualWeightsOptimization.called, expectedFunctionCalls, 'Random subspace optimization method - Number of deterministic subsets to generate');
+	}
+	
+	// Test the behaviour of the deterministic subsets generation method, using random data 
+	{
+		// Generate a random number of assets
+		var nbAssets = Math.floor(Math.random()*(25-2+1) + 2); // max 25 min 2
+			
+		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
+		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+			return PortfolioAllocation.equalWeights(subsetAssetsIdx.length);
+		}
+
+		// Compute the RSO equally weighted portfolio
+		// In the specific case of the deterministic subsets generation method, an RSO equally weighted portfolio
+		// must be equal to an equally weighted portfolio over all the original assets
+		var expectedWeights = PortfolioAllocation.equalWeights(nbAssets);
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization, {subsetsGenerationMethod: 'deterministic'});
+		
+		var weightsOK = true;
+		if (expectedWeights.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-8) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Random subspace optimization method - Deterministic subsets generation method');
+	}
+
+	// Test the behaviour of the automated subsetting in case minWeights/maxWeights constraints are provided, using random data 
+	{
+		// Generate a random number of assets
+		var nbAssets = Math.floor(Math.random()*(50-2+1) + 2); // max 50 min 2
+				
+		// Generate random lower and upper bounds on these assets 
+		// (feasibility of the associated portfolio optimization problem is not relevant).
+		var lowerBounds = new Array(nbAssets);
+		var upperBounds = new Array(nbAssets);
+		for (var i = 0; i < nbAssets; ++i) {
+			lowerBounds[i] = Math.random();
+			upperBounds[i] = Math.random();
+		}
+		
+		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
+		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+			// In case the automated subsetting of minWeights/maxWeights is not correct, throw
+			var boundsOK = true;
+
+			for (var i = 0; i < subsetAssetsIdx.length; ++i) {
+				if (subsetPortfolioOptimizationMethodParams.constraints.minWeights[i] != lowerBounds[subsetAssetsIdx[i]-1]) {
+					boundsOK = false;
+					break;
+				}
+				if (subsetPortfolioOptimizationMethodParams.constraints.maxWeights[i] != upperBounds[subsetAssetsIdx[i]-1]) {
+					boundsOK = false;
+					break;
+				}
+			}
+			assert.equal(boundsOK, true, 'Random subspace optimization method -  Automated subsetting of minWeights/maxWeights constraints');
+			
+			return PortfolioAllocation.equalWeights(subsetAssetsIdx.length);
+		}
+		
+		// Compute the RSO equally weighted portfolio
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization, { constraints: { minWeights: lowerBounds, maxWeights: upperBounds}});	
+	}
+	
+	// Test the subsets aggregation method properties, using static data
+	{
+		var nbAssets = 3;
+		
+		// Define the portfolio optimization method to test the subsets aggregation method
+		function subsetOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+			// Use the number of function calls to compute the subset portfolio weights
+			subsetOptimization.called++;
+
+			if (subsetOptimization.called === 1) {
+				return [1, 0]; // subsetAssetsIdx is equal to [1, 2] -> [1, 0, 0] for original portfolio weights
+			}
+			else if (subsetOptimization.called === 2) {
+				return [0, 1]; // subsetAssetsIdx is equal to [1, 3] -> [0, 0, 1] for original portfolio weights
+			}
+			else {
+				return [0, 0]; // subsetAssetsIdx is equal to [2, 3] -> [0, 0, 0] for original portfolio weights
+			}
+		}
+		
+		// Compute the RSO portfolio
+		// Test the 'average' subsets aggregation method
+		var expectedWeights = [0.3333333333333333, 0, 0.3333333333333333];
+		subsetOptimization.called = 0;	
+		var averageWeights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetOptimization, {subsetsGenerationMethod: 'deterministic', subsetsAggregationMethod: 'average'});
+		assert.deepEqual(averageWeights, expectedWeights, 'Random subspace optimization method - Average subsets aggregation method');
+
+		// Compute the RSO portfolio
+		// The default subsets aggregation method must be 'average'		
+		subsetOptimization.called = 0;
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetOptimization, {subsetsGenerationMethod: 'deterministic'});
+		assert.deepEqual(weights, averageWeights, 'Random subspace optimization method - Default subsets aggregation method');
+
+		// Compute the RSO portfolio
+		// Test the 'median' subsets aggregation method
+		var expectedWeights = [0.21134201925334137, 0, 0.21134201925334137];
+		subsetOptimization.called = 0;	
+		var medianWeights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetOptimization, {subsetsGenerationMethod: 'deterministic', subsetsAggregationMethod: 'median'});
+		assert.deepEqual(medianWeights, expectedWeights, 'Random subspace optimization method - Median subsets aggregation method');		
+	}
+});	
+
+
+
+QUnit.test('Random subspace mean variance portfolio - error cases', function(assert) {    	
+	// Test using static data
+	// Test the unsupported cases:
+	// - Missing mean-variance optimization method
+	// - Target volatility not provided
+	// - Unsupported mean-variance optimization method
 	{
 		// Problem data
 		var covMat =[[0.0146, 0.0187, 0.0145],
@@ -1737,141 +2069,70 @@ QUnit.test('Random subspace mean variance portfolio - error cases', function(ass
 		// Compute the target maximum volatility
 		var maxVolatility = covMat[0][0];
 		
-		// Test an unsupported subsets generation method
+		// Test missing mean-variance optimization method
 		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'unknown', constraints: {maxVolatility: maxVolatility}}) },
-			new Error('unsupported subsets of assets generation method'),
-			"Random subspace mean variance portfolio - Unsupported subsets generation method");
-
-		// Test an unsupported subsets aggregation method
-		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsAggregationMethod: 'unknown', constraints: {maxVolatility: maxVolatility}}) },
-			new Error('unsupported aggregation method'),
-			"Random subspace mean variance portfolio - Unsupported aggregation method");
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat)},
+			new Error('missing mean-variance optimization method'),
+			"Random subspace mean variance portfolio - Missing mean-variance optimization method");
 
 		// Test no desired maximum volatility provided
 		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat) },
-			new Error('missing maximum portfolio volatility constraint'),
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetPortfolioOptimizationMethodParams: { optimizationMethod: 'maximumTargetVolatility' } }) },
+			new Error('missing mean-variance optimization method maximum volatility constraint'),
 			"Random subspace mean variance portfolio - No desired maximum volatility");
 
-		// Test wrong size of subsets of assets to generate: < 2
+		// Test an unsupported mean-variance optimization method
 		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { sizeSubsets: 1, constraints: {maxVolatility: maxVolatility}}) },
-			new Error('the size of the subsets of assets must be between 2 and 2'),
-			"Random subspace mean variance portfolio - Size of subsets of assets to generate < 2");
-
-		// Test wrong size of subsets of assets to generate: >= n
-		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { sizeSubsets: 3, constraints: {maxVolatility: maxVolatility}}) },
-			new Error('the size of the subsets of assets must be between 2 and 2'),
-			"Random subspace mean variance portfolio - Size of subsets of assets to generate >= n");			
-			
-		// Test an unsupported subsets optimization method
-		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsOptimizationMethod: 'unknown', constraints: {maxVolatility: maxVolatility}}) },
-			new Error('unsupported subsets optimization method'),
-			"Random subspace mean variance portfolio - Unsupported subsets optimization method");
-	}
-	
-	// Test using static data
-	// Test the unsupported case:
-	// - Less than 3 assets
-	{
-		// Problem data
-		var covMat =[[0.0146, 0.0187],
-					[0.0187, 0.0854]];
-		var returns = [0.062, 0.146];
-		
-		// Compute the desired maximum volatility
-		var maxVolatility = covMat[0][0];
-		
-		// Test less than 3 assets
-		assert.throws(function() { 
-			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: {maxVolatility: maxVolatility}}) },
-			new Error('the number of assets must be equal to or greater than 3'),
-			"Random subspace mean variance portfolio - Less than 3 assets");
+			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetPortfolioOptimizationMethodParams: { optimizationMethod: 'unknown' } }) },
+			new Error('unsupported mean-variance optimization method'),
+			"Random subspace mean variance portfolio - Unsupported mean-variance optimization method");
 	}
 });	
 
 
 QUnit.test('Random subspace mean variance portfolio', function(assert) {    
 	// Test using static data
-	// Test using the deterministic subset generation that the average aggregation method is the default method
-	// (Test that the final portfolio might not be fully invested)
 	{
-		// Problem data
-		var covMat =[[0.0146, 0.0187, 0.0145],
-					[0.0187, 0.0854, 0.0104],
-					[0.0145, 0.0104, 0.0289]];
-		var returns = [0.062, 0.146, 0.128];
+		var covMat = [[1, 0.3, -0.2], 
+		              [0.3, 1, 0.6], 
+					  [-0.2, 0.6, 1]];
+		var returns = [0.1, 0.2, 0.15];
 		
-		// Compute the desired maximum volatility
-		var maxVolatility = Math.sqrt(covMat[0][0]);
-		
-		// Test the deterministic subset generation with the average aggregation method
-		var expectedWeights = [0.6620689655172421, 0.059375396144818106, 0.19810532833311822];
-		var defaultWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
-		var averageWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsAggregationMethod: 'average', constraints: {maxVolatility: maxVolatility}});
-		assert.deepEqual(defaultWeights, expectedWeights, 'Random subspace mean variance portfolio - Default aggregation method #1');
-		assert.deepEqual(averageWeights, expectedWeights, 'Random subspace mean variance portfolio - Default aggregation method #2');
+		var expectedWeights = [0.09395200108235617, 0.1853986157617026, 0.11749197001156553];
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, 
+		                                                                                { subsetsGenerationMethod: 'deterministic', 
+																			              subsetPortfolioOptimizationMethodParams: {
+																							  optimizationMethod: 'maximumTargetVolatility',
+																							  constraints: {maxVolatility: Math.sqrt(0.10)}
+																						  }
+																						});
+		var weightsOK = true;
+		if (expectedWeights.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-8) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Random subspace mean variance portfolio, #1');
 	}
 	
-	// Test using static data
-	// Test that a target maximum volatility of zero produces a zero-weights portfolio
-	{
-		// Problem data
-		var covMat =[[0.0146, 0.0187, 0.0145],
-					[0.0187, 0.0854, 0.0104],
-					[0.0145, 0.0104, 0.0289]];
-		var returns = [0.062, 0.146, 0.128];
-		
-		// Compute the desired maximum volatility
-		var maxVolatility = 0;
-		
-		// Test that a 0 maximum volatility target is properly supported
-		var expectedWeights = [0, 0, 0];
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
-		assert.deepEqual(weights, expectedWeights, 'Random subspace mean variance portfolio - Zero volatility portfolio');
-	}
+	// Test using static data volatility target, which can lead to infeasible portfolios
+	// TODO
 
-	// Test using static data
-	// Test using the deterministic subset generation that the average aggregation method is different from the median aggregation method
-	{
-		var covMat = [[0.40755159,0.03175842,0.05183923,0.05663904,0.0330226,0.00827775,0.02165938,0.01332419,0.0343476,0.02249903],
-					[0.03175842,0.9063047,0.03136385,0.02687256,0.01917172,0.00934384,0.02495043,0.00761036,0.02874874,0.01336866],
-					[0.05183923,0.03136385,0.19490901,0.04408485,0.03006772,0.01322738,0.03525971,0.0115493,0.0427563,0.02057303],
-					[0.05663904,0.02687256,0.04408485,0.19528471,0.02777345,0.00526665,0.01375808,0.00780878,0.02914176,0.01640377],
-					[0.0330226,0.01917172,0.03006772,0.02777345,0.34059105,0.00777055,0.02067844,0.00736409,0.02542657,0.01284075],
-					[0.00827775,0.00934384,0.01322738,0.00526665,0.00777055,0.15983874,0.02105575,0.00518686,0.01723737,0.00723779],
-					[0.02165938,0.02495043,0.03525971,0.01375808,0.02067844,0.02105575,0.68056711,0.01377882,0.04627027,0.01926088],
-					[0.01332419,0.00761036,0.0115493,0.00780878,0.00736409,0.00518686,0.01377882,0.95526918,0.0106553,0.00760955],
-					[0.0343476,0.02874874,0.0427563,0.02914176,0.02542657,0.01723737,0.04627027,0.0106553,0.31681584,0.01854318],
-					[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]];
-		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
-		
-		// Compute the desired maximum volatility
-		var maxVolatility = Math.sqrt(covMat[0][0]);
-		
-		// Test the deterministic subset generation with the average aggregation method
-		var expectedAverageWeights = [ 0.18664209254001649,0.1219974697273006,0.06081950012745328,0.16358574496222086,0.0393886477420831,0.10478807379843348,0.023263830007040718,0.07261924023616481,0.08380931567945873,0.14101018026163825];
-		var averageWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
-		assert.deepEqual(averageWeights, expectedAverageWeights, 'Random subspace mean variance portfolio - Average aggregation method');
+	// Test using static data return target, which can lead to infeasible portfolios
+	// TODO
 
-		// Test the deterministic subset generation with the median aggregation method
-		var expectedMedianWeights = [ 0.1784969272086642, 0.16259205477471955, 0.05573399239111082, 0.15097385631284607,  0.03821202596692463, 0.09459960500406696, 0.027483340427787176, 0.0858640477180723, 0.07630631309056779, 0.12675131788705216];
-		var medianWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsAggregationMethod: 'median', constraints: {maxVolatility: maxVolatility}});
-		assert.deepEqual(medianWeights, expectedMedianWeights, 'Random subspace mean variance portfolio - Median aggregation method');
-	}
-
-	
-	/*
 	// Test using static data
 	// Reference: http://mba.tuck.dartmouth.edu/pages/faculty/ken.french/data_library.html, 100 Portfolios Formed on Size and Book-to-Market (10 x 10)
 	// Returns data from 1963/07 to 1973/06 used to computed the expected returns/covariance matrix
 	// 4 portfolios have been removed due to missing data
 	//
-	// This example can be used to stress-test the algorithm
+	// This example is used to stress-test the algorithm, but it is not possible to compare the results to some expected weights 
 	{
 		var covMat = [[0.008626335034, 0.006715399917, 0.007042419992, 0.007048459, 0.0066366781, 0.006594382192, 0.006188482528, 0.006144514577, 0.005581524855, 0.005791371247, 0.006839503165, 0.006026119572, 0.00556042548, 0.004834846375, 0.004511975974, 0.00502810301, 0.004273827084, 0.004391065668, 0.004333287312, 0.005263026397, 0.006093797699, 0.005328759167, 0.004885570623, 0.005006898428, 0.004375058515, 0.004536227401, 0.00382383205, 0.004188885336, 0.004227284984, 0.004480470259, 0.005652719041, 0.004684925202, 0.004824278, 0.004694296476, 0.0038311798, 0.004131720831, 0.003918816918, 0.00363012853, 0.004303746538, 0.004208510197, 0.00500884843, 0.004497613403, 0.003925394458, 0.003826366745, 0.003479102582, 0.003217506668, 0.003092539967, 0.003387487433, 0.003395715859, 0.004000762357, 0.004921900893, 0.004177801985, 0.003654297707, 0.003598637829, 0.00347358152, 0.003243638023, 0.003030619633, 0.003440298944, 0.003931812779, 0.004004083997, 0.00379606579, 0.00338809299, 0.003208075825, 0.002935523324, 0.002579952426, 0.002747787374, 0.002993945136, 0.003157948431, 0.003715079122, 0.003337110603, 0.002848833667, 0.002949900901, 0.002982481082, 0.002356035502, 0.002656567017, 0.002544831954, 0.002931137112, 0.003179676958, 0.00410448382, 0.003094311644, 0.002412252584, 0.002356759221, 0.001942123379, 0.002101900141, 0.002560515946, 0.002299870077, 0.002083781247, 0.002701932892, 0.002757407576, 0.002009863366, 0.001980655134, 0.001876568152, 0.001624975344, 0.001797528616, 0.001651044294, 0.001615803773],
 						[0.006715399917, 0.006683590368, 0.006014896374, 0.005908565288, 0.005722001587, 0.005670592412, 0.005404122902, 0.005228753424, 0.004781393518, 0.004867670897, 0.006057294555, 0.005460206075, 0.004834687069, 0.00427960842, 0.004094676601, 0.004430417541, 0.003713099085, 0.003918644507, 0.003805239886, 0.004724829646, 0.005547769669, 0.004641512869, 0.004275172741, 0.004535712695, 0.004002068481, 0.003998855101, 0.003461115736, 0.003868338392, 0.003743206232, 0.00397440804, 0.005132938989, 0.004315534403, 0.004334464152, 0.004243317135, 0.003586062754, 0.003673558324, 0.003599684906, 0.003328464186, 0.003895523432, 0.003933823625, 0.00454823586, 0.004173927655, 0.00350670524, 0.003414971713, 0.003313012908, 0.003017905708, 0.002835420141, 0.00304936103, 0.003091043629, 0.00371479407, 0.004518149563, 0.003944750725, 0.003314415963, 0.00343389213, 0.003213881416, 0.003034389219, 0.002929474526, 0.00334420473, 0.003452367593, 0.003555839981, 0.003597330441, 0.003228763006, 0.002824046695, 0.002719042358, 0.002595143005, 0.00264760704, 0.002929607457, 0.003064194774, 0.003378001969, 0.003206598288, 0.002600477361, 0.002858297419, 0.002724947082, 0.002440528653, 0.002583794193, 0.002526042736, 0.002966731622, 0.003089654503, 0.003539376119, 0.002988376321, 0.002327715382, 0.0023059398, 0.0020451527, 0.001968497738, 0.002535640801, 0.002346819807, 0.002105827515, 0.00248426969, 0.002719471677, 0.002091166113, 0.00204061465, 0.001945355621, 0.00177718764, 0.001833740965, 0.001833126743, 0.001802919713],
@@ -1976,67 +2237,14 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		var maxVolatility = 0.10;
 		
 		// Compute the RSO-MVO weights
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subspaceOptimizationAlgorithm: 'meanVariance', nbRandomSubsets: 16384*1, constraints: {maxVolatility: maxVolatility}});
-	}
-	*/
-	
-
-	// Test using static data
-	// Test the algorithm when all returns are negative; the associated portfolio must be null.
-	{
-		// Problem data
-		var covMat = [[0.002533106361, 0.002161135405, 0.002605003686],
-                     [0.002161135405, 0.002252008852, 0.002439575054],
-                     [0.002605003686, 0.002439575054, 0.003315580611]];
-		var returns = [-0.0000244756209, -0.003612424187, -0.004045817996];
-		
-		// Compute the desired maximum volatility
-		var maxVolatility = 0.10/Math.sqrt(12);
-		
-		// Test that the algorithm is behaving properly
-		var expectedWeights = [0, 0, 0];
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
-		assert.deepEqual(weights, expectedWeights, 'Random subspace mean variance portfolio - Test negative returns');
-	}
-	
-	// Test using static data
-	// Test using the deterministic subset generation that the mean variance subsets optimization is the default subsets optimization method
-	{
-		// Problem data
-		var covMat =[[0.0146, 0.0187, 0.0145],
-					[0.0187, 0.0854, 0.0104],
-					[0.0145, 0.0104, 0.0289]];
-		var returns = [0.062, 0.146, 0.128];
-		
-		// Compute the desired maximum volatility
-		var maxVolatility = Math.sqrt(covMat[0][0]);
-		
-		// Test the deterministic subset generation with the mean-variance/maximum volatility constraint subsets optimization method
-		var expectedWeights = [0.6620689655172421, 0.059375396144818106, 0.19810532833311822];
-		var defaultWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
-		var averageWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsOptimizationAlgorithm: 'maximumTargetVolatility', constraints: {maxVolatility: maxVolatility}});
-		assert.deepEqual(defaultWeights, expectedWeights, 'Random subspace mean variance portfolio - Default subsets optimization method #1');
-		assert.deepEqual(averageWeights, expectedWeights, 'Random subspace mean variance portfolio - Default subsets optimization method #2');
-	}
-	
-	// Test using static data
-	// Test using the deterministic subset generation that the mean-variance/maximum volatility constraint method is different from the  mean-variance/minimum variance subsets optimization method
-	{
-		// Problem data
-		var covMat =[[0.0146, 0.0187, 0.0145],
-					[0.0187, 0.0854, 0.0104],
-					[0.0145, 0.0104, 0.0289]];
-		var returns = [0.062, 0.146, 0.128];
-		
-		// Compute the desired maximum volatility
-		var maxVolatility = Math.sqrt(covMat[0][0]);
-		// Test the deterministic subset generation with the mean variance and minimum variance subsets optimization method
-		var expectedWeightsMeanVariance = [0.6620689655172421, 0.059375396144818106, 0.19810532833311822];
-		var expectedWeightsMinimumVariance = [0.6643678160919539, 0.0659536541889483, 0.26967852971909767];
-		var meanVarianceWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', constraints: {maxVolatility: maxVolatility}});
-		var minimumVarianceWeights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsGenerationMethod: 'deterministic', subsetsOptimizationMethod: 'minimumVariance'});
-		assert.deepEqual(meanVarianceWeights, expectedWeightsMeanVariance, 'Random subspace mean variance portfolio - Maximum volatility subsets optimization method');
-		assert.deepEqual(minimumVarianceWeights, expectedWeightsMinimumVariance, 'Random subspace mean variance portfolio - Minimum variance subsets optimization method');
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { nbRandomSubsets: 16384*1, 
+		                                                                                                   subsetPortfolioOptimizationMethodParams: { 
+																										       optimizationMethod: 'maximumTargetVolatility', 
+																											   constraints: {
+																												   maxVolatility: maxVolatility 
+																											    }
+																										     }
+																										  });
 	}
 });	
 

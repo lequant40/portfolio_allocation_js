@@ -224,7 +224,12 @@ QUnit.test('Random subspace mean variance portfolio - internal target max volati
 		var targetMaxVolatility = generateRandomValue(minVolatility, maxVolatility);
 		
 		// Compute the associated portfolio weights
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: {maxVolatility: targetMaxVolatility}});
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetPortfolioOptimizationMethodParams: { 
+		                                                                                                      optimizationMethod: 'maximumTargetVolatility', 
+																											  constraints: {
+																												  maxVolatility: targetMaxVolatility 
+																											  }
+		                                                                                                    }} );
 		
 		// Compare the computed portfolio volatility with the target volatility
 		var portfolioVolatility = Math.sqrt(PortfolioAllocation.Matrix.vectorDotProduct(PortfolioAllocation.Matrix.xy(new PortfolioAllocation.Matrix(covMat), new PortfolioAllocation.Matrix(weights)), 

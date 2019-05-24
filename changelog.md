@@ -9,9 +9,9 @@
 - Added a FISTA-like optimization method for composite convex problems
 - Added the computation of geometric center and geometric median of m points in R^n
 - Added the computation of all the k-subsets of a n-set
-- Added the computation of the random subspace mean variance optimization portfolio, with two subspaces optimization methods:
--- Standard mean-variance optimization with a given maximum volatility constraint 
--- Minimum variance optimization 
+- Added a maximum volatility target constraint for the mean-variance optimization algorithm
+- Added an helper method to compute portfolios: the random subspace method
+- Applied the random subspace method to the mean variance optimization portfolio
 - Replaced the randomKSubsetIterator_ internal method RANKSB from A. Nijenhuis and ‎H.S. Wilf by the method D from J.S. Vitter, which is provably faster and uniform
 - Added a method to approximately compute the inverse of the standard normal cumulative distribution function
 - Added a method to generate uniformly distributed vectors on the R^n unit hypersphere

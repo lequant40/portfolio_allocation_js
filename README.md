@@ -2,11 +2,11 @@
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
-PortfolioAllocation is a JavaScript library designed to help solving the mathematical problem of financial portfolio allocation.
+PortfolioAllocation is a JavaScript library designed to help solving the mathematical problem of portfolio optimization.
 
-In layman's terms, imagine you are faced with the problem of deciding how to invest some of your available funds into different financial instruments: stocks, bonds, mutual funds, exchange traded funds (ETFs), cryptocurrencies...
+In layman's terms, imagine you are faced with the problem of deciding how to invest your available funds into different financial instruments: stocks, bonds, mutual funds, exchange traded funds, cryptocurrencies...
 
-You can then use the PortfolioAllocation library to compute which proportion of which instrument you need to hold so that your total holdings (your portfolio) is optimal (the best possible among all the possible portfolios you could hold).
+A library such as PortfolioAllocation then allows you to determine which proportion of which instrument you need to hold so that your available funds are allocated the best possible way.
 
 Please do not hesitate to report any bug / request additional features !
 
@@ -23,7 +23,7 @@ Please do not hesitate to report any bug / request additional features !
 
 ## Included algorithms
 
-### Portfolio allocation algorithms
+### Portfolio optimization algorithms
 
 - Equal weights (EW)  
   Analyzed by Victor DeMiguel and al. in their research paper [Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?](https://doi.org/10.1093/rfs/hhm075).
