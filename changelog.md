@@ -1,13 +1,16 @@
-### 0.0.7 - XX/YY/2019
-- Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities.
-- Added the meanVarianceCornerPortfolios to compute the corner portfolios with their returns and volatilities.
-- Added the computation of the maximum Sharpe ratio portfolio, through the efficient frontier computation.
+### 0.0.8 - XX/YY/20ZZ
+- On it...
+
+### 0.0.7 - 25/05/2019
+- Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities
+- Added the meanVarianceCornerPortfolios method to compute the corner portfolios with their returns and volatilities
+- Added the computation of the maximum Sharpe ratio portfolio, through the efficient frontier computation
 - Added a max function
 - Added toTypedArray method for bit sets, and updated the critical line algorithm to use typed arrays for variables indexes
 - Reorganized the bit set structure files
 - Misc. tests improvements
 - Added a FISTA-like optimization method for composite convex problems
-- Added the computation of geometric center and geometric median of m points in R^n
+- Added the computation of geometric center and geometric median of m points in R^n, using the FISTA method
 - Added the computation of all the k-subsets of a n-set
 - Added a maximum volatility target constraint for the mean-variance optimization algorithm
 - Added an helper method to compute portfolios: the random subspace method
@@ -24,6 +27,7 @@ in preparation for random optimization algorithms
 - Fix for issue https://github.com/lequant40/portfolio_allocation_js/issues/4 (updated README, to be consistent between version displayed/published on third-party site) 
 - Reworked the generic numerical optimization portfolio algorithm, now called numericalOptimizationWeights, and added bound contraints
 - Renamed the MCA and MVA algorithms to minimumCorrelationWeights and proportionalMinimumVarianceWeights to be consistent with the other algorithms
+- Updated the grunt dependencies versions
 
 ### 0.0.6 - 10/06/2018
 - Updated the Maximin portfolio method output signature to allow outputting only the portfolio weights

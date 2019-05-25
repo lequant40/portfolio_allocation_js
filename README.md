@@ -1,14 +1,14 @@
-# PortfolioAllocation v0.0.6 ([Changelog](changelog.md))
+# PortfolioAllocation v0.0.7 ([Changelog](changelog.md))
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
-PortfolioAllocation is a JavaScript library designed to help solving the mathematical problem of portfolio optimization.
+PortfolioAllocation is a JavaScript library designed to help solving the mathematical problem of portfolio allocation and optimization.
 
 In layman's terms, imagine you are faced with the problem of deciding how to invest your available funds into different financial instruments: stocks, bonds, mutual funds, exchange traded funds, cryptocurrencies...
 
-A library such as PortfolioAllocation then allows you to determine which proportion of which instrument you need to hold so that your available funds are allocated the best possible way.
+A library such as PortfolioAllocation allows you to easily determine which proportion of which instrument you need to hold so that your available funds are allocated the best possible way.
 
-Please do not hesitate to report any bug / request additional features !
+Do not hesitate to report any bug / request additional features !
 
 
 ## Features
@@ -17,13 +17,13 @@ Please do not hesitate to report any bug / request additional features !
 - Compatible with any browser supporting ECMAScript 5 for front-end development
 - Compatible with [Node.js](https://nodejs.org/) for back-end development
 - Code continuously tested and integrated by [Travis CI](https://travis-ci.org/)
-- Code heavily documented for internal developers using [JSDoc](http://usejsdoc.org/)
-- Code heavily documented for users using [GitHub Pages](https://lequant40.github.io/portfolio_allocation_js/)
+- Code documented for internal developers using [JSDoc](http://usejsdoc.org/)
+- Code documented for users using [GitHub Pages](https://lequant40.github.io/portfolio_allocation_js/)
 
 
 ## Included algorithms
 
-### Portfolio optimization algorithms
+### Portfolio allocation and optimization algorithms
 
 - Equal weights (EW)  
   Analyzed by Victor DeMiguel and al. in their research paper [Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?](https://doi.org/10.1093/rfs/hhm075).
@@ -59,18 +59,27 @@ Please do not hesitate to report any bug / request additional features !
   Introduced by Martin Young in the research paper [A Minimax Portfolio Selection Rule with Linear Programming Solution](http://www.jstor.org/stable/2634472), the minimax portfolio uses the minimum return as a measure of risk instead of the variance as in the Markowitz framework.
 
 - Random portfolio  
-  A random portfolio, while not directly usable to allocate assets in real-life, can be used to benchmark the performances of portfolio allocation strategies, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
+  Random portfolios are generally used to benchmark the performances of portfolio allocation and optimization algorithms, as pioneered by Ronald J. Surz in the article [Portfolio Opportunity Distributions](https://doi.org/10.3905/joi.3.2.36) and latter complemented by Patrick Burns in the article [Random Portfolios for Performance Measurement](https://doi.org/10.1007/3-540-36626-1_11).
 
-- Numerical optimization portfolio  
-  When no specific numerical algorithm exist to solve a particular portfolio allocation problem, generic numerical optimization algorithms must be used instead (e.g., grid search on the simplex).
+- Maximum Sharpe ratio (MSR), a.k.a. (Lintner) tangency portfolio  
+  Introduced by John Lintner in the research paper [The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets](https://www.jstor.org/stable/1924119), the MSR portfolio possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
+
+- Random subspace mean-variance optimization portfolio (RSO-MVO)  
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), the RSO-MVO portfolio combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
 
 
 ### Misc. helper algorithms
 - Portfolio weights rounding  
-  The rounding algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al. allows to compute real-life portfolio weights from the theoretical portfolio weights obtained from any portfolio allocation algorithm.
+  The portfolio weights obtained through a portfolio optimization algorithm are usually provided with several digits after the decimal point. For any practical usage, these theoretical weights need to be rounded off, which can be done thanks to the algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al..
 
-- Mean-variance efficient frontier and corner portfolios computation, through the Markowitz critical line algorithm  
-  The set of all mean-variance efficient portfolios (the mean-variance efficient frontier), as well its generating discrete set (the set of corner portfolios) can be efficiently computed by a specialized algorithm developped by Harry M. Markowitz.
+- Mean-variance efficient frontier and corner portfolios computation  
+  The set of all mean-variance efficient portfolios (the mean-variance efficient frontier), as well its generating discrete set (the set of corner portfolios) can be efficiently computed thanks to a specialized algorithm developped by Harry M. Markowitz: [the critical line method](https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm).
+
+- Generic random subspace optimization method  
+  As a direct extension of the RSO-MVO method, a generic random subspace optimization method has been implemented and is usable with any portfolio optimization method.
+
+- Generic numerical optimization algorithms  
+  When no specialized numerical algorithm exist to solve a particular portfolio optimization problem, a slow-but-always-working solution is to use generic numerical optimization algorithms instead (e.g., grid search on the simplex).
 
 
 ## Usage
