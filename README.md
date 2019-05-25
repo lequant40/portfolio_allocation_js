@@ -65,7 +65,7 @@ Do not hesitate to report any bug / request additional features !
   Introduced by John Lintner in the research paper [The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets](https://www.jstor.org/stable/1924119), the MSR portfolio possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
 
 - Random subspace mean-variance optimization portfolio (RSO-MVO)  
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by [Benjamin J. Gillen](http://www.its.caltech.edu/~bgillen/index.htm) in the research paper [Subset Optimization for Asset Allocation](http://www.its.caltech.edu/~bgillen/papers/Subsets.pdf), the RSO-MVO portfolio combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by Benjamin J. Gillen in the research paper [Subset Optimization for Asset Allocation](https://authors.library.caltech.edu/79336/), the RSO-MVO portfolio combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
 
 
 ### Misc. helper algorithms
