@@ -36,6 +36,6 @@
     "test": "grunt test"
   },
   "dependencies": {
-    "request": "^2.81.0"
+    
   }
 }
