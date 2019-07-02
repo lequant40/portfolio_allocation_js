@@ -73,6 +73,8 @@ QUnit.test('Bit set data structure', function(assert) {
 	  bs.clear();
 	  assert.equal(bs.isEmpty(), true, 'Bit set, static tests - bit set cleared');
 	  
+	  
+	  // TODO: TEST INIT FROM ARRAY
   }  
   
   //TODO: use random data

@@ -458,7 +458,7 @@ QUnit.test('Simplex random point computation', function(assert) {
 			var sampledPointDimension = sampledPoint.length;
 			assert.equal(sampledPointDimension, dimension, "Restricted simplex random sampler point computation, coordinates length - Test " + i + "," + j);
 		 
-			 // Check that the coordinates of the sampled point belong to the unit interval
+			 // Check that the coordinates of the sampled point belong to the constrained unit interval
 			 var sampledPointBelongToBoundedInterval = true;
 			 for (var k = 0; k < sampledPoint.length; ++k) {
 				if (sampledPoint[k] > upperBounds[k] || sampledPoint[k] < lowerBounds[k]) {
@@ -481,6 +481,215 @@ QUnit.test('Simplex random point computation', function(assert) {
 });
 
 
+
+QUnit.test('Simplex emptiness check computation', function(assert) {    
+  // Test with static data the failure cases:
+  // - A lower bound lower than 0
+  // - An upper bound greater than 1
+  // - A lower bound strictly greater than an upper bound
+  // - An empty simplex
+  {
+	 // Test a lower bound lower than 0
+	assert.throws(function() { 
+		PortfolioAllocation.simplexEmptinessCheck_(4, [0, 0, 0, -0.1]) },
+		new Error('incorrect problem detected: lower bound strictly lower than 0'),
+		"Simplex emptiness check  computation, incorrect lower bound");
+
+	// Test an upper bound  greater than 1
+	assert.throws(function() { 
+		PortfolioAllocation.simplexEmptinessCheck_(4, null, [1, 1, 1, 1.1]) },
+		new Error('incorrect problem detected: upper bound strictly greater than 1'),
+		"Simplex emptiness check computation, incorrect upper bound");
+
+	// Test a lower bound strictly greater than an upper bound
+	assert.throws(function() { 
+		PortfolioAllocation.simplexEmptinessCheck_(4, [0, 0, 0, 0.5], [1, 1, 1, 0.4]) },
+		new Error('infeasible problem detected: lower bound strictly greater than upper bound'),
+		"Simplex emptiness check computation, infeasible bounds");
+	
+	// Test an empty simplex due to lower bounds
+	assert.throws(function() { 
+		PortfolioAllocation.simplexEmptinessCheck_(4, [0.5, 0.3, 0.2, 0.1]) },
+		new Error('infeasible problem detected: the restricted simplex is empty'),
+		"Simplex emptiness check computation, empty simplex due to lower bounds");
+		
+	// Test an empty simplex due to upper bounds
+	assert.throws(function() { 
+		PortfolioAllocation.simplexEmptinessCheck_(4, null, [0.5, 0.2, 0.1, 0.1]) },
+		new Error('infeasible problem detected: the restricted simplex is empty'),
+		"Simplex emptiness check computation, empty simplex due to upper bounds");
+  }
+  
+  // Test with random data the success case when either lower or
+  // upper bounds are not provided.
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var minDimension = 2;
+	  var maxDimension = 100;
+
+	  // Aim of these tests is to check that:
+      // - When lower bounds are not provided, they are correctly replaced with 0s
+	  // - When lower bounds are not provided, they are correctly replaced with 1s
+	  for (var i = 0; i < nbTests; ++i) {
+		  // Generate a random dimension
+		  var dim = Math.floor(Math.random()*(maxDimension - minDimension + 1) + minDimension);
+		   
+		  // Generate random permissive lower bounds
+		  var lowerBounds = new Array(dim);
+		  var expectedSumLowerBounds = 0;
+		  for (var k = 0; k < dim; ++k) {
+			  lowerBounds[k] = Math.random()*(1/dim - 1/maxDimension - 0) + 0; // lowerBounds[k] belongs to [0, 1/dim - 1/maxDimension [
+			  expectedSumLowerBounds += lowerBounds[k];
+		  }
+
+  		  // Generate random permissive upper bounds
+		  var upperBounds = new Array(dim);
+		  var expectedSumUpperBounds = 0;
+		  for (var k = 0; k < dim; ++k) {
+			  upperBounds[k] = Math.random()*(1 - (1/dim + 1/maxDimension)) + (1/dim + 1/maxDimension); // lowerBounds[k] belongs to [1/dim + 1/maxDimension, 1 [
+			  expectedSumUpperBounds += upperBounds[k];
+		  }
+
+          // Ensure that the unit simplex is not empty
+		  var sumBounds = PortfolioAllocation.simplexEmptinessCheck_(dim);
+		  var sumLowerBounds = sumBounds[0];
+		  var sumUpperBounds = sumBounds[1];
+		  assert.equal(sumLowerBounds, 0, "Simplex emptiness check computation, unit simplex - Sum of lower bounds");
+		  assert.equal(sumUpperBounds, dim, "Simplex emptiness check computation, unit simplex - Sum of upper bounds");
+		  
+		  // Ensure that the unit simplex with permissive lower bounds is not empty
+		  var sumBounds = PortfolioAllocation.simplexEmptinessCheck_(dim, lowerBounds);
+		  var sumLowerBounds = sumBounds[0];
+		  var sumUpperBounds = sumBounds[1];
+		  assert.equal(Math.abs(sumLowerBounds - expectedSumLowerBounds) <= 1e-12, true, "Simplex emptiness check computation, unit simplex with permissive lower bounds - Sum of lower bounds");
+		  assert.equal(sumUpperBounds, dim, "Simplex emptiness check computation, unit simplex with permissive lower bounds - Sum of lower bounds");
+
+		  // Ensure that the unit simplex with permissive upper bounds is not empty
+		  var sumBounds = PortfolioAllocation.simplexEmptinessCheck_(dim, null, upperBounds);
+		  var sumLowerBounds = sumBounds[0];
+		  var sumUpperBounds = sumBounds[1];
+		  assert.equal(sumLowerBounds, 0, "Simplex emptiness check computation, unit simplex with permissive upper bounds - Sum of lower bounds");
+		  assert.equal(Math.abs(sumUpperBounds - expectedSumUpperBounds) <= 1e-12, true, "Simplex emptiness check computation, unit simplex with permissive upper bounds - Sum of upper bounds");
+	  }
+  }
+  
+  // Test with random data success and failure cases
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var minDimension = 2;
+	  var maxDimension = 100;
+	  
+	  // Aim of these tests is to check success and failure cases with lower, upper and 
+	  // lower and upper bounds.
+	  for (var i = 0; i < nbTests; ++i) {
+		  // Generate a random dimension
+		  var dim = Math.floor(Math.random()*(maxDimension - minDimension + 1) + minDimension);
+
+		  
+		  // Generate random feasible lower bounds with sum l_i = k with k < 1,
+		  // and random unfeasible lower bounds with sum l_i = k' with k' > 1.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, dim).next();
+		  
+		  var feasibleLowerBounds = new Array(dim);
+		  var feasibleLowerBoundsFactor = Math.random()*(0.9 - 0.1) + 0.1;
+		  var expectedSumFeasibleLowerBounds = 0;
+		  for (var j = 0; j < dim; ++j) {
+			  feasibleLowerBounds[j] = integerBounds[j] * feasibleLowerBoundsFactor/100;
+			  expectedSumFeasibleLowerBounds += feasibleLowerBounds[j];
+		  }
+		  
+		  var unfeasibleLowerBounds = new Array(dim);
+		  var unfeasibleLowerBoundsFactor = Math.random()*(1.9 - 1.1) + 1.1;
+		  for (var j = 0; j < dim; ++j) {
+			  unfeasibleLowerBounds[j] = Math.min(1, integerBounds[j] * unfeasibleLowerBoundsFactor/100);
+		  }
+		  
+		  // Test success cases with lower bounds
+		  var sumBounds = PortfolioAllocation.simplexEmptinessCheck_(dim, feasibleLowerBounds);
+		  var sumLowerBounds = sumBounds[0];
+		  var sumUpperBounds = sumBounds[1];
+		  assert.equal(Math.abs(sumLowerBounds - expectedSumFeasibleLowerBounds) <= 1e-12, true, "Simplex emptiness check computation, restricted unit simplex with lower bounds - Sum of lower bounds " + i);
+		  assert.equal(sumUpperBounds, dim, "Simplex emptiness check computation, restricted unit simplex with lower bounds - Sum of upper bounds " + i);
+		  
+		  // Test failure cases with lower bounds
+		  assert.throws(function() { 
+			PortfolioAllocation.simplexEmptinessCheck_(dim, unfeasibleLowerBounds) },
+			new Error('infeasible problem detected: the restricted simplex is empty'),
+			"Simplex emptiness check computation, restricted unit simplex with lower bounds - Infeasible lower bounds " + i);
+		
+
+		  // Generate random feasible upper bounds with sum u_i = k with k > 1,
+		  // and random unfeasible upper bounds with sum u_i = k' with k' < 1.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, dim).next();
+		  
+		  var feasibleUpperBounds = new Array(dim);
+		  var feasibleUpperBoundsFactor = Math.random()*(1.9 - 1.1) + 1.1;
+		  var expectedSumFeasibleUpperBounds = 0;
+		  for (var j = 0; j < dim; ++j) {
+			  feasibleUpperBounds[j] = Math.min(1, integerBounds[j] * feasibleUpperBoundsFactor/100);
+			  expectedSumFeasibleUpperBounds += feasibleUpperBounds[j];
+		  }
+		  
+		  var unfeasibleUpperBounds = new Array(dim);
+		  var unfeasibleUpperBoundsFactor = Math.random()*(0.9 - 0.1) + 0.1;
+		  for (var j = 0; j < dim; ++j) {
+			  unfeasibleUpperBounds[j] = integerBounds[j] * unfeasibleUpperBoundsFactor/100;
+		  }
+		  
+		  // Test success cases with upper bounds
+		  var sumBounds = PortfolioAllocation.simplexEmptinessCheck_(dim, null, feasibleUpperBounds);
+		  var sumLowerBounds = sumBounds[0];
+		  var sumUpperBounds = sumBounds[1];
+		  assert.equal(sumLowerBounds, 0, "Simplex emptiness check computation, restricted unit simplex with upper bounds - Sum of lower bounds " + i);
+		  assert.equal(Math.abs(sumUpperBounds - expectedSumFeasibleUpperBounds) <= 1e-12, true, "Simplex emptiness check computation, restricted unit simplex with upper bounds - Sum of upper bounds " + i);
+		  
+		  // Test failure cases with lower bounds
+		  assert.throws(function() { 
+			PortfolioAllocation.simplexEmptinessCheck_(dim, null, unfeasibleUpperBounds) },
+			new Error('infeasible problem detected: the restricted simplex is empty'),
+			"Simplex emptiness check computation, restricted unit simplex with upper bounds - Infeasible lower bounds " + i);
+		
+		
+		  // Generate random feasible upper bounds with sum u_i = k with k > 1,
+		  // and random unfeasible upper bounds with sum u_i = k' with k' < 1.
+		  //
+		  // In both cases, ensure u_i >= l_i.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, dim).next();
+		  
+		  var feasibleUpperBounds = new Array(dim);
+		  var feasibleUpperBoundsFactor = Math.random()*(1.9 - 1.1) + 1.1;
+		  var expectedSumFeasibleUpperBounds = 0;
+		  for (var j = 0; j < dim; ++j) {
+			  feasibleUpperBounds[j] = Math.max(feasibleLowerBounds[j], Math.min(1, integerBounds[j] * feasibleUpperBoundsFactor/100));
+			  expectedSumFeasibleUpperBounds += feasibleUpperBounds[j];
+		  }
+		  
+		  var unfeasibleUpperBounds = new Array(dim);
+		  var unfeasibleUpperBoundsFactor = Math.random()*(0.9 - 0.1) + 0.1;
+		  for (var j = 0; j < dim; ++j) {
+			  unfeasibleUpperBounds[j] = Math.max(feasibleLowerBounds[j], integerBounds[j] * unfeasibleUpperBoundsFactor/100);
+		  }
+		  
+		  // Test success cases with lower and upper bounds
+		  var sumBounds = PortfolioAllocation.simplexEmptinessCheck_(dim, feasibleLowerBounds, feasibleUpperBounds);
+		  var sumLowerBounds = sumBounds[0];
+		  var sumUpperBounds = sumBounds[1];
+		  assert.equal(Math.abs(sumLowerBounds - expectedSumFeasibleLowerBounds) <= 1e-12, true, "Simplex emptiness check computation, restricted unit simplex with both bounds - Sum of lower bounds " + i);
+		  assert.equal(Math.abs(sumUpperBounds - expectedSumFeasibleUpperBounds) <= 1e-12, true, "Simplex emptiness check computation, restricted unit simplex with both bounds - Sum of upper bounds " + i);
+		  
+		  // Test failure cases with lower bounds
+		  assert.throws(function() { 
+			PortfolioAllocation.simplexEmptinessCheck_(dim, unfeasibleUpperBounds, unfeasibleUpperBounds) },
+			new Error('infeasible problem detected: the restricted simplex is empty'),
+			"Simplex emptiness check computation, restricted unit simplex with both bounds - Infeasible both bounds " + i);
+	  }
+  }
+});
+
+
+
 QUnit.test('Simplex random direction computation', function(assert) {    
   // Test with random data
   {
@@ -488,7 +697,7 @@ QUnit.test('Simplex random direction computation', function(assert) {
 	  var nbTests = 10;
 	  var nbSubTests = 20;
 	  var minDimension = 3;
-	  var maxDimension = 3;
+	  var maxDimension = 10;
 
 	  // Aim of these tests is to check that for a sample of size n:
 	  // - An array of coordinates of size n is returned
@@ -522,6 +731,8 @@ QUnit.test('Simplex random direction computation', function(assert) {
   }
 
 });
+
+
 
 
 QUnit.test('Simplex grid search computation', function(assert) {    

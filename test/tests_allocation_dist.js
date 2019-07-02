@@ -933,7 +933,7 @@ QUnit.test('Random weights portfolio', function(assert) {
 			var minAssets = Math.floor(Math.random()*(maxAssets - 1 + 1) + 1);
 			
 			// Generate a random portfolio for this number of assets and these cardinality constraints
-			var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minAssets: minAssets, maxAssets: maxAssets } });
+			var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minNbAssets: minAssets, maxNbAssets: maxAssets } });
 			
 			// Check that the number of non-zero weights is between minAssets and maxAssets
 			var nbNonZeroAssets = 0;
@@ -945,6 +945,127 @@ QUnit.test('Random weights portfolio', function(assert) {
 			assert.equal(maxAssets >= nbNonZeroAssets, true, "Random weights portfolio with cardinality constraints, number of non-zero weights - Test " + i + "/1");
 			assert.equal(minAssets <= nbNonZeroAssets, true, "Random weights portfolio with cardinality constraints, number of non-zero weights - Test " + i + "/2");
 		}
+	}
+
+	// Test with random data, exposure constraints
+	{
+		// Setup static parameters of the random test
+		var nbTests = 10;
+		var nbAssetsMin = 1;
+		var nbAssetsMax = 50;
+
+		// Aim of these tests is to check that for a portfolio of n assets with a constrained exposure,
+		// the exposure is properly constrainted.
+		for (var i = 0; i < nbTests; ++i) {
+			// Generate a random number of assets
+			var nbAssets = Math.floor(Math.random()*(nbAssetsMax - nbAssetsMin + 1) + nbAssetsMin);
+			
+			// Generate a random exposure constraint
+			var maxExposure = Math.random();
+			var minExposure = Math.min(Math.random(), maxExposure);
+
+			// Generate a random portfolio for this number of assets/exposure
+			var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minExposure: minExposure, maxExposure: maxExposure } });
+
+			// Check that the sum of the weights is belongs to the exposure interval, near to machine precision
+			var weightsSum = 0;
+			for (var k = 0; k < randomWeights.length; ++k) {
+				weightsSum += randomWeights[k];
+			}
+			assert.equal(weightsSum <= maxExposure + 1e-14, true, "Random weights portfolio with exposure constraints, weights lower than max exposure - Test " + i);
+			assert.equal(weightsSum >= minExposure - 1e-14, true, "Random weights portfolio with exposure constraints, weights greater than min exposure - Test " + i);
+		}
+	}
+	
+	// Test the error case when lower bounds are not consistent with the desired maximum number of assets
+	{
+		assert.throws(function() { 
+			PortfolioAllocation.randomWeights(4, { constraints: { maxNbAssets: 3, minWeights: [0.05, 0.05, 0.2, 0.3, 0.4] } }) },
+			new Error('maximum number of assets not consistent with lower bounds contraints'),
+			"Random weights portfolio - Inconsistent lower bounds and maximum number of assets");
+	}
+		
+	// Test with random data, min and max weights contraints
+	{
+	  // Setup static parameters of the random test
+	  var nbTests = 50;
+	  var nbAssetsMin = 1;
+	  var nbAssetsMax = 50;
+	  
+	  // Aim of these tests is to check that the generated weights are compatible with lower, upper and 
+	  // lower and upper bounds.
+	  for (var i = 0; i < nbTests; ++i) {
+		  // Generate a random number of assets
+		  var nbAssets = Math.floor(Math.random()*(nbAssetsMax - nbAssetsMin + 1) + nbAssetsMin);
+
+		  
+		  // Generate random feasible lower bounds with sum l_i = k with k < 1.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, nbAssets).next();
+		  var feasibleLowerBounds = new Array(nbAssets);
+		  var feasibleLowerBoundsFactor = Math.random()*(0.9 - 0.1) + 0.1;
+		  for (var j = 0; j < nbAssets; ++j) {
+			  feasibleLowerBounds[j] = integerBounds[j] * feasibleLowerBoundsFactor/100;
+		  }
+		   
+		  // Generate a random portfolio with lower bounds constraints
+		  var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minWeights: feasibleLowerBounds } });
+		  
+			// Check that the weights belong to the interval [l_i, 1]
+			var weightsBelongInterval = true;
+			for (var k = 0; k < randomWeights.length; ++k) {
+				if (randomWeights[k] > 1 || randomWeights[k] < feasibleLowerBounds[k]) {
+					weightsBelongInterval = false;
+					break;
+				}
+			}
+			assert.equal(weightsBelongInterval, true, "Random weights portfolio with lower bounds constraints - Test " + i);
+
+
+		  // Generate random feasible upper bounds with sum u_i = k with k > 1.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, nbAssets).next();
+		  var feasibleUpperBounds = new Array(nbAssets);
+		  var feasibleUpperBoundsFactor = Math.random()*(1.9 - 1.1) + 1.1;
+		  for (var j = 0; j < nbAssets; ++j) {
+			  feasibleUpperBounds[j] = Math.min(1, integerBounds[j] * feasibleUpperBoundsFactor/100);
+		  }
+
+		  // Generate a random portfolio with upper bounds constraints
+		  var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { maxWeights: feasibleUpperBounds } });
+
+			// Check that the weights belong to the interval [0, u_i]
+			var weightsBelongInterval = true;
+			for (var k = 0; k < randomWeights.length; ++k) {
+				if (randomWeights[k] > feasibleUpperBounds[k] || randomWeights[k] < 0) {
+					weightsBelongInterval = false;
+					break;
+				}
+			}
+			assert.equal(weightsBelongInterval, true, "Random weights portfolio with upper bounds constraints - Test " + i);
+
+			
+		  // Generate random feasible upper bounds with sum u_i = k with k > 1.
+		  //
+		  // Ensure u_i >= l_i.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, nbAssets).next();
+		  var feasibleUpperBounds = new Array(nbAssets);
+		  var feasibleUpperBoundsFactor = Math.random()*(1.9 - 1.1) + 1.1;
+		  for (var j = 0; j < nbAssets; ++j) {
+			  feasibleUpperBounds[j] = Math.max(feasibleLowerBounds[j], Math.min(1, integerBounds[j] * feasibleUpperBoundsFactor/100));
+	      }
+		  		  
+		  // Generate a random portfolio with lower and upper bounds constraints
+		  var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minWeights: feasibleLowerBounds, maxWeights: feasibleUpperBounds } });
+		  
+			// Check that the weights belong to the interval [l_i, u_i]
+			var weightsBelongInterval = true;
+			for (var k = 0; k < randomWeights.length; ++k) {
+				if (randomWeights[k] > feasibleUpperBounds[k] || randomWeights[k] < feasibleLowerBounds[k]) {
+					weightsBelongInterval = false;
+					break;
+				}
+			}
+			assert.equal(weightsBelongInterval, true, "Random weights portfolio with lower and upper bounds constraints - Test " + i);
+	  }
 	}
 });
 
@@ -1862,10 +1983,39 @@ QUnit.test('Random subspace optimization method - error and limit cases', functi
 });	
 
 QUnit.test('Random subspace optimization method', function(assert) {    
+	// Tests the properties of the number of subsets to generate in case of random subsets generation with 2 assets, using random data 
+	{
+		// Limit case to test
+		var nbAssets = 2;
+		
+		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
+		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
+			// Count the number of function calls
+			subsetEqualWeightsOptimization.called++;
+			
+			return PortfolioAllocation.equalWeights(subsetAssetsIdx.length);
+		}
+		
+		// Compute the RSO equally weighted portfolio
+		// The default number of subsets in case of random subsets generation method to generate must be equal to 128
+		var expectedFunctionCalls = 1;
+		subsetEqualWeightsOptimization.called = 0;
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization);
+		assert.equal(subsetEqualWeightsOptimization.called, expectedFunctionCalls, 'Random subspace optimization method - Default number of random subsets to generate with 2 assets');
+		
+		// Compute the RSO equally weighted portfolio
+		// The number of subsets to generate in case of random subsets generation method must be equal to the specified one
+		var nbSubsetsToGenerate = Math.floor(Math.random()*(1000-1+1) + 1); // max 1000 min 1
+		var expectedFunctionCalls = 1;
+		subsetEqualWeightsOptimization.called = 0;
+		var weights = PortfolioAllocation.randomSubspaceOptimizationWeights(nbAssets, subsetEqualWeightsOptimization, {nbRandomSubsets: nbSubsetsToGenerate});
+		assert.equal(subsetEqualWeightsOptimization.called, expectedFunctionCalls, 'Random subspace optimization method - Specified number of random subsets to generate with 2 assets');							
+	}
+	
 	// Tests the properties of the number of subsets to generate in case of random subsets generation, using random data 
 	{
 		// Generate a random number of assets
-		var nbAssets = Math.floor(Math.random()*(25-2+1) + 2); // max 25 min 2
+		var nbAssets = Math.floor(Math.random()*(25-3+1) + 3); // max 25 min 3
 			
 		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
 		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {

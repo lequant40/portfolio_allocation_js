@@ -19,7 +19,7 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 			PortfolioAllocation.computeCornerPortfolios_(new PortfolioAllocation.Matrix([0.1, 0.2]), 
 														 new PortfolioAllocation.Matrix([[1,0],[0,1]]), 
 														 { constraints: {minWeights: [0.6, 0.3], maxWeights: [0.2, 1]} }) },
-			new Error('infeasible problem detected'),
+			new Error('infeasible problem detected: lower bound strictly greater than upper bound'),
 			"Mean variance portfolio - Corner portfolios, lower bounds greater than upper bounds");
 			
 		//  Sum lower bounds > 1
@@ -27,7 +27,7 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 			PortfolioAllocation.computeCornerPortfolios_(new PortfolioAllocation.Matrix([0.1, 0.2]), 
 														 new PortfolioAllocation.Matrix([[1,0],[0,1]]), 
 														 { constraints: {minWeights: [0.6, 0.5], maxWeights: [0.7, 0.5]} }) },
-			new Error('infeasible problem detected'),
+			new Error('infeasible problem detected: the restricted simplex is empty'),
 			"Mean variance portfolio - Corner portfolios, sum of lower bounds greater than one");
 		
 		//  Sum upper bounds < 1
@@ -35,7 +35,7 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 			PortfolioAllocation.computeCornerPortfolios_(new PortfolioAllocation.Matrix([0.1, 0.2]), 
 														new PortfolioAllocation.Matrix([[1,0],[0,1]]), 
 														{ constraints: {minWeights: [0.4, 0.4], maxWeights: [0.4, 0.5]} }) },
-			new Error('infeasible problem detected'),
+			new Error('infeasible problem detected: the restricted simplex is empty'),
 			"Mean variance portfolio - Corner portfolios, sum of upper bounds lower than one");
 		
 		// Identical returns

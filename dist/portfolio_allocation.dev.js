@@ -3353,8 +3353,13 @@ self.BitSet_ = BitSet_;
 *
 * @summary Construct a bit set.
 *
-* @description This function constructs an empty bit set (a.k.a. bit array, bit vector),
-* which is a data structure taylored to storing (relatively small) integers.
+* @description This function constructs either a bit set with its bits 
+* initialized to the values contained in the optional input array arr
+* made of natural integers, or an empty bit set if the array arr is
+* not provided.
+* 
+* A bit set (a.k.a. bit array, bit vector) is a data structure taylored 
+* to storing (relatively small) integers.
 *
 * The internal way to handle bit sets has been fully adapted from: 
 * - https://github.com/infusion/BitSet.js
@@ -3362,12 +3367,22 @@ self.BitSet_ = BitSet_;
 *
 * @see <a href="https://en.wikipedia.org/wiki/Bit_array">Bit array</a>
 *
+* @param {Array.<number>} arr, an optional array of natural integers.
 * @return {this} the constructed bit set.
 *
 * @example
 * var myBitSet = new BitSet_();
+*
+* var myBitSet = new BitSet_([1, 3, 4]);
 */
-function BitSet_() {
+function BitSet_(arr) {
+	function fromArray(arr) {
+		// Fill the bitset
+		for (var i = 0; i < arr.length; ++i) {
+			that.set(arr[i]);
+		}
+	}
+	
     // Catches incorrect usage of var b = BitSet_() instead of var b = new BitSet_()
 	if (!(this instanceof BitSet_)) {
       return new BitSet_();
@@ -3384,6 +3399,11 @@ function BitSet_() {
 	
 	// For subsequent usage in initialization sub-functions
 	var that = this;
+	
+	// Specific process in case the input is provided and is an array
+	if (arr instanceof Array || (typeof Uint32Array === 'function' && arr instanceof Uint32Array)) {
+		fromArray(arr);
+	}
 	
 	/**
 	* @function iterator
@@ -4282,7 +4302,7 @@ function kSubsetsIterator_(n, k, useArrayCopy) {
 * @param {number} n the number of elements of the n-set {1,...,n} whose k-subsets are desired, a non-negative integer.
 * @param {number} k a non-negative integer, with 1 <= k <= n.
 * @param {boolean} useArrayCopy an optional boolean that can be set to false to re-use the same output array throughout
-* all the computations(this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
+* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
 * @return {function} a function to be used as an iterator through its .next() method, computing random 
 * k-subsets of the n-set {1,...,n}.
 *
@@ -7455,6 +7475,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 
 
 /* Start Wrapper private methods - Unit tests usage only */
+self.simplexEmptinessCheck_ = simplexEmptinessCheck_;
 self.simplexRationalRounding_ = simplexRationalRounding_;
 self.simplexRandomSampler_ = simplexRandomSampler_;
 self.simplexDirectionRandomSampler_ = simplexDirectionRandomSampler_;
@@ -7464,30 +7485,107 @@ self.simplexEuclidianProjection_ = simplexEuclidianProjection_;
 self.simplexSparseEuclidianProjection_ = simplexSparseEuclidianProjection_;
 /* End Wrapper private methods - Unit tests usage only */
 
+/**
+* @function simplexEmptinessCheck_
+*
+* @summary Checks the emptiness of the restricted unit simplex.
+*
+* @description This function checks the emptiness of the restricted unit simplex
+* of R^n, which is defined as the unit simplex of R^n subject to lower and upper 
+* bounds contraints.
+*
+* In more details, this functions checks that the lower bounds l_i, i = 1..n 
+* and the upper bounds u_i, i = 1..n satisfy:
+* - 0 <= l_i <= u_i <= 1, i = 1..n
+* - sum l_i < 1 < sum u_i, c.f. formula 2.2 of the reference
+*
+* @see <a href="https://doi.org/10.1016/S0167-7152(99)00095-4">Kai-Tai Fang, Zhen-Hai Yang, On uniform design of experiments with restricted
+* mixtures and generation of uniform distribution on some domains, Statistics & Probability Letters, Volume 46, Issue 2, 
+* 15 January 2000, Pages 113-120</a>
+*
+* @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
+* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @throws Throws an error in case the restricted unit simplex is empty.
+* @return {Array.<number>} In case the restricted unit simplex is not empty, returns an array of 2 real numbers:
+* - the sum of the lower bounds, sum l_i
+* - the sum of the upper bounds, sum u_i
+*
+* @example
+* simplexEmptinessCheck_(3, [0.5, 0.1, 0.2]);
+* //[0.8, 3]
+*
+* @example
+* simplexEmptinessCheck_(3, [0.7, 0.3, 0.2]);
+* // new Error("infeasible problem detected: the restricted simplex is empty")
+*/
+function simplexEmptinessCheck_(n, l, u) {
+	// Initializations
+	var sumLowerBounds = 0;
+	var sumUpperBounds = 0;
+	
+	// - Feasibility checks on the restricted simplex:
+	// -- Lower bounds and upper bounds must satisfy 0 <= l_i <= u_i <= 1, i = 1..n
+	// -- Lower bounds and upper bounds must satisfy sum l_i < 1 < sum u_i, c.f. formula 2.2 of the reference
+	for (var i = 0; i < n; ++i) {
+		var lowerBound = 0;
+		if (l) {
+			lowerBound = l[i];
+		}
+
+		var upperBound = 1;
+		if (u) {
+			upperBound = u[i];
+		}
+
+		// Check on lower and upper bounds l_i and u_i
+		if (lowerBound > upperBound) {
+			throw new Error('infeasible problem detected: lower bound strictly greater than upper bound');
+		}
+		if (lowerBound < 0) {
+			throw new Error('incorrect problem detected: lower bound strictly lower than 0');
+		}
+		if (upperBound > 1) {
+			throw new Error('incorrect problem detected: upper bound strictly greater than 1');
+		}
+		
+		// Compute the running sum of lower and upper bounds, for subsequent feasibility check
+		sumLowerBounds += lowerBound;
+		sumUpperBounds += upperBound;		
+	}
+	
+	if (sumLowerBounds > 1 || sumUpperBounds < 1) {
+		throw new Error('infeasible problem detected: the restricted simplex is empty');
+	}
+	
+	// Return the sum of lower bounds and the sum of upper bounds,
+	// for potential usage in the calling function.
+	return [sumLowerBounds, sumUpperBounds];
+}
 
 
 /**
 * @function simplexSparseEuclidianProjection_
 *
-* @summary Returns a closest point on the standard simplex subject to a sparsity constraint.
+* @summary Returns a closest point on the unit simplex subject to a sparsity constraint.
 *
 * @description This function computes a closest point (relative to the euclidian distance) 
-* with at most k non-zero elements on the standard simplex of R^n to a point x = (x_1,...,x_n) in R^n, 
+* with at most k non-zero elements on the unit simplex of R^n to a point x = (x_1,...,x_n) in R^n, 
 * using an O(n) implementation of the algorithm 1 of the reference.
 *
 * In other words, this function computes an at most k-sparse euclidian projection of 
-* a point x in R^n onto the standard simplex of R^n.
+* a point x in R^n onto the unit simplex of R^n.
 *
 * @see <a href="https://arxiv.org/abs/1206.1529">Anastasios Kyrillidis, Stephen Becker, Volkan Cevher and, Christoph Koch, Sparse projections onto the simplex, arXiv:1206.1529 [cs.LG]</a>
 *
 * @param {Array.<number>} x, a point belonging to R^n, array of n real numbers.
 * @param {number} k, a natural integer strictly greater than one corresponding to the maximum desired sparsity
 * (i.e., non-zero elements) of the projected point.
-* @return {Array.<number>} the computed closest point to x with at most k non-zero elements, array of n real numbers.
+* @return {Array.<number>|Float64Array} the computed closest point to x with at most k non-zero elements, array of n real numbers.
 *
 * @example
 * simplexSparseEuclidianProjection_([0.5, 0.1, 0.2], 1);
-* //[[1,0,0]]
+* //[1,0,0]
 */
 function simplexSparseEuclidianProjection_(x, k) {
 	// Initializations
@@ -7523,7 +7621,7 @@ function simplexSparseEuclidianProjection_(x, k) {
 	}
 	
 	
-	// Compute the projection on the standard simplex of the k largest elements of x.
+	// Compute the projection on the unit simplex of the k largest elements of x.
 	var proj_x_k = simplexEuclidianProjection_(x_k);
 	
 	
@@ -7545,13 +7643,13 @@ function simplexSparseEuclidianProjection_(x, k) {
 /**
 * @function simplexEuclidianProjection_
 *
-* @summary Returns the closest point on the standard simplex.
+* @summary Returns the closest point on the unit simplex.
 *
 * @description This function computes the closest point (relative to the euclidian distance)
-* lying on the standard simplex of R^n to the input point x = (x_1,...,x_n) in R^n.
+* lying on the unit simplex of R^n to the input point x = (x_1,...,x_n) in R^n.
 *
 * In other words, this function computes the euclidian projection of the point x in R^n
-* onto the standard simplex of R^n.
+* onto the unit simplex of R^n.
 *
 * Internally, the algorithm used is an O(n) algorithm, c.f. the reference.
 *
@@ -7571,7 +7669,7 @@ function simplexEuclidianProjection_(x) {
 	var zeros = Matrix_.zeros(n, 1);
 	var ones = Matrix_.ones(n, 1);
 	
-	// Convert the problem of the euclidian projection on the standard simplex
+	// Convert the problem of the euclidian projection on the unit simplex
 	// into the associated instance of the continuous quadratic knapsack problem.	
 	var d = ones;
 	var a = new Matrix_(x);
@@ -7637,7 +7735,7 @@ function simplexGridSampler_(n, k, useArrayCopy) {
 	* of the unit simplex of R^n, until exhaustion of all such points.
 	*
 	* @memberof simplexDeterministicRationalSampler_
-	* @return {Array.<number>|null} an array of n real numbers corresponding to the coordinates of the generated point in R^n,
+	* @return {Array.<number>|Float64Array|-1} an array of n real numbers corresponding to the coordinates of the generated point in R^n,
 	* or -1 in case all such points have been generated.
 	*/
 	this.sample = function() {
@@ -7751,48 +7849,26 @@ function simplexRandomSampler_(n, l, u, rnd) {
 	// Misc. computations in case the simplex is being sampled through the theorem 1
 	// of the second reference:
 	//
-	// - Feasibility checks on the restricted simplex:
-	// -- Lower bounds and upper bounds must satisfy 0 <= l_i <= u_i <= 1, i = 1..n
-	// -- Lower bounds and upper bounds must satisfy sum l_i < 1 < sum u_i, c.f. formula 2.2 of the second reference
-	//    (In case sum l_i == 1 or sum u_i == 1, the computations are prematurly stopped, because the restricted
-	//    simplex is then equal to a point)
-	//
-	// - Deletion of possible superflous constraints, as described in formula 2.3 of the second reference
-	//
-	// - Computation of the upper bounds*, as defined after formula 2.3' of the second reference
-	//
-	// - In parallel of the three steps above, computation of lower, upper and upper* bounds sums, 
-	// as well as the upper* bounds running sum
 	if (this.lowerBounds || this.upperBounds) {
-		// Feasibility checks
-		var sumLowerBounds = 0;
-		var sumUpperBounds = 0;
-		for (var i = 0; i < this.n; ++i) {
-			var lowerBound = this.lowerBounds[i];
-			var upperBound = this.upperBounds[i];
-			
-			// Check on lower and upper bounds l_i and u_i
-			if (lowerBound > upperBound) {
-				throw new Error('infeasible problem detected: lower bound strictly greater than upper bound');
-			}
-			if (lowerBound < 0) {
-				throw new Error('incorrect problem detected: lower bound strictly lower than 0');
-			}
-			if (upperBound > 1) {
-				throw new Error('incorrect problem detected: upper bound strictly greater than 1');
-			}
-
-			// Compute the running sum of lower and upper bounds, for subsequent feasibility check
-			sumLowerBounds += lowerBound;
-			sumUpperBounds += upperBound;
-		}
-		this.sumLowerBounds = sumLowerBounds;
-		this.sumUpperBounds = sumUpperBounds;
+		// Emptiness check on the restricted simplex.
+		//
+		// In case the restricted simplex is empty, an exception is thrown, so that
+		// the process is (violently) stopped here.
+		var sumBounds = simplexEmptinessCheck_(n, this.lowerBounds, this.upperBounds);
+		this.sumLowerBounds = sumBounds[0];
+		this.sumUpperBounds = sumBounds[1];
 		
-		if (this.sumLowerBounds > 1 || this.sumUpperBounds < 1) {
-			throw new Error('infeasible problem detected: the restricted simplex is empty');
-		}
-		else if (this.sumLowerBounds == 1 || this.sumUpperBounds == 1) {
+		// In case lower bounds or upper bounds are binding (sum l_i == 1 or sum u_i == 1), 
+		// the computations are prematurly stopped, because the restricted simplex is then equal to a point.
+		//
+		// Otherwise:
+		// - Deletion of possible superflous constraints, as described in formula 2.3 of the second reference
+		//
+		// - Computation of the upper bounds*, as defined after formula 2.3' of the second reference
+		//
+		// - In parallel of the steps above, computation of upper* bounds sums, 
+		// as well as the upper* bounds running sum
+		if (this.sumLowerBounds == 1 || this.sumUpperBounds == 1) {
 			// Nothing to do
 		}
 		else {
@@ -8072,16 +8148,16 @@ function simplexDirectionRandomSampler_(n) {
 *
 * @summary Compute a closest rational point on the unit simplex.
 *
-* @description Given a point x = (x_1,...,x_n) on the standard simplex of R^n, this function computes a proximal point xr = (xr_1,...,xr_n) on 
+* @description Given a point x = (x_1,...,x_n) on the unit simplex of R^n, this function computes a proximal point xr = (xr_1,...,xr_n) on 
 * the r-th rational grid of the unit simplex of R^n, 1/r * I_n(r), with I_n(r) the set of N^n containing the points m = (m_1,...,m_n) 
 * statisfying sum m_i = r with r a strictly positive natural integer, so that the computed proximal point xr is one of the closest points to x 
 * on this grid with respect to any norm in a large class, c.f. the first reference.
 *
-* @see <a href="https://doi.org/10.1007/s10898-013-0126-2">M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the standard simplex: 
+* @see <a href="https://doi.org/10.1007/s10898-013-0126-2">M. Bomze, S. Gollowitzer, and E.A. Yıldırım, Rounding on the unit simplex: 
 * Regular grids for global optimization, J. Global Optim. 59 (2014), pp. 243–258</a>
 * @see <a href="https://arxiv.org/abs/1501.00014">Rama Cont, Massoud Heidari, Optimal rounding under integer constraints</a>
 * 
-* @param {Array.<number>} x a point belonging to the standard simplex of R^n, array of n real numbers.
+* @param {Array.<number>} x a point belonging to the unit simplex of R^n, array of n real numbers.
 * @param {number} r the indice of the rational grid of the unit simplex of R^n, 1/r * I_n(r), on which to compute the closest point to x, natural integer greater than or equal to 1.
 * @return {Array.<number>} the computed closest point to x on the r-th rational grid of the unit simplex of R^n, array of n real numbers.
 *
@@ -8217,38 +8293,12 @@ function simplexGridSearch_(f, n, k, l, u) {
 		}
 	}
 	
-	// - Optional feasibility checks on the restricted simplex:
-	// -- Lower bounds and upper bounds must satisfy 0 <= l_i <= u_i <= 1, i = 1..n
-	// -- Lower bounds and upper bounds must satisfy sum l_i <= 1 <= sum u_i, c.f. formula 2.2 of the second reference
-	//    (In case sum l_i == 1 or sum u_i == 1, the computations are prematurly stopped, because the restricted
-	//    simplex is then equal to a point)
+	// Emptiness check on the restricted simplex.
+	//
+	// In case the restricted simplex is empty, an exception is thrown, so that
+	// the process is (violently) stopped here.
 	if (lowerBounds || upperBounds) {
-		// Feasibility checks
-		var sumLowerBounds = 0;
-		var sumUpperBounds = 0;
-		for (var i = 0; i < n; ++i) {
-			var lowerBound = lowerBounds[i];
-			var upperBound = upperBounds[i];
-			
-			// Check on lower and upper bounds l_i and u_i
-			if (lowerBound > upperBound) {
-				throw new Error('infeasible problem detected: lower bound strictly greater than upper bound');
-			}
-			if (lowerBound < 0) {
-				throw new Error('incorrect problem detected: lower bound strictly lower than 0');
-			}
-			if (upperBound > 1) {
-				throw new Error('incorrect problem detected: upper bound strictly greater than 1');
-			}
-
-			// Compute the running sum of lower and upper bounds, for subsequent feasibility check
-			sumLowerBounds += lowerBound;
-			sumUpperBounds += upperBound;
-		}
-		
-		if (sumLowerBounds > 1 || sumUpperBounds < 1) {
-			throw new Error('infeasible problem detected: the restricted simplex is empty');
-		}
+		var sumBounds = simplexEmptinessCheck_(n, lowerBounds, upperBounds);
 	}
 	
 	// Initialize the current minimum value and the current list of associated grid points
@@ -10360,23 +10410,13 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 	// - There is a unique optimal solution to the E-maximizing portfolio linear 
 	// program
 	function computeMaxReturnPortfolio_(mu, lowerBounds, upperBounds) {		
-		// Check that the problem is feasible (l_i <= u_i, sum l_i <= 1 and 1 <= sum u_i,
-		// c.f. paragraph 12.3.1 of the second reference).
-		for (var i = 1; i <= nbAssets; ++i) {
-			var lb_i = lowerBounds.getValue(i, 1);
-			var ub_i = upperBounds.getValue(i, 1);
-			
-			if (lb_i > ub_i) {
-				throw new Error('infeasible problem detected');
-			}
-		}
-
-		var sum_lb = lowerBounds.sum();
-		var sum_ub = upperBounds.sum();
-		if (sum_lb > 1 || sum_ub < 1) {
-			throw new Error('infeasible problem detected');
-		}
-
+		// Check that the problem is feasible (i.e., that the restricted unit simplex on which
+		// the E-maximization is taking place is not empty, c.f. paragraph 12.3.1 of the second
+		// reference).
+		//
+		// Note: if ever needed for performances reasons, the .toArray() calls below could be
+		// replaced with another way.
+		var sumBounds = simplexEmptinessCheck_(nbAssets, lowerBounds.toArray(), upperBounds.toArray());
 		
 		// Order the assets in descending order w.r.t. their returns
 		var mu_idx = typeof Uint32Array === 'function' ? new Uint32Array(nbAssets) : new Array(nbAssets);
@@ -11492,17 +11532,18 @@ self.numericalOptimizationWeights = function (nbAssets, fct, opt) {
 	}
 
 	// Initialize the options default values
-	if (opt.optimizationMethod === undefined) {
-		opt.optimizationMethod = 'grid-search';
+	var optimizationMethod = opt.optimizationMethod;
+	if (optimizationMethod === undefined) {
+		optimizationMethod = 'grid-search';
 	}
-	if (opt.optimizationMethod === 'grid-search') {
+	if (optimizationMethod === 'grid-search') {
 		if (opt.optimizationMethodParams.k === undefined) {
 			opt.optimizationMethodParams.k = nbAssets;
 		}
 	}
 	
 	// Select the proper optimisation method
-	if (opt.optimizationMethod === 'grid-search') {
+	if (optimizationMethod === 'grid-search') {
 		// Call the rational grid search method
 		return simplexGridSearch_(fct, nbAssets, opt.optimizationMethodParams.k, opt.constraints.minWeights, opt.constraints.maxWeights);
 	}
@@ -11604,6 +11645,10 @@ self.proportionalMinimumVarianceWeights = function (sigma, opt) {
 * invested portfolio of n assets, as computed by the random subspace optimization method described informally 
 * in the first reference and more formally in the second and third references (in the specific case of 
 * the mean-variance portfolio optimization algorithm).
+*
+* Optionally, the following constraints can be added:
+* - Minimum weight of each asset to include in the portfolio
+* - Maximum weight of each asset to include in the portfolio
 *
 * This algorithm combines the usage of a random subspace optimization method with an arbitrary portfolio
 * optimization algorithm the following way:
@@ -11736,7 +11781,6 @@ self.randomSubspaceOptimizationWeights = function(nbAssets, fct, opt) {
 	// to which their average/median would also be identical.
 	//
 	// Thus, this case is explicitely managed for performances reasons.
-
 	var nbRandomSubsets = opt.nbRandomSubsets;
 	if (nbRandomSubsets === undefined) {
 		nbRandomSubsets = 128;		
@@ -12061,12 +12105,16 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 *
 * @summary Compute the weights of a randomly generated portfolio.
 *
-* @description This function returns the weights w_1,...,w_n associated to a fully invested and long-only 
-* random portfolio of n assets.
+* @description This function returns the weights w_1,...,w_n associated to a fully invested
+* and long-only random portfolio of n assets.
 *
 * Optionally, the following constraints can be added:
 * - Minimum number of assets to include in the portfolio
 * - Maximum number of assets to include in the portfolio
+* - Minimum weight of each asset to include in the portfolio
+* - Maximum weight of each asset to include in the portfolio
+* - Minimum exposure of the portfolio
+* - Maximum exposure of the portfolio
 *
 * This portfolio is not unique.
 *
@@ -12081,56 +12129,248 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 *
 * @param {number} nbAssets the number of assets in the universe, natural integer superior or equal to 1.
 * @param {object} opt optional parameters for the algorithm.
-* @param {number} opt.constraints.minAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
-* @param {number} opt.constraints.maxAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.constraints.minNbAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
+* @param {number} opt.constraints.maxNbAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets.
+* @param {Array.<number>} opt.constraints.minWeights an array of size nbAssets (l_i),i=1..nbAssets containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..nbAssets; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an array of size nbAssets (u_i),i=1..nbAssets containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..nbAssets; defaults to an array made of ones.
+* @param {number} opt.constraints.minExposure the minimum exposure of the portfolio expressed in percent, a strictly positive real number satisfying 0 < opt.constraints.minExposure <= opt.constraints.maxExposure <= 1; defaults to 1.
+* @param {number} opt.constraints.maxExposure the maximum exposure of the portfolio expressed in percent, a strictly positive real number satisfying 0 < opt.constraints.minExposure <= opt.constraints.maxExposure <= 1; defaults to 1.
 * @return {Array.<number>} the weights corresponding to a random portfolio, array of real numbers of length nbAssets.
 *
 * @example
 * randomWeights(5);
 * // ~[0, 0 0.33, 0.33, 0.33]
+*
+* randomWeights(5, { constraints: { minExposure: 0.4, maxExposure: 0.8, minWeights: [0.2,0.1,0.4,0.3,0], maxWeights: [0.9,0.8,0.4,0.7,1] } });
+* // ~[0, 0.10498858706451236, 0, 0.32412466798840733, 0.04620902965198814]
 */
 self.randomWeights = function (nbAssets, opt) {
-	// TODO: Checks, if enabled
-
-	// Decode options
+	// Initialize the options structure
 	if (opt === undefined) {
-		opt = { constraints: {} };
+		opt = {};
 	}
-	var nbMinAssets = opt.constraints.minAssets || 1;
-	var nbMaxAssets = opt.constraints.maxAssets || nbAssets;
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
 	
-	// 1 - Generate the number of assets to include in the portfolio (uniform generation)
-	var nbSelectedAssets = Math.floor(Math.random() * (nbMaxAssets - nbMinAssets +1)) + nbMinAssets;
 	
-	// 2 - Generate the indices of the assets to include in the portfolio (uniform generation)
-	var selectedAssetsIdx = new randomKSubsetIterator_(nbAssets, nbSelectedAssets).next();
+	// ------	
 	
-	// 3 - Generate the weights of the assets to include in the portfolio (uniform generation)
-	//
-	// Extra caution needs to be taken in case one of the weights is zero,
-	// as exactly nbSelectedAssets must be included in the portfolio.
-	var selectedAssetsWeights;
-	var simplexSampler = new simplexRandomSampler_(nbSelectedAssets);
-	while (true) {
-		// Generate a sample of assets weights
-		selectedAssetsWeights = simplexSampler.sample();
+	
+	// Decode options
+	
+	// The minimum number of assets to include in the portfolio
+	var nbMinAssets = opt.constraints.minNbAssets;
+	if (nbMinAssets === undefined) {
+		nbMinAssets = 1;
+	}
+	
+	// The maximum number of assets to include in the portfolio
+	var nbMaxAssets = opt.constraints.maxNbAssets;
+	if (nbMaxAssets === undefined) {
+		nbMaxAssets = nbAssets;
+	}
+
+	// The minimum exposure of the portfolio
+	var minExposure = opt.constraints.minExposure;
+	if (minExposure === undefined) {
+		minExposure = 1;
+	}
+	
+	// The maximum exposure of the portfolio
+	var maxExposure = opt.constraints.maxExposure;
+	if (maxExposure === undefined) {
+		maxExposure = 1;
+	}
+	
+	// The maximum number of iterations
+	var maxIter = opt.maxIter;
+	if (maxIter === undefined) {
+		maxIter = 10000;
+	}
+
+	
+	// ------	
+	
+	
+	// Core process
+	
 		
-		// Reject the sample if there is one asset with a zero weight
-		var rejectSample = false;
-		for (var i = 0; i < nbSelectedAssets; ++i) {
-			if (selectedAssetsWeights[i] == 0) {
-				rejectSample = true;
-				break;
+	// Extract the mandatory minimum number of assets to include in the portfolio based 
+	// on optional lower bounds constraints.
+	//
+	// Extract the mandatory and free assets indexes based on optional lower bounds contraints.
+	var nbMandatoryAssets = 0;
+	var nbFreeAssets = nbAssets;
+	if (opt.constraints.minWeights) {
+		for (var i = 0; i < nbAssets; ++i) {
+			if (opt.constraints.minWeights[i] > 0) {
+				++nbMandatoryAssets;
 			}
 		}
-		if (!rejectSample) {
-			break;
+		
+		var mandatoryAssetsIdx = typeof Uint32Array === 'function' ? new Uint32Array(nbMandatoryAssets) : new Array(nbMandatoryAssets);
+		for (var i = 0, j = 0; i < nbAssets; ++i) {
+			if (opt.constraints.minWeights[i] > 0) {
+				mandatoryAssetsIdx[j++] = i + 1;
+			}
 		}
 	}
+	
+	nbFreeAssets -= nbMandatoryAssets;
+	var freeAssetsIdx = typeof Uint32Array === 'function' ? new Uint32Array(nbFreeAssets) : new Array(nbFreeAssets);
+	for (var i = 0, j = 0; i < nbAssets; ++i) {
+		if (opt.constraints.minWeights === undefined || (opt.constraints.minWeights && opt.constraints.minWeights[i] === 0)) {
+			freeAssetsIdx[j++] = i + 1;
+		}
+	}
+		
+	// In case the mandatory minimum number of assets to include in the portfolio 
+	// is strictly greater than the desired maximum number of assets, throw an error.
+	//
+	// Otherwise, override the desired minimum number of assets.
+	if (nbMandatoryAssets > nbMaxAssets) {
+		throw new Error('maximum number of assets not consistent with lower bounds contraints');
+	}
+	else {
+		nbMinAssets = Math.max(nbMinAssets, nbMandatoryAssets);
+	}
+	
+	// Repeat steps 1 - 7 until the generated weights are feasible w.r.t. all the constraints:
+	// - Cardinality constraints
+	// - Minimum/maximum weights constraints
+	// - Minimum/maximum exposure
+	var nbIter = -1;
+	while (true) {
+		// Increment the number of iterations
+		++nbIter;
+		
+		// Check the number of iterations
+		if (nbIter > maxIter) {
+			throw new Error('maximum number of iterations reached');
+		}
+		
+		
+		// 1 - Generate the number of assets to include in the portfolio (uniform generation)
+		var nbSelectedAssets = Math.floor(Math.random() * (nbMaxAssets - nbMinAssets +1)) + nbMinAssets;
+		var nbSelectedFreeAssets = nbSelectedAssets - nbMandatoryAssets;
+		
+		// 2 - Generate the indices of the assets to include in the portfolio (uniform generation);
+		//     which is the union of the mandatory assets indices and of the selected free assets indices
+		var selectedFreeAssetsIdx = new randomKSubsetIterator_(nbFreeAssets, nbSelectedFreeAssets, false).next();
+		for (var i = 0; i < nbSelectedFreeAssets; ++i) {
+			var idx = selectedFreeAssetsIdx[i] - 1;
+			selectedFreeAssetsIdx[i] = freeAssetsIdx[idx];
+		}
+		var selectedAssetsIdx = typeof Uint32Array === 'function' ? new Uint32Array(nbSelectedAssets) : new Array(nbSelectedAssets);
+		for (var i = 0; i < nbMandatoryAssets; ++i) {
+			selectedAssetsIdx[i] = mandatoryAssetsIdx[i];
+		}
+		for (var i = nbMandatoryAssets, j = 0; i < nbSelectedAssets; ++i, ++j) {
+			selectedAssetsIdx[i] = selectedFreeAssetsIdx[j];			
+		}
+		selectedAssetsIdx.sort(function(a, b) { // sort in increasing order
+			return a - b;
+		});
+
+		// 3 - Generate the exposure of the portfolio (uniform generation)
+		//
+		//     From this step, the potential partial exposure of the portfolio is managed thanks
+		//     to a slack asset variable and its associated exact weight constraint.
+		var portfolioExposure = Math.random() * (maxExposure - minExposure) + minExposure;
+		var nbSlackAssets = 0;
+		if (portfolioExposure !== 1) {
+			// A slack asset variable is added to the selected assets variables
+			//
+			// By convention, its index is nbSelectedAssets + 1
+			nbSlackAssets = 1;
+			
+			// Definition of weights constraints for the nbSelectedAssets assets, plus the slack asset variable
+			var lowerBounds = typeof Float64Array === 'function' ? new Float64Array(nbSelectedAssets + nbSlackAssets) : new Array(nbSelectedAssets + nbSlackAssets);
+			var upperBounds = typeof Float64Array === 'function' ? new Float64Array(nbSelectedAssets + nbSlackAssets) : new Array(nbSelectedAssets + nbSlackAssets);
+
+			// Default weights constraints for the selected assets
+			for (var i = 0; i < nbSelectedAssets; ++i) {
+				lowerBounds[i] = 0;
+				upperBounds[i] = 1;
+			}
+			
+			// Weight constraint (exact) for the slack asset variable
+			var portfolioExposureWeightConstraint = 1 - portfolioExposure;	
+			lowerBounds[nbSelectedAssets] = portfolioExposureWeightConstraint;
+			upperBounds[nbSelectedAssets] = portfolioExposureWeightConstraint;
+		}
+		
+		// 4 - In case minimum/maximum weights constraints are provided, automatically map
+		//     these constraints to the generated assets.
+		if (opt.constraints.minWeights) {
+			// In case default lower bounds contraints have already been set in step 3 above
+			// due to a partial investment constraint, the lowerBounds variable must not be overriden.
+			//
+			// Otherwise, there is no slack asset variable to manage.
+			if (portfolioExposure === 1) {
+				var lowerBounds = typeof Float64Array === 'function' ? new Float64Array(nbSelectedAssets) : new Array(nbSelectedAssets);
+			}
+			
+			// Weights constraints for the selected assets
+			for (var i = 0; i < nbSelectedAssets; ++i) {
+				lowerBounds[i] = opt.constraints.minWeights[selectedAssetsIdx[i]-1];
+			}
+			
+			// Weight constraint for the potential slack asset variable has already been
+			// set in step 3 above
+		}
+		if (opt.constraints.maxWeights) {
+			// In case default upper bounds contraints have already been set in step 3 above
+			// due to a partial investment constraint, the upperBounds variable must not be overriden.
+			//
+			// Otherwise, there is no slack asset variable to manage.
+			if (portfolioExposure === 1) {
+				var upperBounds = typeof Float64Array === 'function' ? new Float64Array(nbSelectedAssets) : new Array(nbSelectedAssets);
+			}
+			
+			// Weights constraints for the selected assets
+			for (var i = 0; i < nbSelectedAssets; ++i) {
+				upperBounds[i] = opt.constraints.maxWeights[selectedAssetsIdx[i]-1];
+			}
+			
+			// Weight constraint for the potential slack asset variable has already been
+			// set in step 3 above
+		}		
+		
+		// 5 - Test for the feasibility of the generated assets w.r.t. the optional lower and upper bounds
+		try {
+			var sumBounds = simplexEmptinessCheck_(nbSelectedAssets + nbSlackAssets, lowerBounds, upperBounds);
+		}
+		catch (e) {
+			// In case the check above results in an exception, it means the generated assets are not feasible.
+			//
+			// So, generate a whole new set of number of assets / assets indices.
+			continue;
+		}
+		
+		// 6 - Generate the weights of the assets to include in the portfolio (uniform generation)
+		var selectedAssetsWeights = new simplexRandomSampler_(nbSelectedAssets + nbSlackAssets, lowerBounds, upperBounds).sample();
+		
+		// 7 - Test for the feasibility of the generated weights w.r.t. the cardinality constraint,
+        //     i.e., exactly the first nbSelectedAssets assets weights must be non zero.
+		for (var i = 0; i < nbSelectedAssets; ++i) {
+			// In case of a zero weight, generate a whole new set of number of assets / assets indices
+			if (selectedAssetsWeights[i] == 0) { 
+				continue;
+			}
+		}
+		
+		// At this stage, the generated weights are feasible w.r.t. all constraints,
+		// so that the process can be stopped.
+		break;
+	}
+
 	
 	// Compute the final weights vector:
 	// - The weights associated to assets not included in the portfolio at step 2 are set to zero
-	// - The weights associated to assets included in the portfolio at step 2 are set to their values generated at step 3
+	// - The weights associated to assets included in the portfolio at step 2 are set to their values generated at step 5
 	var weights = Matrix_.zeros(nbAssets, 1);
 	for (var i = 0; i < nbSelectedAssets; ++i) {
 		// Extract included assets information

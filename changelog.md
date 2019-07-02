@@ -1,5 +1,6 @@
 ### 0.0.8 - XX/YY/20ZZ
-- On it...
+- Introduced a function simplexEmptinessCheck_ to avoid copy/pasting feasibility checks on the restricted simplex everywhere
+- Added min/max exposure constraints, and min/max weights contraints in the random portfolio generation method
 
 ### 0.0.7 - 25/05/2019
 - Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities
