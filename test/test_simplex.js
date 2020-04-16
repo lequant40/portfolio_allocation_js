@@ -6,6 +6,27 @@ QUnit.module('Simplex internal module', {
 });
 
 
+QUnit.test('Simplex characteristic function computation', function(assert) {    
+  // Test with static data
+  {
+	  // Point belonging to the unit simplex
+	  var x = [0.1, 0.9];
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x), 0, 'Simplex characteristic function computation - Test 1');
+
+	  // Point belonging to a restricted unit simplex
+	  var x = [0.3, 0.4, 0.3];
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x, null, [0.5, 0.5, 0.5]), 0, 'Simplex characteristic function computation - Test 2');
+
+	  // Point NOT belonging to the unit simplex
+	  var x = [0.1, 1.9];
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x), Number.POSITIVE_INFINITY, 'Simplex characteristic function computation - Test 3');
+  }
+  
+  // Test with random data
+  // TODO
+});
+
+
 QUnit.test('Simplex sparse euclidian projection computation', function(assert) {    
   // Test with static data
   // Reference for the initial point: Nelson Maculan, Geraldo Galdinode, Paula Jr., A linear-time median-finding algorithm for projecting a vector on the simplex of R^n
@@ -51,8 +72,9 @@ QUnit.test('Simplex euclidian projection computation', function(assert) {
 	  for (var i = 0; i < testValues.length; ++i) {
 	      assert.deepEqual(PortfolioAllocation.simplexEuclidianProjection_(testValues[i]), expectedValues[i], 'Simplex euclidian projection - Test 1 #' + i);
       } 
-	  
   }
+  
+  // Test with static data, restricted unit simplex, TODO
 });
 
 

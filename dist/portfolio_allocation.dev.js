@@ -3358,7 +3358,7 @@ self.BitSet_ = BitSet_;
 * made of natural integers, or an empty bit set if the array arr is
 * not provided.
 * 
-* A bit set (a.k.a. bit array, bit vector) is a data structure taylored 
+* A bit set (a.k.a. bit array, bit vector) is a data structure tailored 
 * to storing (relatively small) integers.
 *
 * The internal way to handle bit sets has been fully adapted from: 
@@ -3426,7 +3426,7 @@ function BitSet_(arr) {
 	* var myBitSet = new BitSet_().add(2);
 	* var myIterator = new myBitSet.iterator();
 	* myIterator.next(); myIterator.next();
-	* // 2; -1;
+	* // 2; 0;
 	*/
 	this.iterator = function() {
 		// Initialize the current words index and the current word to
@@ -3876,13 +3876,17 @@ BitSet_.prototype = {
 self.aliasMethodSampler_ = aliasMethodSampler_;
 self.randomCompositionsIterator_ = randomCompositionsIterator_;
 self.compositionsIterator_ = compositionsIterator_;
+self.permutationsIterator_ = permutationsIterator_;
 self.subsetsIterator_ = subsetsIterator_;
 self.kSubsetsIterator_ = kSubsetsIterator_;
-self.randomKSubsetIterator_ = randomKSubsetIterator_;
+self.randomKSubsetsIterator_ = randomKSubsetsIterator_;
+self.randomPermutationsIterator_ = randomPermutationsIterator_;
 self.binomial_ = binomial_;
 /* End Wrapper private methods - Unit tests usage only */
  
 
+ 
+ 
 /**
 * @function aliasMethodSampler_
 *
@@ -4025,23 +4029,23 @@ function aliasMethodSampler_(p) {
 *
 * @param {number} n a non-negative integer whose composition are desired.
 * @param {number} k a non-negative integer indicating the number of parts of desired composition of n.
-* @param {boolean} useArrayCopy an optional boolean that can be set to false to re-use the same output array throughout
-* all the computations(this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
+* @param {boolean} reuseOutputArray an optional boolean that can be set to true to re-use the same output array throughout
+* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to false.
 * @return {function} a function to be used as an iterator through its .next() method, computing all 
-* the k-compositions of n until they all have been exhausted, in which case -1 is returned..
+* the k-compositions of n until they all have been exhausted, in which case -1 is returned.
 *
 * @example
 * var myIterator = new compositionsIterator_(6, 3);
 * myIterator.next(); myIterator.next();
 * // [6,0,0]; [5,1,0];
 */
-function compositionsIterator_(n, k, useArrayCopy) {
+function compositionsIterator_(n, k, reuseOutputArray) {
 	// Initialize n and k
 	this.n = n;
 	this.k = k;
 	
-	// Initialize the copy array variable
-	this.useArrayCopy = useArrayCopy;
+	// Initialize the re-use array variable
+	this.reuseOutputArray = reuseOutputArray;
 	
 	// Variables required for NEXTCOM internal computations,
 	// initialized so as to generate the first composition upon
@@ -4101,11 +4105,133 @@ function compositionsIterator_(n, k, useArrayCopy) {
 		this.mtc = (this.r[this.k - 1] != this.n);
 		
 		// Return either the r array, or a copy of the r array, so that callers can alter it
-		if (this.useArrayCopy) {
-			return this.r.slice(0);
+		if (this.reuseOutputArray) {
+			return this.r;
 		}
 		else {
-			return this.r;
+			return this.r.slice(0);
+		}
+	}
+}
+
+
+/**
+* @function permutationsIterator_
+*
+* @summary Returns an iterator to compute all the permutations of letters.
+*
+* @description This function constructs an iterator to compute all the permutations of 
+* the set {1..n} (equivalent to a set of n letters), using the Heap's algorithm described in the second
+* reference.
+*
+* @see <a href="https://doi.org/10.1093/comjnl/6.3.293">B. R. Heap, Permutations by Interchanges, 
+* The Computer Journal, Volume 6, Issue 3, November 1963, Pages 293–298</a>
+* @see <a href="https://dx.doi.org/10.1145%2F356689.356692">R. Sedgewick, Permutation Generation Methods, 
+* Computing Surveys, Vol 9, No 2, June 1977</a>
+*
+* @param {number} n a non-negative integer.
+* @param {boolean} reuseOutputArray an optional boolean that can be set to true to re-use the same output array throughout
+* all the computations(this improves the performances, but requires the caller to NOT alter the output array); defaults to false.
+* @return {function} a function to be used as an iterator through its .next() method, computing all 
+* the permutations of the set {1..n} until they all have been exhausted, in which case -1 is returned.
+*
+* @example
+* var myIterator = new permutationsIterator_(2);
+* myIterator.next();myIterator.next();myIterator.next();
+* // [1,2]; [2,1];-1
+*/
+function permutationsIterator_(n, reuseOutputArray) {
+	// Initialize n
+	this.n = n;
+	
+	// Initialize the re-use array variable
+	this.reuseOutputArray = reuseOutputArray;
+	
+	// Initialize the array holding the permutation to 1..n
+	this.p = typeof Uint32Array === 'function' ? new Uint32Array(this.n) : new Array(this.n);
+	for (var i = 0; i < this.n; ++i) {
+		this.p[i] = i+1;
+	}
+	
+	// Initialize the array holding the recursion stack to 0's
+	this.c = typeof Uint32Array === 'function' ? new Uint32Array(this.n) : new Array(this.n);
+	for (var i = 0; i < this.n; ++i) {
+		this.c[i] = 0;
+	}
+
+	// Initialize the iteration counter
+	this.j = -1;
+	
+	/*
+	* @function next
+	*
+	* @summary Returns the next permutation of the set {1..n}, as constructed by the Heap's algorithm.
+	*
+	* @description This function computes the next permutation of the set {1..n}, using
+	* the Heap's algorithm described in the second reference.
+	*
+	* @memberof randomPermutationIterator_
+	* @return {Array.<number>|Uint32Array} an array of n elements containing the computed next permutation of the set {1..n}.
+	*/
+	this.next = function() {	
+		// No more permutations to generate
+		if (this.j >= this.n) {
+			return -1;
+		}
+		
+		// First call
+		if (this.j === -1) {
+			++this.j;
+			
+			// Return either the p array, or a copy of the p array, so that callers can alter it
+			if (this.reuseOutputArray) {
+				return this.p;
+			}
+			else {
+				return this.p.slice(0);
+			}
+		}
+		else {
+			// Main logic of the Heap's algorithm
+			while (this.j < this.n) {
+				if (this.c[this.j] < this.j) {
+					// Swap step
+					if (this.j % 2 === 0) { // j is even, swap P(j) and P(0)
+						var tmp = this.p[this.j];
+						this.p[this.j] = this.p[0];
+						this.p[0] = tmp;
+					}
+					else { // j is odd, swap P(j) and P(c(j))
+						var tmp = this.p[this.j];
+						this.p[this.j] = this.p[this.c[this.j]];
+						this.p[this.c[this.j]] = tmp;
+					}
+					
+					// A new permutation has been computed:
+					// - Increment the iteration counter for the current recursion level, 
+					// and revert to the base case of the recursion
+					++this.c[this.j];
+					this.j = 0;
+					
+					// - Return either the p array, or a copy of the p array, so that callers can alter it
+					if (this.reuseOutputArray) {
+						return this.p;
+					}
+					else {
+						return this.p.slice(0);
+					}
+				}
+				else {
+					// Recursion level j is finished, so:
+					// - Reset the iteration counter for the recursion level j
+					// - Get back to the previous recursion level
+					this.c[this.j] = 0;
+					++this.j;
+				}
+			}
+			
+			// No more permutations to generate
+			return -1;
 		}
 	}
 }
@@ -4141,7 +4267,7 @@ function randomCompositionsIterator_(n, k) {
 	this.k = k;
 	
 	// Initialize the uniform random k-subset iterator
-	this.ranksb = new randomKSubsetIterator_(n+k-1, k-1);
+	this.ranksb = new randomKSubsetsIterator_(n+k-1, k-1);
 	
 	// Initialize the array holding the k-compositions
 	this.r = typeof Uint32Array === 'function' ? new Uint32Array(k) : new Array(k);
@@ -4180,6 +4306,105 @@ function randomCompositionsIterator_(n, k) {
 		
 		// Return a copy of the r array, so that the caller can alter it
 		return this.r.slice(0);
+	}
+}
+
+
+/**
+* @function randomPermutationsIterator_
+*
+* @summary Returns an infinite iterator to compute random permutations of letters.
+*
+* @description This function constructs an infinite iterator to compute random permutations of 
+* the set {1..n} (equivalent to a set of n letters), using the algorithm RANPER described in 
+* section 8 of the reference.
+*
+* The random permutations are generated uniformly at random.
+*
+* @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
+*
+* @param {number} n a non-negative integer.
+* @param {out} TODO.
+* @return {function} a function to be used as an infinite iterator through its .next() method, computing  
+* random permutations of the set {1..n}.
+*
+* @example
+* var myIterator = new randomPermutationsIterator_(6);
+* myIterator.next();
+* // [1,3,2,4,6,5]
+*/
+function randomPermutationsIterator_(n, out) {
+	// Initialize n
+	this.n = n;
+	
+	// Initialize the array holding the permutation to 1..n, if needed
+	if (out === undefined) {
+		this.r = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
+		for (var i = 0; i < this.n; ++i) {
+			this.r[i] = i+1;
+		}
+	}
+	else {
+		this.r = out;
+	}
+
+	/**
+	* @function uniformrv
+	*
+	* @summary Returns a number generated uniformly at random in interval ]0,1[.
+	*
+	* @description This function computes a number uniformly at random in interval ]0,1[.
+	*
+	* @memberof randomPermutationsIterator_
+	* @return {number} a number generated uniformly at random in interval ]0,1[, a real number
+	*
+	*/
+	function uniformrv() {
+		// Generate a random number in the [0, 1[ interval
+		var rnd = Math.random();
+		
+		// While the generated random number is (exactly) equal to 0,
+		// reject it.
+		while (rnd === 0) {
+			rnd = Math.random();
+		}
+		
+		// Return the generated random number, which is then 
+		// generated uniformly at random in the ]0,1[ interval.
+		return rnd;
+	}
+	
+	/**
+	* @function next
+	*
+	* @summary Returns a random permutation of the set {1..n}.
+	*
+	* @description This function computes a random permutation of the set {1..n}, using
+	* the algorithm RANPER described in section 8 of the reference.
+	*
+	* @memberof randomPermutationsIterator_
+	* @return {Array.<number>|Uint32Array} an array of n elements containing the computed random permutation of the set {1..n}.
+	*/
+	this.next = function() {
+		// Construct a copy of the r array, so that the caller can alter it, if applicable
+		if (out === undefined) {
+			var rr = this.r.slice(0);
+		}
+		else {
+			var rr = out;
+		}
+		
+		// Main logic of the RANPER algorithm
+		for (var m = 1; m <= this.n; ++m) {
+			var l = m + Math.floor( uniformrv()*(this.n + 1 - m) );
+			
+			var tmp = rr[l-1];
+			rr[l-1] = rr[m-1];
+			rr[m-1] = tmp;
+		}
+
+		// Return the possibly altered copy of the r array
+		return rr;
 	}
 }
 
@@ -4248,7 +4473,7 @@ function kSubsetsIterator_(n, k, useArrayCopy) {
 	* of the n-set {1,...,n} or -1 to indicate that all the k-subsets have already been computed.
 	*/
 	this.next = function() {
-		if (!this.firstcall && !this.mtc) {
+		if (!this.firstcall && (!this.mtc || this.k === 0)) {
 			// No more k-subset to generate
 			return -1;
 		}
@@ -4286,7 +4511,7 @@ function kSubsetsIterator_(n, k, useArrayCopy) {
 }
 
 /**
-* @function randomKSubsetIterator_
+* @function randomKSubsetsIterator_
 *
 * @summary Returns an infinite iterator to compute random k-subsets of a n-set.
 *
@@ -4307,11 +4532,11 @@ function kSubsetsIterator_(n, k, useArrayCopy) {
 * k-subsets of the n-set {1,...,n}.
 *
 * @example
-* var myIterator = new randomKSubsetIterator_(6, 3);
+* var myIterator = new randomKSubsetsIterator_(6, 3);
 * myIterator.next();
 * // [1, 2, 5];
 */
-function randomKSubsetIterator_(n, k, useArrayCopy) {
+function randomKSubsetsIterator_(n, k, useArrayCopy) {
 	// Initialize n and k
 	this.n = n;
 	this.k = k;
@@ -4340,7 +4565,7 @@ function randomKSubsetIterator_(n, k, useArrayCopy) {
 	*
 	* @description This function computes a number uniformly at random in interval ]0,1[.
 	*
-	* @memberof randomKSubsetIterator_
+	* @memberof randomKSubsetsIterator_
 	* @return {number} a number generated uniformly at random in interval ]0,1[, a real number
 	*
 	*/
@@ -4367,7 +4592,7 @@ function randomKSubsetIterator_(n, k, useArrayCopy) {
 	* @description This function computes a random k-subset of a n-set using the method A of the references,
 	* and is used by the method D to avoid its worst-case behaviour, c.f. the references.
 	*
-	* @memberof randomKSubsetIterator_
+	* @memberof randomKSubsetsIterator_
 	*
 	*/
 	this.method_a = function() {
@@ -4417,7 +4642,7 @@ function randomKSubsetIterator_(n, k, useArrayCopy) {
 	*
 	* @description This function computes a random k-subset of a n-set using the method D of the references.
 	*
-	* @memberof randomKSubsetIterator_
+	* @memberof randomKSubsetsIterator_
 	*
 	*/
 	this.method_d = function() {
@@ -4518,7 +4743,7 @@ function randomKSubsetIterator_(n, k, useArrayCopy) {
 	*
 	* @description This function computes a random k-subset of a n-set using the method D of the references.
 	*
-	* @memberof randomKSubsetIterator_
+	* @memberof randomKSubsetsIterator_
 	* @return {Array.<number>|Uint32Array} a random k-subset of the n-set {1,...,n}, a sorted array of k increasing strictly positive integers.
 	*
 	*/
@@ -4787,8 +5012,8 @@ function geometricCenter_(x) {
 *
 * y = argmin_x in R^n f(x) = sum ||y - x_i||_2, i = 1..m
 *
-* The algorithm implemented uses a serie of successive converging hyperbolic approximations of
-* the euclidian norms appearing in the function f above, c.f. the second and third references,
+* The algorithm implemented uses a series of successive converging hyperbolic approximations of
+* the euclidean norms appearing in the function f above, c.f. the second and third references,
 * which allows to compute the geometric median using a standard first-order convex
 * optimization algorithm.
 *
@@ -4848,7 +5073,7 @@ function geometricMedian_(x) {
 	// TODO: Checks
 	
 	
-	// Initialisations
+	// Initializations
 	var m = x.length; // the number of points provided in input
 	var n = x[0].nbRows; // the dimension of each point provided in input
 
@@ -4856,7 +5081,7 @@ function geometricMedian_(x) {
 	
 	
 	// The geometric median will be computed using successive epsilon-approximations of
-	// the euclidian norms appearing in its objective function, c.f. the second and the third
+	// the euclidean norms appearing in its objective function, c.f. the second and the third
 	// references.
 	//
 	// - Each epsilon-approximation of the objective function of the geometric median
@@ -4888,14 +5113,23 @@ function geometricMedian_(x) {
 	}
 		
 			
-	// TODO: BETTER COMMENT + add 1e-2 as parametrized in input
-	// Compute the minimum of the function f_eps on R^n, for successive decreasing values
+	// Compute the minimum f_eps(x^*_eps) of the function f_eps on R^n, for successive decreasing values
 	// of epsilon (which is actually squared in the computation of f_eps and gradf_eps).
 	//
-	// 0 <= G(x^*_eps) - G(x^*) <= eps*m  =>  G(x^*_eps) - eps*m <= G(x^*) <= G(x^*_eps)
-	// c.f. example 3.3 of the fifth reference 
-	var eps_f = 1e-2 / m;
+	// The following formula, from example 3.3 of the fifth reference, allows to 
+	// bracket the quality of the approximation of the value f(x^*_eps) v.s. the true 
+	// value f(x^*):
+	//
+	// 0 <= f(x^*_eps) - f(x^*) <= eps*m 
+    // =>  | f(x^*_eps) - f(x^*) | <= eps*m 
+	var eps_f = 1 / m;
 	var sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, x0, {eps: 1e-4, maxIter: -1, maxLine: -1});
+
+	eps_f = 1e-1 / m;
+	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-4, maxIter: -1, maxLine: -1});
+
+	eps_f = 1e-2 / m;
+	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-4, maxIter: -1, maxLine: -1});
 
 
 	// Return the computed optimal solution to the hyperbolic approximation of the 
@@ -4912,15 +5146,271 @@ function geometricMedian_(x) {
 self.max_ = max_;
 self.median_ = median_;
 self.select_ = select_;
+self.permutationEntropy_ = permutationEntropy_;
 self.hypot_ = hypot_;
 self.rank_ = rank_;
 self.ftca_ = ftca_;
 self.normcdf_ = function(x) { return normcdf_(x); }
 self.norminv_ = norminv_;
 self.hypersphereRandomSampler_ = hypersphereRandomSampler_;
+self.boxGridSampler_ = boxGridSampler_;
 /* End Wrapper private methods - Unit tests usage only */
 
 
+
+ 
+/**
+* @function boxGridSampler_
+*
+* @summary Returns a function to generate all the points of an hyperrectangle of R^n on a regular grid.
+*
+* @description This function constructs a function to generate all the points of the hyperrectangle [l_1, u_1] x ... x [l_n, u_n] of R^n
+* on a regular grid of k_1 points, ..., k_n points, with possibly k_i = k, i=1..n.
+* 
+* The internal algorithm used is based on the dynamically nested loops generator described in the third reference.
+*
+* @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">James Bergstra, Yoshua Bengio, Random Search for Hyper-Parameter Optimization, 
+* Journal of Machine Learning Research 13 (2012) 281-305</a>
+* @see <a href="https://en.wikipedia.org/wiki/Hyperrectangle">Hyperrectangle</a>
+* @see <a href="https://www.codeproject.com/Tips/759707/Generating-dynamically-nested-loops">NATKIT7, Generating dynamically nested loops</a>
+*
+* @param {number} n the dimension of the hyperrectangle of R^n, natural integer superior or equal to 1.
+* @param {number|Array.<number>} (number) k the common number of grid points to generate on all the intervals [l_i, u_i], i=1..n,
+* a natural integer superior or equal to 1.
+*                                (Array.<number>) k the number of grid points k_1=k[0],...,k_n=k[n-1] to generate on the 
+* intervals [l_i, u_i], i=1..n, an array of natural integers superior or equal to 1.
+* @param {Array.<number>} l the optional lower bounds l_i of the hyperrectangle, an array of n real numbers l_i which must satisfy l_i <= u_i, i = 1..n; defaults to an array of zeros.
+* @param {Array.<number>} u the optional upper bounds u_i of the hyperrectangle, an array of n real numbers u_i which must satisfy l_i <= u_i, i = 1..n; defaults to an array of ones.
+* @param {boolean} reuseOutputArray an optional boolean that can be set to true to re-use the same output array throughout
+* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to false.
+* @return {function} a function to be used through its .sample() method, computing all 
+* the points of the hyperrectangle [l_1, u_1] x ... x [l_n, u_n] of R^n on a regular grid of k_1 points,...,k_n points.
+*
+* @example
+* var mySampler = new boxGridSampler_(3, 11);
+* mySampler.sample(); mySampler.sample(); ...; mySampler.sample();
+* // [0, 0, 0]; [0, 0, 0.1]; [0, 0, 0.2]; ... ; -1
+*/
+function boxGridSampler_(n, k, l, u, reuseOutputArray) {
+	// Initializations
+	this.n = n;
+	this.k = k;
+	this.reuseOutputArray = reuseOutputArray;
+	
+	// The different loop variables in the dynamic nested loops generator
+	this.arrs = typeof UInt32Array === 'function' ? new UInt32Array(this.n) : new Array(this.n);
+	for (var i = 0; i < this.n; ++i) {
+		this.arrs[i] = 0;
+	}
+	
+	// The coordinates of the current point being sampled
+	this.x = typeof Float64Array === 'function' ? new Float64Array(this.n) : new Array(this.n);
+	
+	// The lower bounds of the hyperrectangle
+	this.l = l;
+	if (!this.l) {
+		this.l = typeof Float64Array === 'function' ? new Float64Array(this.n) : new Array(this.n); 
+		for (var i = 0; i < this.n; ++i) {
+			this.l[i] = 0; // default lower bounds values
+		}
+	}
+	
+	// The upper bounds of the hyperrectangle
+	this.u = u;
+	if (!this.u) {
+		this.u = typeof Float64Array === 'function' ? new Float64Array(this.n) : new Array(this.n); 
+		for (var i = 0; i < this.n; ++i) {
+			this.u[i] = 1; // default upper bounds values
+		}
+	}
+	
+	// The number of grid points to generate and the grid size in each of the dimension of the hyperrectangle
+	this.nbGridPoints = typeof UInt32Array === 'function' ? new UInt32Array(this.n) : new Array(this.n);
+	this.gridSize = typeof Float64Array === 'function' ? new Float64Array(this.n) : new Array(this.n);
+	for (var i = 0; i < this.n; ++i) {
+		// The number of grid points to be computed on the interval [l_i, u_i] 
+		// of the i-th dimension of the hyperrectangle
+		var k_i;
+		if (this.k[i]) {
+			 k_i = this.k[i];
+		}
+		else {
+			k_i = this.k;
+		}
+		this.nbGridPoints[i] = k_i;
+		
+		// The associated grid size
+		if (k_i === 1) {
+			this.gridSize[i] = 0;
+		}
+		else {
+			this.gridSize[i] = (this.u[i] - this.l[i]) / (this.nbGridPoints[i] - 1);
+		}
+	}
+
+
+	// Feasibility checks
+	for (var i = 0; i < this.n; ++i) {
+		var lowerBound = this.l[i];
+		var upperBound = this.u[i];
+
+		// Check on lower and upper bounds l_i and u_i
+		if (lowerBound > upperBound) {
+			throw new Error('infeasible problem detected: lower bound ' + lowerBound + ' strictly greater than upper bound ' + upperBound);
+		}
+		
+		// Check on the grid size in case the lower bound is not equal to the upper bound
+		else if (lowerBound < upperBound) {
+			if (this.gridSize[i] <= 0) {
+				throw new Error('incorrect number of grid points to generate on the interval [' + lowerBound + ', ' + upperBound + ']: ' + this.nbGridPoints[i]);
+			}
+		}
+	}
+	
+
+	/**
+	* @function sample
+	*
+	* @summary Returns a point of the hyperrectangle [l_1, u_1] x ... x [l_n, u_n] of R^n 
+	* on a regular grid of k_1 points,...,k_n points.
+	*
+	* @description This function generates a point of the hyperrectangle [l_1, u_1] x ... x [l_n, u_n] of R^n
+	* on a regular grid of k_1 points,...,k_n points.
+	*
+	* Each call to this function results in the generation of a new point, until exhaustion of all such points.
+	*
+	* @memberof boxGridSampler_
+	* @return {Array.<number>|Float64Array|-1} an array of n real numbers corresponding to the
+	* coordinates of the generated point in R^n, or -1 in case all such points have been generated.
+	*/
+	this.sample = function() {
+		// In case there are no more points to generate, return immediately
+		if (this.arrs[0] === this.nbGridPoints[0]) {
+			return -1;
+		}
+
+		// Otherwise, generate a new point
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = this.l[i] + this.arrs[i] * this.gridSize[i];
+		}
+		
+		// Increment the dynamic nested loops variables for the next call to the .sample() method,
+		// starting from the innermost loop.
+		var change = true;
+		var r = this.n - 1;
+		while (change && r >= 0) {
+			// Increment the innermost variable and check if spill overs
+			++this.arrs[r];
+            if (this.arrs[r] === this.nbGridPoints[r]) {        
+                // If the first loop variable has spilled over, stop here, as it means 
+				// there are no more points to generate.
+				if (r === 0) {
+					break;
+				}
+				
+				// Otherwise, reintialize the loop variable
+				this.arrs[r] = 0;
+				
+                // Change the upper variable by one
+                // We need to increment the immediate upper level loop by one
+                change = true;
+            }
+            else {
+                // Stop the increment here as the upper levels of the loop are unaffected
+				change = false;
+			}
+
+            // Move to upper level of the loop
+			--r;
+        }
+
+		// Return either the point being sampled, or a copy of the point being sampled so that callers can alter it
+		if (this.reuseOutputArray) {
+			return this.x;
+		}
+		else {
+			return this.x.slice(0);
+		}
+	}
+}
+
+
+/**
+* @function permutationEntropy_
+*
+* @summary Compute the permutation entropy of a serie of values.
+*
+* @description This function returns the permutation entropy H of a serie of values [x_1,...,x_n],
+* which provides a simple and robust method to estimate the complexity of a time series,
+* c.f. the first reference.
+*
+* In case there are several identical maximum values, TODO.
+*
+* The algorithm implemented internally is described in section 3 of the second reference.
+*
+* @see <a href="https://journals.aps.org/prl/abstract/10.1103/PhysRevLett.88.174102">Bandt, C.; Pompe, B. Permutation Entropy: A Natural Complexity Measure for  Time Series. Phys. Rev. Lett. 88 (2002) 17, 174102</a>
+* @see <a href="https://link.springer.com/article/10.1140/epjst/e2013-01862-7">Riedl, M.; Müller, A.; Wessel, N.: Practical considerations of permutation entropy. The European Physical Journal Special Topics 222 (2013) 2, 249–262</a>
+
+* @param {Array.<number>} x an array of real numbers.
+* @param {m} m a strictly positive natural integer representing the embedding dimension to consider, usually belonging to {3..7}, c.f. the first reference.
+* @return {number} the permutation entropy of the time series x, using the embedding dimension m
+*
+* @example
+* permutationEntropy_([6,9,11,12,8,13,5], 3);
+* // 1.5219
+*/
+function permutationEntropy_(x, m) {
+	// Initialisations
+	var n = x.length;
+	var permutationsCounter = {};
+	var nbPermutations = 0;
+
+	// Core loop of the algorithm
+	var idxStart = 0;
+	var idxEnd = n - m + 1;	
+	var xxPermutation = typeof UInt32Array === 'function' ? new UInt32Array(m) : new Array(m);
+	for (var i = idxStart; i < idxEnd; ++i) {
+		// Step 3 of the algorithm described in section 3 of the second reference:
+		// - Extract the m values x_i...x_i+m-1 from the original array 
+		var xx = x.slice(i, i + m);
+		
+		// - Calculate the ranks of the m values x_i...x_i+m-1, which are the indices 
+		// of the values in ascending sorted order.
+		for (var j = 0; j < m; ++j) {
+			xxPermutation[j] = j + 1;
+		}
+		xxPermutation.sort(function(a, b) {
+			return xx[a-1] - xx[b-1];
+		});
+		
+		// Step 4 of the algorithm described in section 3 of the second reference:
+		// increase the counter of the equal pattern by one.
+		var permutationIndex = xxPermutation.toString();
+		permutationsCounter[permutationIndex] = (permutationsCounter[permutationIndex] || 0) + 1;
+		
+		// Misc. updates
+		++nbPermutations;
+	}
+	
+	// Steps 6 and 7 of the algorithm described in section 3 of the second reference:
+	// - Calculate the relative frequency of all the encountered permutations
+	// - Select all the permutations whose frequency is > 0
+	// - Calculate the permutation entropy using these selected permutations
+	var pE = 0;
+	for (var key in permutationsCounter) {
+		if (permutationsCounter.hasOwnProperty(key)) {           
+			var permutationCounter = permutationsCounter[key];
+			var permutationFrequency = permutationCounter / nbPermutations;
+			
+			pE += permutationFrequency * Math.log(permutationFrequency)
+		}
+	}
+	
+	// Return the computed permutation entropy
+	return -pE / Math.log(2);
+}
+
+	
 /**
 * @function max_
 *
@@ -5855,8 +6345,11 @@ function norminv_(p) {
 * 
 * @see <a href="https://dl.acm.org/citation.cfm?id=377946">	Mervin E. Muller, A note on a method for generating points uniformly on n-dimensional spheres, Communications of the ACM CACM Homepage archive
 Volume 2 Issue 4, April 1959 Pages 19-20 </a>
+* @see Nicholas J. Higham. 2002. Accuracy and Stability of Numerical Algorithms (2nd ed.). Soc. for Industrial and Applied Math., Philadelphia, PA, USA. 
 *
 * @param {number} n the dimension of the unit hypersphere of R^n, natural integer superior or equal to 1.
+* @param {boolean} reuseOutputArray an optional boolean that can be set to true to re-use the same output array throughout
+* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to false.
 * @return {function} a function to be used through its .sample() method, computing random  
 * points on the unit hypersphere of R^n.
 *
@@ -5865,10 +6358,11 @@ Volume 2 Issue 4, April 1959 Pages 19-20 </a>
 * mySampler.sample();
 * // [1, 0, 0]
 */
-function hypersphereRandomSampler_(n) {
+function hypersphereRandomSampler_(n, reuseOutputArray) {
 	// Initializations
 	this.n = n;
 	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
+	this.reuseOutputArray = reuseOutputArray;
 	
 	/**
 	* @function sample
@@ -5885,7 +6379,12 @@ function hypersphereRandomSampler_(n) {
 	this.sample = function() {
 		// Computation of n independent random variables from N(0,1), which will form the basis
 		// of the coordinates of the point being sampled.
-		var sum_sq = 0;
+		//
+		// In parallel, compute the 2 norm of the associated vector, for subsequent 
+		// normalization, with an accurate algorithm by S. J. Hammarling
+		// C.f. problem 27.5 of the second reference.
+		var t = 0;
+		var s = 1;
 		for (var i = 0; i < this.n; ++i) {
 			// Generate a random variable from N(0,1), using the inverse method
 			var u = Math.random(); // u ~ U[0,1[
@@ -5897,19 +6396,33 @@ function hypersphereRandomSampler_(n) {
 			// Set the i-th coordinate of the point being sampled.
 			this.x[i] = r;
 			
-			// Compute the running sum of the squares of the normal variables, for the subsequent normalization step.
-			sum_sq += r * r;
+			// Compute the running 2 norm of the associated vector.
+			var absR = Math.abs(r);
+			if (absR != 0) {
+				if (absR > t) {
+					s = 1 + s * (t/r) * (t/r);
+					t = absR;
+				}
+				else  {
+					s = s + (r/t) * (r/t);
+				}
+			}
 		}
 
 		// Normalization of the computed coordinates of the point being sampled, so that
 		// the 2-norm of the associated vector in R^n is equal to 1.
-		var x_two_norm = Math.sqrt(sum_sq);
+		var x_two_norm = t * Math.sqrt(s);
 		for (var i = 0; i < this.n; ++i) {
 			this.x[i] = this.x[i]/x_two_norm;
 		}
 		
-		// Return a copy of the point being sampled, so that callers can alter it.
-		return this.x.slice();
+		// Return either the point being sampled, or a copy of the point being sampled so that callers can alter it
+		if (this.reuseOutputArray) {
+			return this.x;
+		}
+		else {
+			return this.x.slice(0);
+		}
 	}
 }
 
@@ -5989,7 +6502,7 @@ function sampleCovariance_(x, y) {
 
 
 /**
- * @file Misc. optimisation functions.
+ * @file Misc. optimization functions.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
@@ -5998,28 +6511,865 @@ self.lpsolvePDHG_ = lpsolvePDHG_;
 self.qpsolveGSMO_ = qpsolveGSMO_;
 self.qksolveBS_ = qksolveBS_;
 self.ccpsolveFISTA_ = ccpsolveFISTA_;
+self.gssSolve_ = gssSolve_;
+self.bisection_ = bisection_;
+self.goldenSectionSearch_ = goldenSectionSearch_;
 /* End Wrapper private methods - Unit tests usage only */
  
+
+ 
+/**
+* @function gssSolve_
+*
+* @summary Returns a possible solution to a minimization problem, 
+* using a generating set search algorithm.
+*
+* @description This function computes a possible solution to a minimization problem 
+* defined on on R^n using a generating set search algorithm (direct search-like).
+*
+* The problem is assumed to be provided in the following format:
+*
+* min f(x), x in R^n
+*
+* optionally s.t. l <= x <= u (finite bound constraints)
+*
+* where:
+* - f: R^n -> R is a function
+* - l an n by 1 matrix
+* - u an n by 1 matrix
+*
+* The problem is assumed to be solvable, i.e., argmin f(x), x in R^n or 
+* argmin f(x), x in R^n n [l, u], is assumed to be non-empty.
+*
+* The algorithm used internally is a generating set search algorithm, based on both
+* deterministic and random polling sets, c.f. the first and the second references.
+*
+* To be noted that while the convergence of the algorithm is ensured for a large class
+* of functions, c.f. the fourth reference, there is no guarantee that the point computed
+* is a solution to the minimization problem.
+*
+* @see <a href="https://epubs.siam.org/doi/abs/10.1137/140961602">S. Gratton, C. W. Royer, L. N. Vicente, and Z. Zhang, Direct Search Based on Probabilistic Descent, SIAM J. Optim., 25(3), 1515–1541.</a>
+* @see <a href="https://link.springer.com/article/10.1007%2Fs10589-019-00062-4">S. Gratton, C. W. Royer, L. N. Vicente, and Z. Zhang, Direct search based on probabilistic feasible descent for bound and linearly constrained problems, Computational Optimization and Applications volume 72, pages 525–559 (2019)</a>
+* @see <a href="https://hal.archives-ouvertes.fr/tel-01688027#">C. Royer, Derivative-Free Optimization Methods based on Probabilistic and Deterministic Properties: Complexity Analysis and Numerical Relevance, PhD Thesis</a> 
+* @see <a href="https://link.springer.com/article/10.1007/s10107-010-0429-8">L. N. Vicente and A. L. Custodio, Analysis of direct searches for discontinuous functions, Mathematical Programming volume 133, pages 299–325 (2012)</a>
+*
+* @param {function} f, a function representing the function f above, which must take as input argument
+* a n by 1 matrix x corresponding to a point in R^n and which must return as output a real number 
+* corresponding to f(x).
+* @param {Matrix_} x0, an n by 1 matrix corresponding to the point on which to
+* start the algorithm (usually, the best possible guess of the optimal solution).
+* @param {Matrix_} l an optional n by 1 matrix corresponding to the lower bounds constraints (required if u is provided).
+* @param {Matrix_} u an optional n by 1 matrix corresponding to the upper bounds constraints (required if l is provided).
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the absolute tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-06.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 10000.
+* @param {number} opt.alphaZero the initial value of the step size, a strictly positive real number; defaults to 1.
+* @param {number} opt.alphaMax the maximum value of the step size, a strictly positive real number; defaults to 1e10.
+* @param {number} opt.gamma the factor by which the step size is multiplied if an improved point is found, a real number belonging to [1,+infinity[; defaults to 1 in case of .
+* @param {number} opt.theta the factor by which the step size is multiplied if no improved point is found, a real number belonging to ]0,1[; defaults to 0.5.
+* @param {string} opt.unconstrainedPollingSet the polling set to consider in case no bounds constraints are active (or defined),
+* , a string either equal to:
+* - 'coordinateDirections' to use the polling set equal to the positive spanning set D_+ = {e_1, ..., e_n, -e_1, ..., -e_n}
+* - 'probabilisticDescentDirections' to use the polling set made of random directions uniformly distributed
+* on the unit sphere of R^n
+* - 'custom' to use a custom polling set
+* ; defaults to 'coordinateDirections'
+* @param {string} opt.constrainedPollingSet the polling set to consider in case bounds constraints are active,
+* , a string either equal to:
+* - 'coordinateDirections' to use the polling set equal to the positive spanning set D_+ = {e_1, ..., e_n, -e_1, ..., -e_n}
+* - 'custom' to use a custom polling set
+* ; defaults to 'coordinateDirections'
+* @param {string} opt.pollingType the polling strategy to use when searching the polling set for a 
+* direction of sufficient decrease, a string either equal to:
+* - 'opportunistic' to search the polling set for the first direction with a sufficient decrease in function value
+* - 'complete' to search the polling set for the direction with the lowest sufficient decrease in function value
+* ; defaults to 'opportunistic'
+* @param {function} opt.rho, the forcing function used in order to determine what is a sufficient decrease
+* in function value, which must take as input argument a real number and which must return as output a real number; 
+* defaults to the function x -> x^2/2
+*
+* @return {Array<Object>} an array arr containing two elements: 
+* - arr[0] an n by 1 matrix containing a possible solution x^* to the problem
+* - arr[1] the possible optimal value of the function f, f(x^*)
+*
+*/
+ function gssSolve_(f, x0, l, u, opt) {
+	// Internal function.
+	//
+	// Definition of the polling set generator made of the coordinate directions and their negatives, 
+	// which is:
+	// - The positive spanning set equal to D_+ = {e_1, ..., e_n, -e_1, ..., -e_n} 
+	// in case no bounds constraints are active, c.f. section 2.2 of the first reference
+	// - The approximate tangent cone equal to {e_i, i in Ip} U {-e_i, i in Im}
+	// in case bounds constraints are active, c.f. formula 5.6 of the third reference
+	function coordinateDirectionsPollingSetGenerator(x, alpha, Ip, Im) {
+		// Initializations
+		this.n = x.nbRows;
+		this.alpha = alpha;
+		this.nbGeneratedPollingDirections = 0;
+		this.d = Matrix_.zeros(n, 1); // placeholder for the coordinate direction to generate at each call of the .next() method
+
+		// Initialization of the polling directions, either to:
+		// - {e_1, ..., e_n, -e_1, ..., -e_n}, in case no bound constraints are imposed
+		// - the approximate tangent cone at (x, alpha), as described in formula 5.6 of the third reference
+		//
+		// Note: The polling directions are not computed here, only their indices.
+		this.nbPollingDirections;
+		this.pollingDirectionsIndices;
+		if (Ip && Im) {	
+			// The polling directions indices are {i, i in Ip} U {-i, i in Im}, 
+			// c.f. formula 5.6 of the third reference.
+			this.nbPollingDirections = Ip.length + Im.length;
+			this.pollingDirectionsIndices = typeof Int32Array === 'function' ? new Int32Array(this.nbPollingDirections) : new Array(this.nbPollingDirections);
+			for (var i = 0; i < Ip.length; ++i) {
+				this.pollingDirectionsIndices[i] = Ip[i];
+			}
+			for (var i = Ip.length, j= 0; i < this.nbPollingDirections; ++i, ++j) {
+				this.pollingDirectionsIndices[i] = -Im[j];
+			}
+		}
+		else {
+			// The polling directions indices are {1,2,...,n,-1,...,-n}
+			this.nbPollingDirections = 2*this.n;
+			this.pollingDirectionsIndices = typeof Int32Array === 'function' ? new Int32Array(this.nbPollingDirections) : new Array(this.nbPollingDirections);
+			for (var i = 0; i < this.n; ++i) {
+				this.pollingDirectionsIndices[i] = i + 1;
+			}
+			for (var i = this.n, j = 0; i < 2*this.n; ++i, ++j) {
+				this.pollingDirectionsIndices[i] = - (j + 1);
+			}
+		}
+
+		
+		// ------
+		
+
+		// Iterator on the polling set directions.
+		//
+		// Generate polling directions corresponding to the 
+		// the computed coordinate directions indices.
+		this.next = function() {		
+			// In case all the polling directions have already been generated, 
+			// there is nothing more to do.
+			if (this.nbGeneratedPollingDirections >= this.nbPollingDirections) {
+				return -1;
+			}
+
+
+			// The coordinate directions +-e_i, i=1..n are null vectors, except on their i-th element 
+			// equal to 1 (+e_i) or to -1 (-e_i).
+			//
+			// This observation allows to optimize the generation of the coordinate directions vectors
+			// thanks to a simple reset to 0 / set to +-1 mechanism.
+
+			// Reset the polling direction to generate to a null vector,
+			// if a polling direction has already been generated.
+			if (this.nbGeneratedPollingDirections >= 1) {
+				var previousPollingDirectionIndice = this.pollingDirectionsIndices[this.nbGeneratedPollingDirections - 1];
+				if (previousPollingDirectionIndice < 0) {
+					this.d.data[-previousPollingDirectionIndice - 1] = 0;
+				}
+				else if (previousPollingDirectionIndice > 0) {
+					this.d.data[previousPollingDirectionIndice - 1] = 0;
+				}
+				else {
+					throw new Error('internal error: 0 polling direction indice detected');
+				}
+			}
+
+			// Set to 1 or to -1 the proper coordinate of the polling direction to generate.
+			var pollingDirectionIndice = this.pollingDirectionsIndices[this.nbGeneratedPollingDirections];
+			if (pollingDirectionIndice < 0) {
+				this.d.data[-pollingDirectionIndice - 1] = -1;
+			}
+			else if (pollingDirectionIndice > 0) {
+				this.d.data[pollingDirectionIndice - 1] = 1;
+			}
+			else {
+				throw new Error('internal error: 0 polling direction indice detected');
+			}
+
+			
+			// Increment the number of generated polling directions
+			++this.nbGeneratedPollingDirections;
+
+			
+			// Return the generated polling direction
+			return this.d;
+		}
+	}
+
+	
+	// Internal function.
+	//
+	// Definition of the polling set generator made of random directions uniformly distributed
+	// on the unit sphere of R^n, c.f. Appendix B of the first reference.
+	function randomUnitSpherePollingSetGenerator(x, alpha) {
+		// Initializations
+		this.n = x.nbRows;
+		this.nbGeneratedPollingDirections = 0;
+		this.d = Matrix_.zeros(n, 1); // placeholder for the direction to generate at each call	
+		this.nbPollingDirections = Math.floor(Math.log( 1 - Math.log(theta)/Math.log(gamma) ) / Math.log(2)) + 1; // = m in section 5.4 of the second reference, the minimal number of random directions to generate
+		this.hypersphereRandomSampler = new hypersphereRandomSampler_(this.n, true); // uniform sampler of directions on the unit sphere, with output array re-usage for improved performances
+		
+		
+		// ------
+		
+
+		// Iterator on the polling set directions.
+		//
+		// Generate polling directions corresponding to random 
+		// directions uniformly distributed on the unit sphere of R^n.
+		this.next = function() {
+			// In case all the polling directions have already been generated, 
+			// there is nothing more to do.
+			if (this.nbGeneratedPollingDirections >= this.nbPollingDirections) {
+				return -1;
+			}
+			
+			
+			// Specific case if m = 2, c.f. section 7 of the first reference,
+			// for which the set D_k = {v, -v} is optimal.
+			if (this.nbPollingDirections === 2 && this.nbGeneratedPollingDirections === 1) {
+				this.d = Matrix_.ax(-1, this.d, this.d);
+			}
+			else {
+				// Generate a random vector uniformly distributed on the unit sphere of R^n.
+				var vect = this.hypersphereRandomSampler.sample();
+				this.d = Matrix_.fill(this.n, 1, function(i,j) { return vect[i-1]; }, this.d);
+			}
+			
+			
+			// Increment the number of generated polling directions
+			++this.nbGeneratedPollingDirections;
+
+			
+			// Return the generated direction
+			return this.d;
+		}
+	}
+	
+	
+	// ------
+	
+	
+	// Misc. initializations
+	var n = x0.nbRows;
+	var eps_tol = 1e-12; // used to numerically determine some conditions
+
+	
+	// ------
+	
+	
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	
+	// The maximum number of iterations of the GSS algorithm
+	var maxIterations = opt.maxIter;
+	if (maxIterations === undefined) {
+		maxIterations = 10000;
+	}
+	
+	// The tolerance value under which the GSS algorithm is considered to have converged
+	var eps = opt.eps;
+	if (eps === undefined) {
+		eps = 1e-6;
+	}
+	
+	// The lower and upper bounds constraints
+	if (l && u) {
+		if (l.length != u.length) {
+			throw new Error("incompatible number of lower bounds and upper bounds constraints: " + l.length + " v.s. " + u.length);
+		}
+		else {
+			l = new Matrix_(l);
+			u = new Matrix_(u);
+		}
+	}
+	if (l && !u) {
+		throw new Error('missing upper bounds constraints');
+	}
+	else if (!l && u) {
+		throw new Error('missing lower bounds constraints');
+	}
+
+	// The polling set in case of no active bounds constraints
+	var unconstrainedPollingSet = opt.unconstrainedPollingSet;
+	if (unconstrainedPollingSet === undefined) {
+		unconstrainedPollingSet = 'coordinateDirections';
+	}
+	if (unconstrainedPollingSet !== 'coordinateDirections' 
+	    && unconstrainedPollingSet !== 'probabilisticDescentDirections'
+		&& unconstrainedPollingSet !== 'custom') {
+		throw new Error('unsupported unconstrained polling set');
+	}
+	
+	// The generator of the polling set in case of no active bounds constraints.
+	var unconstrainedPollingSetGenerator;
+	if (unconstrainedPollingSet === 'coordinateDirections') {
+		unconstrainedPollingSetGenerator = coordinateDirectionsPollingSetGenerator;
+	}
+	else if (unconstrainedPollingSet === 'probabilisticDescentDirections') {
+		unconstrainedPollingSetGenerator = randomUnitSpherePollingSetGenerator;
+	}
+	else if (unconstrainedPollingSet === 'custom') {
+		unconstrainedPollingSetGenerator = opt.customUnconstrainedPollingSetGenerator;
+	}
+	else {
+		throw new Error('internal error: unsupported unconstrained polling set detected');
+	}
+
+	// The polling set in case of active bounds constraints
+	var constrainedPollingSet = opt.constrainedPollingSet;
+	if (constrainedPollingSet === undefined) {
+		constrainedPollingSet = 'coordinateDirections';
+	}
+	if (constrainedPollingSet !== 'coordinateDirections' 
+		&& constrainedPollingSet !== 'custom') {
+		throw new Error('unsupported constrained polling set');
+	}
+	
+	// The generator of the polling set in case of active bounds constraints.
+	var constrainedPollingSetGenerator;
+	if (constrainedPollingSet === 'coordinateDirections') {
+		constrainedPollingSetGenerator = coordinateDirectionsPollingSetGenerator;
+	}
+	else if (constrainedPollingSet === 'custom') {
+		constrainedPollingSetGenerator = opt.customConstraintedPollingSetGenerator;
+	}
+	else {
+		throw new Error('internal error: unsupported constrained polling set detected');
+	}
+	
+	// The initial step size
+	var alphaZero = opt.alphaZero;
+	if (alphaZero === undefined) {
+		alphaZero = 1;
+	}
+
+	// The maximum value of the step size
+	var alphaMax = opt.alphaMax;
+	if (alphaMax === undefined) {
+		alphaMax = 1e10;
+	}
+	
+	// Gamma, the factor by which the step size is multiplied if an improved point is found.
+	//
+	// By default, gamma is equal to 1 in case of deterministic direct search based on positive spanning sets, 
+	// or equal to 2 in case of probabilistic descent, c.f. section 5 of the first reference.
+	//
+	// In case of custom polling set, gamma is set to 1.
+	var gamma = opt.gamma;
+	if (gamma === undefined) {
+		if (unconstrainedPollingSet === 'coordinateDirections') {
+			gamma = 1;
+		}
+		else if (unconstrainedPollingSet === 'probabilisticDescentDirections') {
+			gamma = 2;
+		}
+		else if (unconstrainedPollingSet === 'custom') {
+			gamma = 1;
+		}
+		else {
+			throw new Error('internal error: unsupported unconstrained polling set detected');
+		}
+	}
+	
+	// Theta, the factor by which the step size is multiplied if no improved point is found
+	//
+	// C.f. section 2.2 of the first reference.
+	var theta = opt.theta;
+	if (theta === undefined) {
+		theta = 0.5;
+	}
+
+	// The polling type
+	var pollingType = opt.pollingType;
+	if (pollingType === undefined) {
+		pollingType = 'opportunistic';
+	}
+	if (pollingType !== 'opportunistic' && pollingType !== 'complete') {
+		throw new Error('unsupported polling type');
+	}
+	
+	// Initialization of the forcing function.
+	//
+	// By default, it is equal to f: x -> x^2/2, as proposed in
+	// section 1 of the first reference.
+    var rho = opt.rho; 
+	if (rho === undefined) {
+		rho = function (alpha) {
+			return alpha * alpha / 2;
+		}
+	}
+	
+	
+    // ------
+
+
+	// Initialization of the x iterates
+	var x_k = Matrix_.copy(x0); // placeholder for the x_k vector
+	var x_kp = Matrix_.copy(x0); // placeholder for the x_kp vector
+	var x_kp_best = Matrix_.copy(x0); // placeholder for the best x_kp vector, mostly used in case of complete polling
+	var f_x_k = f(x_k); // placeholder for the f(x_k) value
+	var f_x_kp = f(x_kp); // placeholder for the f(x_kp) value
+	var f_x_kp_best = undefined; // placeholder for the best f(x_kp) value, mostly used in case of complete polling
+	
+	// Initialization of the step size
+	var alpha_k = alphaZero;
+
+	
+	// ------
+		
+
+	// Main loop of the Algorithm 2.1 of the fourth reference,
+	// guaranteed to converge per theorem 2.2 of the fourth reference,
+	// provided certain conditions on f and on the set of polling directions D are met.
+	var iter = 0;
+	while (true) {
+		// Check the number of iterations
+		if (maxIterations !== -1 && iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+		
+		
+		// Update the number of iterations
+		++iter;
+		
+		
+		// Update of rho_alpha_k 
+		var rho_alpha_k = rho(alpha_k);
+		
+		
+		// Search step (acceleration moves)
+        //
+		// Try to compute a point x_* such that f(x_*) < f (x_k) - rho(alpha_k), using any heuristic.
+		//
+		// If such a point is found then set x_k+1 = x_*, consider the search step as successful, and skip the poll step.
+		var searchSuccessful = false;
+		
+
+		// Poll step (exploratory moves using movements called "patterns")
+		//
+		// Compute a finite polling set D_k of normalized directions in R^n, which is
+		// searched for a direction d_k in the polling set D_k such that 
+		// f(x_k + alpha_k * d_k) < f(x_k) - rho(alpha_k).
+		// 
+		// If such a direction d_k is found, the poll step is considered as successful, and:
+		// - In case the polling is opportunistic, the poll step is stopped
+		// - In case the polling is complete, the poll step continues until exhaustion 
+		// of the polling set D_k, in order to tentatively find a better direction
+		//
+		// Otherwise, the poll step is considered as unsuccessful.
+		var pollSuccessful = false;
+
+		if (searchSuccessful === false) {		
+			// Before any process, in case bound constraints are imposed, determine the index sets 
+			// of the free bounds constraints at (x_k, alpha_k) named I^+ and I^- in 
+			// formulas 5.5 of the third reference.
+			//
+			// Note: To ensure the future iterates stay numerically feasible, 
+			// eps_tols is added in checking the boundary conditions.
+			if (l && u) {
+				var Ip = new Array(0);
+				var Im = new Array(0);
+				
+				for (var i = 0; i < n; ++i) {
+					if (x_k.data[i] + alpha_k <= u.data[i] - eps_tol) {
+						Ip.push(i + 1);
+					}
+					
+					if (l.data[i] + eps_tol <= x_k.data[i] - alpha_k) {
+						Im.push(i + 1);
+					}
+				}
+			}
+			
+			// Compute the polling set D_k for (x_k, alpha_k):
+			// - In case there are active bounds constraints (Ip U Im <> D_+), 
+			// use the constrained polling set generator
+			// - Otherwise, use the unconstrained polling set generator
+			var D_k;
+			if ((l && u) && Ip.length + Im.length < 2*n) {
+				D_k = new constrainedPollingSetGenerator(x_k, alpha_k, Ip, Im);
+			}
+			else {
+				D_k = new unconstrainedPollingSetGenerator(x_k, alpha_k);
+			}		
+			
+			// Iterate on the polling set D_k
+			var d_k = D_k.next();
+			while (d_k != -1) {
+				x_kp = Matrix_.axpby(1, x_k, alpha_k, d_k, x_kp);
+				f_x_kp = f(x_kp);
+				
+				if ( f_x_kp < f_x_k - rho_alpha_k ) {
+					// The poll step is successful
+					pollSuccessful = true;
+
+					// In case of opportunistic polling, stops there.
+					//
+					// Else, in case of complete polling, determine if the current direction
+					// is better than the best direction found so far, in which case
+					// the current direction becomes the new best direction found so far.
+					if (pollingType === 'opportunistic') {
+						x_kp_best = Matrix_.copy(x_kp, x_kp_best);
+						f_x_kp_best = f_x_kp;
+						
+						break;
+					}
+					else if (pollingType === 'complete') {
+						if (f_x_kp_best === undefined) {
+							x_kp_best = Matrix_.copy(x_kp, x_kp_best);
+							f_x_kp_best = f_x_kp;						
+						}
+						else {
+							if (f_x_kp < f_x_kp_best) {
+								x_kp_best = Matrix_.copy(x_kp, x_kp_best);
+								f_x_kp_best = f_x_kp;
+							}
+						}
+					}
+				}
+				
+				d_k = D_k.next(); 
+			}
+		}
+
+		
+		// Preparation of the next iteration:
+		// - Update of the x_k iterate
+		// - Update of the f_x_k iterate
+		// - Reset of the f_x_kp_best iterate
+		if (searchSuccessful === true || pollSuccessful === true) {
+			x_k = Matrix_.copy(x_kp_best, x_k);
+			f_x_k = f_x_kp_best;
+			f_x_kp_best = undefined;
+		}
+		
+		// - Update of the step size parameter
+		if (pollSuccessful === true || searchSuccessful === true) {
+			// Successful iteration:
+			// - Increase the step size (unless it is already at maximum)
+			alpha_k = Math.min(gamma * alpha_k, alphaMax);
+		}
+		else {
+			// Unsuccessful iteration:
+			// - Decrease the step size
+			alpha_k = theta * alpha_k;			
+		}
+
+	
+		// Stopping condition, based on Theorem 2.3 of the fourth reference
+		if (alpha_k <= eps) {
+			break;
+		}
+	}
+
+	// Return the computed x_k value
+	return x_k;	
+}
+
+/**
+* @function goldenSectionSearch_
+*
+* @summary Returns a solution to a unidimensional minimization problem using the 
+* golden section search method.
+*
+* @description This function returns a solution x^* to the problem min f(x), x in [x_min, x_max], where:
+* - f: [x_min, x_max] -> R is a unimodal function, that is, such that f is monotonically non-increasing for x <= x^* 
+* and monotonically non-decreasing for x >= x^*
+*
+* The algorithm used internally is the golden section search method, c.f. the first and the second
+* references, which is guaranteed to converge.
+*
+* To be noted that when there are several solutions to the problem (i.e., when the function f is
+* not strictly unimodal), the algorithm will converge to one of them.
+*
+* @see <a href="https://en.wikipedia.org/wiki/Golden-section_search">Golden-section search</a>
+* @see William H. Press, Brian P. Flannery, Saul A. Teukolsky, William T. Vetterling, Numerical Recipes in C. The Art of Scientific Computing, 2nd Edition, 1992</a>
+* @see <a href="https://www.jstor.org/stable/2032161">J. Kiefer, Sequential Minimax Search for a Maximum, Proceedings of the American Mathematical Society Vol. 4, No. 3 (Jun., 1953), pp. 502-506</a>
+*
+* @param {function} f, a function representing the function f above, which must take as input argument
+* a real number corresponding to a point in the interval [x_min, x_max] and which must return as output a real number 
+* corresponding to f(x).
+* @param {number} x_min, a real number corresponding to the lower bound of the interval on which 
+* to search for a solution to the problem min f(x), x in [x_min, x_max].
+* @param {number} x_max, a real number corresponding to the upper bound of the interval on which 
+* to search for a solution to the problem min f(x), x in [x_min, x_max].
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the absolute tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-06.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to -1.
+* @return {Array<Object>} an array arr containing:
+* -- arr[0] a solution x^* to the problem, a real number
+* -- arr[1] the optimal value of the function f, f(x^*)
+*
+* @example
+* goldenSectionSearch_(function (x) { return (x-2)*(x-2); }, 1, 5);
+* // ~[2.00000028, 0]
+*
+*/
+function goldenSectionSearch_(f, x_min, x_max, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	
+	// The maximum number of iterations of the algorithm.
+	var maxIterations = opt.maxIter;
+	if (maxIterations === undefined) {
+		maxIterations = -1;
+	}
+	
+	// The (absolute) tolerance value under which the algorithm
+	// is considered to have converged.
+	//
+	// The default is taken to be 1e-6, which is a good numerical 
+	// compromise since the golden section search method is linear.
+	var eps = opt.eps;
+	if (eps === undefined) {
+		eps = 1e-6;
+	}
+	
+	
+	// Initializations
+	var inv_phi = (Math.sqrt(5) - 1) / 2; // ~0.618
+	var one_m_inv_phi = 1 - inv_phi; // ~0.382
+	
+	var a = x_min;
+	var b = x_max;
+	var c = a + one_m_inv_phi * (b - a);
+	var d = a + inv_phi * (b - a);
+	
+	var f_c = f(c);
+	var f_d = f(d);
+
+
+	// Misc. checks
+	if (x_min >= x_max) {
+		throw new Error('bracketing interval lower bound ' + x_min + 
+		                ' greater than bracketing interval upper bound ' + x_max);
+	}
+
+	
+	// Core algorithm
+	//
+	// The function f is evaluated at points c and d above (with a < c < d < b),
+	// and the subinterval [a,c], [c,d] or [d,b] in which to continue to search 
+	// for the minimum of f is chosen based on the comparison between f(c) and f(d).
+	//
+	// The process then continues iteratively, until the chosen subinterval is of
+	// length of at most eps.
+	var iter = 0;	
+	while (true) {
+		// Check the number of iterations
+		if (maxIterations !== -1 && iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+				
+		// Update the number of iterations
+		++iter;
+
+		// Compare f(c) and f(d) to select the next subinterval in
+		// which to continue to search for the minimum of f.
+		if (f_c < f_d) { // x^* belongs to [a, d]
+			b = d;
+			d = c;
+			c = inv_phi*d + one_m_inv_phi*a;
+	
+			f_d = f_c;
+			f_c = f(c);
+		}
+		else if (f_c > f_d) { // x^* belongs to [c, b]
+			a = c;
+			c = d;
+			d = inv_phi*c + one_m_inv_phi*b;
+			
+			f_c = f_d;
+			f_d = f(d);
+		}
+		else { // x^* belongs to [c, d], numerically highly improbable
+			a = c;
+			b = d;
+			c = a + one_m_inv_phi * (b - a);
+			d = a + inv_phi * (b - a);
+			
+			f_c = f(c);
+			f_d = f(d);
+		}
+
+		// Stopping condition, based on the length of the bracketing interval
+		if (Math.abs(b - a) <= eps * (Math.abs(c) + Math.abs(d)) ) {
+			if (f_c < f_d) {
+				return [c, f_c];
+			}
+			else {
+				return [d, f_d];
+			}
+		}
+	}
+}
+
+ 
+/**
+* @function bisection_
+*
+* @summary Returns a solution to a unidimensional non-linear equation using the 
+* bisection method.
+*
+* @description This function returns a solution to the equation f(x) = 0, where:
+* - f: [x_min, x_max] -> R is a continuous function
+* - f(x_min) and f(x_max) have opposite signs
+*
+* The algorithm used internally is the bisection method, c.f. the first and the second
+* references, which is guaranteed to converge.
+*
+* To be noted that when there are several solutions to the equation f(x) = 0 on the
+* interval [x_min, x_max], details on which solution can be found by the bisection method
+* are available in the third reference.
+*
+* @see <a href="https://en.wikipedia.org/wiki/Bisection_method">Bisection method</a>
+* @see William H. Press, Brian P. Flannery, Saul A. Teukolsky, William T. Vetterling, Numerical Recipes in C. The Art of Scientific Computing, 2nd Edition, 1992</a>
+* @see <a href="https://www.jstor.org/stable/2029507">George Corliss, Which Root Does the Bisection Algorithm Find?, SIAM Review,Vol. 19, No. 2 (Apr., 1977), pp. 325-327</a>
+*
+* @param {function} f, a function representing the function f above, which must take as input argument
+* a real number corresponding to a point in the interval [x_min, x_max] and which must return as output a real number 
+* corresponding to f(x).
+* @param {number} x_min, a real number corresponding to the lower bound of the interval on which 
+* to search for a solution to the equation f(x) = 0, which must satisfy f(x_min) * f(x_max) < 0.
+* @param {number} x_max, a real number corresponding to the upper bound of the interval on which 
+* to search for a solution to the equation f(x) = 0, which must satisfy f(x_min) * f(x_max) < 0.
+* @param {object} opt the optional parameters for the algorithm.
+* @param {number} opt.eps the absolute tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-06.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 45.
+* @return {number} a solution to the problem, a real number
+*
+* @example
+* bisection_(function (x) { return x*x - 2; }, 0, 2);
+* // ~1.414
+*
+*/
+function bisection_(f, x_min, x_max, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	
+	// The maximum number of iterations of the algorithm.
+	//
+	// The default is taken to be 45, because 45 bisections correspond to
+	// a bracketing interval length of 2^-45 ~= 2.8e-14, which is more
+	// than sufficient in standard numerical computations.
+	var maxIterations = opt.maxIter;
+	if (maxIterations === undefined) {
+		maxIterations = 45;
+	}
+	
+	// The (absolute) tolerance value under which the algorithm
+	// is considered to have converged.
+	//
+	// The default is taken to be 1e-6, which is a good numerical 
+	// compromise since the bisection method is linear.
+	var eps = opt.eps;
+	if (eps === undefined) {
+		eps = 1e-6;
+	}
+	
+	
+	// Initializations
+	var f_x_min = f(x_min);
+	var f_x_max = f(x_max);
+	var r; // a root of the function f in the interval [x_min, x_max]
+	var dx; // the signed length of the interval [x_min, x_max], which will be halved in each iteration of the bisection algorithm
+	if (f_x_min <= 0) { // by convention taken from the second reference, the bisection root search is oriented so that f(r) <= 0
+		r = x_min;
+		dx = x_max - x_min;
+	}
+	else {
+		r = x_max;
+		dx = x_min - x_max;
+	}
+
+
+	// Misc. checks
+	if (x_min >= x_max) {
+		throw new Error('bracketing interval lower bound ' + x_min + 
+		                ' greater than bracketing interval upper bound ' + x_max);
+	}
+	if (f_x_min == 0) {
+		return x_min; // a root has been found !
+	}
+	if (f_x_max == 0) {
+		return x_max; // a root has been found !
+	}
+	if (f_x_min*f_x_max > 0.0) {
+		throw new Error('interval [' + x_min + ',' + x_max + '] is not a bracketing interval');
+	}
+	
+	
+	// Core algorithm
+	//
+	// The bracketing interval [x_min, x_max] is iteratively
+	// halved until a root r of the function f is found in a subinterval
+	// of length at most eps.
+	var iter = 0;	
+	while (true) {
+		// Check the number of iterations
+		if (maxIterations !== -1 && iter > maxIterations) {
+			throw new Error('maximum number of iterations reached: ' + maxIterations);
+		}
+				
+		// Update the number of iterations
+		++iter;
+		
+		// Halves the current bracketing interval
+		dx = dx / 2;
+		
+		// Compute the mid point of the current bracketing interval,
+		// as well as the value of f at this point.
+		var x_mid = r + dx;
+		var f_mid = f(x_mid);
+		
+		// Keep the orientation of the bisection root search so that f(r) <= 0
+		if (f_mid <= 0) {
+			r = x_mid;
+		}
+		
+		// Early stopping condition, numerically highly improbable
+		if (f_mid == 0) {
+			return r;
+		}
+
+		// Stopping condition, based on the length of the bracketing interval
+		if (Math.abs(dx) <= eps) {
+			return r;
+		}
+	}
+}
+
 
 /**
 * @function ccpsolveFISTA_
 *
-* @summary Returns an optimal solution to a compositive convex problem, 
+* @summary Returns a solution to a composite convex problem, 
 * using a FISTA-like accelerated first-order algorithm.
 *
-* @description This function computes an optimal solution to a compositive convex
+* @description This function computes a solution to a composite convex
 * problem using a FISTA-like accelerated first-order algorithm, c.f. the first reference.
 *
-* The compositive convex problem to solve is assumed to be provided in the
+* The composite convex problem to solve is assumed to be provided in the
 * following format:
 *
 * min F(x) = f(x) + g(x), x in R^n
 *
-* f : R^n -> R is a continuously differentiable convex function with a Lipschitz continuous gradient
-* g : R^n -> R u {+oo} is a (proximable) proper closed convex function
-* gradf : R^n -> R^n is the Lipschitz continuous gradient of f
-* proxg : R^n x R^+* -> R^n is the proximal operator associated to g defined as 
-* proxg(x, mu) = argmin u in R^n ( g(u) + 1/(2*mu) * ||u - x||_2^2 )
+* where:
+* - f: R^n -> R is a continuously differentiable convex function with a Lipschitz continuous gradient
+* - g: R^n -> R u {+oo} is a (proximable) proper closed convex function
+* - gradf: R^n -> R^n is the Lipschitz continuous gradient of f
+* - proxg: R^n x R^+* -> R^n is the proximal operator associated to g defined as 
+* - proxg(x, mu) = argmin u in R^n ( g(u) + 1/(2*mu) * ||u - x||_2^2 )
 *
 * The problem is assumed to be solvable, i.e., argmin F(x), x in R^n, is
 * assumed to be non-empty.
@@ -6029,7 +7379,7 @@ self.ccpsolveFISTA_ = ccpsolveFISTA_;
 * it ensures a convergence rate of O(1/k^2)), with the following additions:
 * - The usage of a convergence criterion based on the gradient of f and on a subdifferential of g,
 * c.f. the fourth reference
-* - The usage of both a fixed and of an adaptative restart mechanism, c.f. the fifth reference
+* - The usage of both a fixed and of an adaptive restart mechanism, c.f. the fifth reference
 * - The usage of a Barzilai and Borwein like step size, c.f. the sixth reference
 *
 * @see <a href="https://doi.org/10.1137/080716542">Amir Beck and Marc Teboulle, A Fast Iterative Shrinkage-Thresholding Algorithm for Linear Inverse Problems, SIAM Journal on Imaging Sciences 2009 2:1, 183-202</a>
@@ -6052,8 +7402,8 @@ self.ccpsolveFISTA_ = ccpsolveFISTA_;
 * the function g above, which must take as input arguments a n by 1 matrix x corresponding to 
 * a point in R^n and a strictly positive real number mu corresponding to a step size and which 
 * must return as output a n by 1 matrix corresponding to proxg(x, mu).
-* @param {Matrix_} x0 an n by 1 matrix corresponding to the point on which to
-* start the FISTA algorithm (usually, the best possible guess of the optimal solution).
+* @param {Matrix_} x0, an n by 1 matrix corresponding to the point on which to
+* start the algorithm (usually, the best possible guess of the optimal solution).
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the absolute tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 10000.
@@ -6063,8 +7413,8 @@ self.ccpsolveFISTA_ = ccpsolveFISTA_;
 * @param {number} opt.alphaMax the maximum value of the step size, a strictly positive real number; defaults to 1e10.
 * @param {number} opt.restartPeriod the restart period, expressed in a number of iterations, of the fixed restart mechanism of the algorithm; defaults to 1000 iterations.
 * @return {Array<Object>} an array arr containing two elements: 
-* - arr[0] an n by 1 matrix containing the optimal solution x^* to the compositive convex problem
-* - arr[1] the optimal value of the function f, i.e. F(x^*)
+* - arr[0] an n by 1 matrix containing the optimal solution x^* to the problem
+* - arr[1] the optimal value of the function F, F(x^*)
 *
 * @example
 * ccpsolveFISTA_(function(x) { return Math.exp((x.getValue(1, 1) - 0.7)*(x.getValue(1, 1) - 0.7)); }, // f(x) = exp((x - 0.7)^2)
@@ -6143,7 +7493,7 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 	// ------
 	
 	
-	// Misc; initializations
+	// Misc. initializations
 	var n = x0.nbRows;
 	var eps_tol = 1e-12; // used to numerically determine some conditions (backtrack, adaptative restart, stepsize)
 	
@@ -6388,7 +7738,7 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 * s.t. <b/x> = r (single linear equality constraint)
 *      l <= x <= u (finite bound constraints)
 *
-* with:
+* where:
 * - d an n by 1 matrix with strictly positive elements, representing a diagonal n by n matrix with strictly positive elements
 * - a an n by 1 matrix
 * - r a real number
@@ -6406,8 +7756,8 @@ function ccpsolveFISTA_(f, gradf, g, proxg, x0, opt) {
 * @param {Matrix_} a an n by 1 matrix.
 * @param {Matrix_} b an n by 1 matrix with strictly positive elements.
 * @param {number} r a real number.
-* @param {Matrix_} l an n by 1 matrix.
-* @param {Matrix_} u an n by 1 matrix.
+* @param {Matrix_} l an n by 1 matrix corresponding to the lower bounds constraints.
+* @param {Matrix_} u an n by 1 matrix corresponding to the upper bounds constraints.
 * @param {object} opt optional parameters for the algorithm.
 * @param {number} opt.eps tolerance when assessing the numerical equality <b/x> = r , a strictly positive real number; defaults to 1e-16.
 * @param {boolean} opt.outputLagrangeMultiplier boolean indicating if the Lagrange multiplier associated to the optimal solution of the problem 
@@ -6764,7 +8114,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 *      l <= x <= u (bound constraints)
 *
 * with:
-* - Q an n by n square symetric positive semi-definite matrix
+* - Q an n by n square symmetric positive semi-definite matrix
 * - p an n by 1 matrix
 * - r a real number
 * - b an n by 1 matrix with strictly positive elements
@@ -6870,7 +8220,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	// Compute the gradient of the function f at the point x, using formula
 	// grad(f)(x) = Q*x + p.
 	//
-	// This step is the most expansive code portion, since matrix-vector
+	// This step is the most expensive code portion, since matrix-vector
 	// multiplication is O(n^2).
 	var grad_f_x = Matrix_.xpy(Matrix_.xy(Q, x), p);
 	
@@ -7475,6 +8825,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 
 
 /* Start Wrapper private methods - Unit tests usage only */
+self.simplexCharacteristicFunction_ = simplexCharacteristicFunction_;
 self.simplexEmptinessCheck_ = simplexEmptinessCheck_;
 self.simplexRationalRounding_ = simplexRationalRounding_;
 self.simplexRandomSampler_ = simplexRandomSampler_;
@@ -7484,6 +8835,92 @@ self.simplexGridSearch_ = simplexGridSearch_;
 self.simplexEuclidianProjection_ = simplexEuclidianProjection_;
 self.simplexSparseEuclidianProjection_ = simplexSparseEuclidianProjection_;
 /* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function simplexCharacteristicFunction_
+*
+* @summary The characteristic function of the restricted unit simplex of R^n.
+*
+* @description This function is the characteristic function of the restricted unit simplex of R^n,
+* c.f. the reference, so that it returns:
+* - 0 <=> x belongs to the restricted unit simplex of R^n
+* - +oo <=> x does not belong to the restricted unit simplex of R^n
+*
+* By definition, x belongs to the restricted simplex of R^n if and only if its coordinates satisfy:
+* - sum x_i == 1
+* - l_i <= x_i <= u_i <= 1, i = 1..n
+*
+* @see <a href="https://en.wikipedia.org/wiki/Characteristic_function_(convex_analysis)">Characteristic function (convex analysis)</a>
+*
+* @param {Array.<number>} x, a point belonging to R^n, array of n real numbers.
+* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of zeros.
+* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of ones.
+* @return {number} In case the point x belongs to the restricted unit simplex of R^n, returns 0, otherwise, returns Number.POSITIVE_INFINITY.
+*
+* @example
+* simplexCharacteristicFunction_([0.1, 0.9]);
+* // == 0
+*
+* @example
+* simplexCharacteristicFunction_([0.1, 1.9]);
+* // == Number.POSITIVE_INFINITY
+*/
+function simplexCharacteristicFunction_(x, l, u) {
+	// Initializations
+	var n = x.length;
+	var eps_tol = 1e-12; // used to numerically determine some conditions
+
+
+	// Emptiness check on the restricted simplex.
+	//
+	// In case the restricted simplex is empty, an exception is thrown, so that
+	// the process is (violently) stopped here.
+	simplexEmptinessCheck_(n, l, u);
+	
+	
+	// Check if the point x belongs to the restricted unit simplex
+	var sum_xi = 0;
+	for (var i = 0; i < n; ++i) {	
+		// Extract the i-th coordinate of the restricted simplex lower bound
+		var lb_i = 0;
+		if (l) {
+			lb_i = l[i];
+		}
+		
+		// Extract the i-th coordinate of the restricted simplex upper bound
+		var up_i = 1;
+		if (u) {
+			up_i = u[i];
+		}
+		
+		// Extract the i-th coordinate of the point x
+		var x_i = x[i];
+
+		// Compare the i-th coordinate of the point x with the lower and the upper bounds
+		// of the restricted simplex.
+		if (x_i < lb_i || x_i > up_i) {
+			return Number.POSITIVE_INFINITY;
+		}
+		
+		// Compute the sum of the coordinates of the point x for later use
+		sum_xi += x_i;
+	}
+	
+	// Check if the point x belongs to the restricted unit simplex, second step.
+	//
+	// Note: Due to limited numerical precision, the test on the sum of the coordinates
+	// of the point x (which must be equal to 1) cannot be exact.
+	if (Math.abs(sum_xi - 1) > eps_tol) {
+		return Number.POSITIVE_INFINITY;
+	}
+	
+
+	// At this stage, the input point x belongs to the restricted unit simplex
+	return 0;
+}
+
+
 
 /**
 * @function simplexEmptinessCheck_
@@ -7504,8 +8941,8 @@ self.simplexSparseEuclidianProjection_ = simplexSparseEuclidianProjection_;
 * 15 January 2000, Pages 113-120</a>
 *
 * @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
-* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
-* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of zeros.
+* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of ones.
 * @throws Throws an error in case the restricted unit simplex is empty.
 * @return {Array.<number>} In case the restricted unit simplex is not empty, returns an array of 2 real numbers:
 * - the sum of the lower bounds, sum l_i
@@ -7569,11 +9006,11 @@ function simplexEmptinessCheck_(n, l, u) {
 *
 * @summary Returns a closest point on the unit simplex subject to a sparsity constraint.
 *
-* @description This function computes a closest point (relative to the euclidian distance) 
+* @description This function computes a closest point (relative to the euclidean distance) 
 * with at most k non-zero elements on the unit simplex of R^n to a point x = (x_1,...,x_n) in R^n, 
 * using an O(n) implementation of the algorithm 1 of the reference.
 *
-* In other words, this function computes an at most k-sparse euclidian projection of 
+* In other words, this function computes an at most k-sparse euclidean projection of 
 * a point x in R^n onto the unit simplex of R^n.
 *
 * @see <a href="https://arxiv.org/abs/1206.1529">Anastasios Kyrillidis, Stephen Becker, Volkan Cevher and, Christoph Koch, Sparse projections onto the simplex, arXiv:1206.1529 [cs.LG]</a>
@@ -7625,7 +9062,7 @@ function simplexSparseEuclidianProjection_(x, k) {
 	var proj_x_k = simplexEuclidianProjection_(x_k);
 	
 	
-	// Compute the final projection by reconciliating the support of the
+	// Compute the final projection by re-conciliating the support of the
 	// projection above and its complementary set.
 	var y = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
 	for (var i = 0; i < k;  ++i) {
@@ -7651,36 +9088,49 @@ function simplexSparseEuclidianProjection_(x, k) {
 * In other words, this function computes the euclidian projection of the point x in R^n
 * onto the unit simplex of R^n.
 *
+* Optionally, lower bounds and upper bounds constraints can be added to the problem, in which case 
+* the unit simplex becomes a restricted unit simplex.
+*
 * Internally, the algorithm used is an O(n) algorithm, c.f. the reference.
 *
 * @see <a href="https://link.springer.com/article/10.1007/s10107-006-0050-z">Kiwiel, K.C., Breakpoint searching algorithms 
 * for the continuous quadratic knapsack problem, Math. Program. (2008) 112: 473</a>
 *
 * @param {Array.<number>} x a point belonging to R^n, array of n real numbers.
+* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of zeros.
+* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of ones.
 * @return {Array.<number>} the computed closest point to x, array of n real numbers.
 *
 * @example
 * simplexEuclidianProjection_([1, 1, 1]);
 * // [~0.33, ~0.33, ~0.33]
 */
-function simplexEuclidianProjection_(x) {
+function simplexEuclidianProjection_(x, l, u) {
 	// Initializations
 	var n = x.length;
-	var zeros = Matrix_.zeros(n, 1);
-	var ones = Matrix_.ones(n, 1);
+
 	
-	// Convert the problem of the euclidian projection on the unit simplex
+	// Emptiness check on the restricted simplex.
+	//
+	// In case the restricted simplex is empty, an exception is thrown, so that
+	// the process is (violently) stopped here.
+	simplexEmptinessCheck_(n, l, u);
+
+
+	// Convert the problem of the euclidean projection on the restricted unit simplex
 	// into the associated instance of the continuous quadratic knapsack problem.	
-	var d = ones;
+	var d = Matrix_.ones(n, 1);
 	var a = new Matrix_(x);
-	var b = ones;
+	var b = Matrix_.ones(n, 1);
 	var r = 1;
-	var l = zeros;
-	var u = ones;
-		
+	var lb = l ? new Matrix_(l) : Matrix_.zeros(n, 1);
+	var ub = u ? new Matrix_(u) : Matrix_.ones(n, 1);
+
+	
 	// Solve this instance.
-	var sol = qksolveBS_(d, a, b, r, l, u);
+	var sol = qksolveBS_(d, a, b, r, lb, ub);
 	var y = sol[0];
+
 	
 	// Return the computed projection
 	return y.toArray();
@@ -7704,8 +9154,8 @@ function simplexEuclidianProjection_(x) {
 * @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
 * @param {number} k the indice of the rational grid of the unit simplex of R^n on which to generate points, 
 * a natural integer superior or equal to 1.
-* @param {boolean} useArrayCopy an optional boolean that can be set to false to re-use the same output array throughout
-* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to true.
+* @param {boolean} reuseOutputArray an optional boolean that can be set to true to re-use the same output array throughout
+* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to false.
 * @return {function} a function to be used through its .sample() method, computing all 
 * the points on the k-th rational grid of the unit simplex of R^n.
 *
@@ -7714,15 +9164,15 @@ function simplexEuclidianProjection_(x) {
 * mySampler.sample(); mySampler.sample(); ...; mySampler.sample();
 * // [1, 0, 0]; [0.9, 0.1, 0]; ...; -1
 */
-function simplexGridSampler_(n, k, useArrayCopy) {
+function simplexGridSampler_(n, k, reuseOutputArray) {
 	// Initializations
 	this.n = n;
 	this.k = k;
 	
-	this.useArrayCopy = useArrayCopy;
+	this.reuseOutputArray = reuseOutputArray;
 	
 	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
-	this.compositionIterator = new compositionsIterator_(k, n, false); // use no array copy in the compositions generation to improve performances
+	this.compositionIterator = new compositionsIterator_(k, n, true); // reuse the ouput array for better performances
 	
 	/**
 	* @function sample
@@ -7740,25 +9190,24 @@ function simplexGridSampler_(n, k, useArrayCopy) {
 	*/
 	this.sample = function() {
 		// Generate a new k-composition of n
-		var x = this.compositionIterator.next();
+		var comp = this.compositionIterator.next();
 
 		// Return -1 in case there is no more samples to draw
-		if (x == -1) {
+		if (comp == -1) {
 			return -1;
 		}
 		
 		// Otherwise, compute the current rational grid point by normalizing the generated k-composition
-		var n = x.length;
-		for (var i = 0; i < n; ++i) {
-			this.x[i] = x[i] / this.k;
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = comp[i] / this.k;
 		}
 
 		// Return either the point being sampled, or a copy of the point being sampled so that callers can alter it
-		if (this.useArrayCopy) {
-			return this.x.slice(0);
+		if (this.reuseOutputArray) {
+			return this.x;
 		}
 		else {
-			return this.x;
+			return this.x.slice(0);
 		}
 	}
 }
@@ -7768,8 +9217,7 @@ function simplexGridSampler_(n, k, useArrayCopy) {
 /**
 * @function simplexRandomSampler_
 *
-* @summary Returns a function to compute random points on the unit simplex of R^n,
-* possibly subject to additional lower bounds and upper bounds constraints on their coordinates.
+* @summary Returns a function to compute random points on the unit simplex of R^n.
 *
 * @description This function constructs a function to compute random points uniformly distributed on either:
 * - the unit simplex of R^n, using the algorithm 2 of the first reference
@@ -7859,10 +9307,10 @@ function simplexRandomSampler_(n, l, u, rnd) {
 		this.sumUpperBounds = sumBounds[1];
 		
 		// In case lower bounds or upper bounds are binding (sum l_i == 1 or sum u_i == 1), 
-		// the computations are prematurly stopped, because the restricted simplex is then equal to a point.
+		// the computations are prematurely stopped, because the restricted simplex is then equal to a point.
 		//
 		// Otherwise:
-		// - Deletion of possible superflous constraints, as described in formula 2.3 of the second reference
+		// - Deletion of possible superfluous constraints, as described in formula 2.3 of the second reference
 		//
 		// - Computation of the upper bounds*, as defined after formula 2.3' of the second reference
 		//
@@ -7872,7 +9320,7 @@ function simplexRandomSampler_(n, l, u, rnd) {
 			// Nothing to do
 		}
 		else {
-			// Deletion of possible superflous constraints, replacing the lower and upper bounds
+			// Deletion of possible superfluous constraints, replacing the lower and upper bounds
 			var updatedSumLowerBounds = 0;
 			var updatedSumUpperBounds = 0;
 			for (var i = 0; i < this.n; ++i) {
@@ -7911,7 +9359,7 @@ function simplexRandomSampler_(n, l, u, rnd) {
 	*
 	* @summary Returns a random point on the unit simplex of R^n.
 	*
-	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
+	* @description This function computes a point chosen uniformly at random on the unit simplex of R^n,
 	* using the O(n) algorithm 2 of the first reference.
 	*
 	* @memberof simplexRandomSampler_
@@ -7951,8 +9399,8 @@ function simplexRandomSampler_(n, l, u, rnd) {
 	* @summary Returns a random point on the unit simplex of R^n subject to exact bounds
 	* on its coordinates.
 	*
-	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
-	* subject to an exact bounds constaints on its coordinates, which makes the point unique and non random.
+	* @description This function computes a point chosen uniformly at random on the unit simplex of R^n,
+	* subject to an exact bounds constraints on its coordinates, which makes the point unique and non random.
 	*
 	* @memberof simplexRandomSampler_
 	* @return {Array.<number>|Float64Array} an array of n real numbers corresponding to the coordinates of the computed point in R^n.
@@ -7986,7 +9434,7 @@ function simplexRandomSampler_(n, l, u, rnd) {
 	* @summary Returns a random point on the unit simplex of R^n subject to additional 
 	* lower bounds and upper bounds constraints on its coordinates.
 	*
-	* @description This function computes a point choosen uniformly at random on the unit simplex of R^n,
+	* @description This function computes a point chosen uniformly at random on the unit simplex of R^n,
 	* subject to additional lower bounds and upper bounds constraints on its coordinates, using the algorithm
     * adapted from the theorem 1 of the second reference.
 	*
@@ -8003,9 +9451,9 @@ function simplexRandomSampler_(n, l, u, rnd) {
 		var delta_k = 1;
 		for (var k = n; k >= 2; --k) {
 			// In case delta_k is numerically null, it means all the remaining coordinates
-			// of the random point being genetared on T_n(0,upperStarBounds) must be set to zero.
+			// of the random point being generated on T_n(0,upperStarBounds) must be set to zero.
 			//
-			// The main loop can then be prematurly stopped.
+			// The main loop can then be prematurely stopped.
 			if (Math.abs(delta_k) <= 1e-14) {
 				for (var kk = k; kk >= 1; --kk) {
 					this.x[kk-1] = 0;
@@ -8013,6 +9461,7 @@ function simplexRandomSampler_(n, l, u, rnd) {
 				break;
 			}
 
+			// Retrieve the k-1th coordinate of the random vector u
 			// Retrieve the k-1th coordinate of the random vector u
 			var u_k = u[k-2];
 
@@ -8068,6 +9517,7 @@ function simplexRandomSampler_(n, l, u, rnd) {
 * 
 * @see <a href="https://projecteuclid.org/euclid.ba/1488337478">Cong, Yulai; Chen, Bo; Zhou, Mingyuan. Fast Simulation of 
 * Hyperplane-Truncated Multivariate Normal Distributions. Bayesian Anal. 12 (2017), no. 4, 1017--1037. doi:10.1214/17-BA1052.</a>
+* @see Nicholas J. Higham. 2002. Accuracy and Stability of Numerical Algorithms (2nd ed.). Soc. for Industrial and Applied Math., Philadelphia, PA, USA. 
 *
 * @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
 * @return {function} a function to be used through its .sample() method, computing random  
@@ -8098,8 +9548,8 @@ function simplexDirectionRandomSampler_(n) {
 	*
 	*/
 	this.sample = function() {
-		// Computation of n independent random variables from N(0,1), which will form the basis
-		// of the coordinates of the point being sampled.
+		// Computation of n independent random variables from N(0,1), which will form
+		// the coordinates of the point x being sampled.
 		var sum = 0;
 		for (var i = 0; i < this.n; ++i) {
 			// Generate a random variable from N(0,1), using the inverse method
@@ -8117,22 +9567,37 @@ function simplexDirectionRandomSampler_(n) {
 		}
 		
 		// Normalization of the computed coordinates of the point being sampled, so that
-		// the associated vector in R^n belongs to the hyperplane <(1,1,...,1)/x> = 0,
+		// the associated vector in R^n also belongs to the hyperplane <(1,1,...,1)/x> = 0,
 		// i.e. sum x_i = 0.
-		// - The associated vector in R^n 
+		// 
+		// In parallel, compute the 2 norm of the vector, for subsequent 
+		// normalization, with an accurate algorithm by S. J. Hammarling,
+		// c.f. problem 27.5 of the second reference.
+		//
+		// Note: The algorithm 2 of the reference stops here.
 		var sum_d_n = sum / this.n;
-		var sum_sq = 0;
+		var t = 0;
+		var s = 1;
 		for (var i = 0; i < this.n; ++i) {
 			this.x[i] = this.x[i] - sum_d_n;
 			
-			// Compute the running sum of the squares of the coordinates, for the subsequent normalization step.
-			sum_sq += this.x[i] * this.x[i];
+			// Compute the running 2 norm of the associated vector.
+			var absX = Math.abs(this.x[i]);
+			if (absX != 0) {
+				if (absX > t) {
+					s = 1 + s * (t/this.x[i]) * (t/this.x[i]);
+					t = absX;
+				}
+				else  {
+					s = s + (this.x[i]/t) * (this.x[i]/t);
+				}
+			}
 		}
 		
 		// Final normalization of the computed coordinates of the point being sampled, so that
 		// the associated vector in R^n belongs to the n-hypersphere, i.e. its 2-norm 
 		// is equal to 1.
-		var x_two_norm = Math.sqrt(sum_sq);
+		var x_two_norm = t * Math.sqrt(s);
 		for (var i = 0; i < this.n; ++i) {
 			this.x[i] = this.x[i]/x_two_norm;
 		}
@@ -8229,17 +9694,17 @@ function simplexRationalRounding_(x, r) {
 * using a grid search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), 
 * c.f. the reference.
 *
-* Optionally, lower bounds and upper bounds constraints can be added to the problem, in which case k
-* must be chosen so that some of the k-th rational grid points belong to the restricted simplex.
+* Optionally, lower bounds and upper bounds constraints can be added to the problem, in which case 
+* the unit simplex becomes a restricted unit simplex.
 *
-* To be noted that per lemma 1 of the reference, the number of points on such a grid is equal to
-* factorial(n + k - 1) / (factorial(k - 1) * factorial(n)), i.e., binomial(n+k-1, n-1), 
-* so that this method can be of limited use, even for small n.
+* To be noted that per lemma 1 of the reference, the number of points on the k-th rational grid
+*  of the unit simplex of R^n is equal to factorial(n + k - 1) / (factorial(k - 1) * factorial(n)), 
+* i.e., binomial(n+k-1, n-1), so that this method might be of limited use, even for small n.
 *
 * For instance, n=5 and k=100 already result in 4598126 points on which to evaluate f.
 *
-* To also be noted that as the optional lower bounds and upper bounds contraints become tigter,
-* the volume of the restricted simplex becomes smaller, so that this method can also be of limited use
+* To also be noted that as the optional lower and upper bounds contraints become tigter,
+* the volume of the restricted simplex becomes smaller, so that this method might also be of limited use
 * because most of the grid points will fall outside of the restricted simplex. 
 *
 * @see <a href="https://ideas.repec.org/p/cor/louvco/2003071.html">Nesterov, Yurii. Random walk in a simplex and 
@@ -8254,8 +9719,8 @@ function simplexRationalRounding_(x, r) {
 * @param {number} n the number of variables of the function f, natural integer superior or equal to 1.
 * @param {number} k the indice of the rational grid of the unit simplex of R^n on which to minimize the function f, 
 * a natural integer superior or equal to 1.
-* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
-* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of zeros.
+* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of ones.
 * @return {Array.<Array.<number>>} an array of possibly several arrays of n real numbers, each array of n real numbers
 * corresponding to a point of R^n minimizing the function f on the k-th rational grid of the unit simplex of R^n.
 *
@@ -8306,7 +9771,7 @@ function simplexGridSearch_(f, n, k, l, u) {
 	var minValueGridPoints = [];
 
 	// Proceed to an exhaustive grid search on the set 1/k * I_n(k), c.f. the reference.
-	var sampler = new simplexGridSampler_(n, k, false); // use no array copy in the simplex grid sampler to improve performances
+	var sampler = new simplexGridSampler_(n, k, true); // use no array copy in the simplex grid sampler to improve performances
 	var weights = sampler.sample();
 	while (weights !== -1) {  
 		// Optionally reject the current grid point if it does not belong to the restricted simplex,
@@ -8359,6 +9824,221 @@ function simplexGridSearch_(f, n, k, l, u) {
 	// Return the list of grid points associated to the minimum value of f
 	return minValueGridPoints;
 }
+
+/**
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function bestConstantlyRebalancedWeights
+*
+* @summary Compute the weights of the best constantly rebalanced portfolio.
+* 
+* @description This function returns the weights w_1,...,w_n associated to the 
+* the best constantly rebalanced portfolio, which is the portfolio of n assets 
+* rebalanced at each period of time so that it holds the same proportion of each assets 
+* and with the best return in hindsight, c.f. the reference.
+*
+* Optionally, the following constraints can be added:
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
+*
+* @see <a href="https://doi.org/10.1109/18.485708">T. M. Cover, Erik Ordentlich, Universal portfolios with side information, 
+* IEEE Transactions on Information Theory, Volume 42, Issue 2 March 1996</a>
+* 
+* @param {Array.<Array.<number>>} priceRelatives an array of n arrays of T real numbers, with 
+* priceRelatives[i-1][j-1] the ratio of the final price to the initial price of the i-th asset
+* for the j-th period of time, i = 1..n, j = 1..T.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @return {Array.<number>} the weights corresponding to best constantly rebalanced portfolio, array of n real numbers.
+*
+* @example
+* bestConstantlyRebalancedWeights([[1 - 0.05, 1 - 0.05], [1, 1], [1 + 0.05, 1 + 0.05]]);
+* // [0, 0, 1]
+*/
+self.bestConstantlyRebalancedWeights = function (priceRelatives, opt) {
+	// Initialize the options structure
+	if (opt === undefined) {
+		opt = { constraints: {} };
+	}
+	if (opt.constraints  === undefined) {
+		opt.constraints = {};
+	}
+
+	// Initialize the options default values
+	if (opt.eps === undefined) {
+		opt.eps = 1e-04;
+	}
+	if (opt.maxIter === undefined) {
+		opt.maxIter = 10000;
+	}
+	
+	// Decode the options
+	var eps = opt.eps;
+	var maxIterations = opt.maxIter;
+	var lowerBounds = opt.constraints.minWeights;
+	var upperBounds = opt.constraints.maxWeights;
+	
+	
+	// ------
+	
+	
+	// Initializations
+	var nbAssets = priceRelatives.length; // m in the reference
+	var nbPeriods = priceRelatives[0].length; // n in the reference
+
+	
+	// ----
+	
+	
+	// The best constantly rebalanced portfolio is a solution to the following
+	// smooth constrained concave optimization problem, c.f. formula 6 of the reference:
+	//
+	// argmax S_n(b) = argmax ( <b/x_1> * ... * <b/x_n> )
+	// s.t. sum b_i = 1
+	//      l <= b <= u
+	//      (i.e., b belongs to a restricted unit simplex)
+	//
+	// This optimization problem will be solved using a first-order method
+	// for convex minimization, using the facts that:
+	// - argmax S_n(b) = argmin -S_n(b)
+	// - The restricted unit simplex is a convex set	
+	// - -S_n(b) is a convex function on the restricted unit simplex (for instance, it
+	//   is log-convex)
+
+	// Define the function representing -S_n(b)
+	function f(b) {
+		// Initialize the placeholder for the price relatives of all the assets at period k
+		var x_k = Matrix_.zeros(nbAssets, 1);
+
+		// Computation of the cumulative product of all the portfolio relatives 
+		// <b/x_k>, k = 1..nbPeriods
+		var prodPortfolioRelatives = 1.0;
+		for (var k = 0; k < nbPeriods; ++k) {
+			// Extract the price relatives x_k for all the assets for the period k
+			x_k = Matrix_.fill(nbAssets, 1, function(i,j) { return priceRelatives[i-1][k]; }, x_k);
+			
+			// Compute the portfolio relative <b/x_k> and add it to the cumulative product
+			prodPortfolioRelatives *= Matrix_.vectorDotProduct(b, x_k);
+		}
+		
+		// Return the computed function value
+		return -prodPortfolioRelatives;
+	}
+	
+	// Define the function representing the gradient of the function -S_n(b).
+	//
+	// By the multiplicative rule, we have for j = 1..m:
+	//
+	// d S_n /d b_j (b) = sum_k ( x_k,j * ( Prod_i <b/x_i>, i = 1..n, i<>k ) ), k = 1..n,
+	// which is a function costly to evaluate for big m/big n.
+	//
+	// In case the portfolio relatives <b/x_i>, i = 1..n, are non null (general case),
+	// an optimized formula is used.
+	function gradf(b) {		
+		// Initialize the placeholder for the price relatives of all the assets at period k
+		var x_k = Matrix_.zeros(nbAssets, 1);
+		
+		// Preliminary computation of all the portfolio relatives <b/x_k>, k = 1..nbPeriods,
+		// as well as their cumulative product (optimized formula only).
+		var portfolioRelatives = typeof Float64Array === 'function' ? new Float64Array(nbPeriods) : new Array(nbPeriods);
+		var prodPortfolioRelatives = 1.0;
+		var nullPortfolioRelatives = false;
+		for (var k = 0; k < nbPeriods; ++k) {
+			// Extract the price relatives x_k for all the assets for the period k
+			x_k = Matrix_.fill(nbAssets, 1, function(i,j) { return priceRelatives[i-1][k]; }, x_k);
+			
+			// Compute the portfolio relative <b/x_k>
+			var b_d_x_k = Matrix_.vectorDotProduct(b, x_k);
+			
+			// Save the portfolio relative for future usage
+			portfolioRelatives[k] = b_d_x_k;
+
+			// Optimized formula only
+			if (nullPortfolioRelatives === false) {
+				// Add the portfolio relative to the cumulative product
+				prodPortfolioRelatives *= b_d_x_k;
+			
+				// Determine if the portfolio relative is numerically close to 0,
+				// in which case the optimized computation of the gradient of the
+				// function S_n(b) cannot be used.
+				if (Math.abs(b_d_x_k) <= 1e-12) {
+					nullPortfolioRelatives = true;
+				}
+			}
+		}
+		
+		// Compute the nbAssets products Prod_i <b/x_i>, i = 1..nbPeriods, i <> k, with k = 1..nbAssets:
+		//
+		// - Optimized formula: if there is no <b/x_k> such that <b/x_k> ~= 0, then the formula
+		// Prod_i <b/x_i>, i = 1..nbPeriods / <b/x_k> == Prod_i <b/x_i>, i = 1..nbPeriods, i <> k
+		// is used.
+		//
+		// - Non-optimized formula: Unsupported for now.
+		var partialPortfolioRelatives;
+		if (nullPortfolioRelatives === false) {
+			partialPortfolioRelatives = Matrix_.fill(nbPeriods, 1, 
+			                                         function(i,j) { return prodPortfolioRelatives / portfolioRelatives[i-1]; });
+		}
+		else {
+			throw new Error('null portfolio relative detected, unsuported case');
+		}
+
+		// Initialize the placeholder for the all the price relatives of the asset k
+		var xx_k = Matrix_.zeros(nbPeriods, 1);
+		
+		// Compute the gradient
+		var res = Matrix_.zeros(nbAssets, 1);
+		for (var k = 0; k < nbAssets; ++k) {
+			// Extract all the price relatives xx_k of the asset k
+			xx_k = Matrix_.fill(nbPeriods, 1, function(i,j) { return priceRelatives[k][i-1]; }, xx_k);
+			
+			// Compute the k-th coordinate of the gradient
+			res.data[k] = -Matrix_.vectorDotProduct(xx_k, partialPortfolioRelatives);
+		}
+
+		// Return the computed gradient
+		return res;
+	}
+
+	// Define the characteristic function of the restricted unit simplex
+	function g(b) {
+		return simplexCharacteristicFunction_(b.data, lowerBounds, upperBounds);
+	}
+	
+	// Define the proximal function associated to g, which is the orthogonal
+	// projection on the restricted simplex.
+	function proxg(b) {
+		return new Matrix_(simplexEuclidianProjection_(b.data, lowerBounds, upperBounds));
+	}
+	
+	// Define the initial point as the projection of the 1 vector 
+	// on the restricted unit simplex.
+	var x0 = new Matrix_(simplexEuclidianProjection_(Matrix_.ones(nbAssets, 1).data, lowerBounds, upperBounds));
+
+	// Solve the convex optimization program above
+	var sol = ccpsolveFISTA_(f, gradf, g, proxg, x0, {eps: eps, maxIter: maxIterations, maxLine: maxIterations});
+
+	
+	// ----
+	
+	
+	// Extract the solution, which is the computed portfolio weights
+	var weights = sol[0];
+
+	// Return the computed weights
+	return weights.toArray();
+}
+
 
 /**
  * @file Functions related to cluster risk parity portfolio.
@@ -8456,7 +10136,7 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 	        }
 	    }
 		    
-		// Check that each integer in the set [1..nbAssets] is appears once and only once 
+		// Check that each integer in the set [1..nbAssets] appears once and only once 
 		// in the list of clusters
 		for (var i = 0; i < partition.length; ++i) {
 		    if (partition[i] !== 1) {
@@ -8517,17 +10197,14 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 		}
 	}
 	
-	// 2(tmp) - Compute the transpose of the matrix mapping the initial assets to the clusters space
-	var assetsToClustersWeightsT = assetsToClustersWeights.transpose()
-	
 	// 3a - Compute the the covariance matrix associated to the weighted clusters space, using formula Var(A*X) = A * Var(X) * A'.
-	var clustersSigma = Matrix_.xy(assetsToClustersWeights, Matrix_.xy(sigma, assetsToClustersWeightsT));
+	var clustersSigma = Matrix_.xy(assetsToClustersWeights, Matrix_.axty(1, sigma, assetsToClustersWeights));
 	
 	// 3b - Compute ERC weights in the clusters space
 	var clustersWeights = self.equalRiskContributionWeights(clustersSigma, opt);
 	
 	// 3c - Compute original assets weights, using formula A' * Y
-	var weights = Matrix_.xy(assetsToClustersWeightsT, new Matrix_(clustersWeights));
+	var weights = Matrix_.txy(assetsToClustersWeights, new Matrix_(clustersWeights));
 	
 	// Return them (already normalized)
 	return weights.toArray();
@@ -8606,29 +10283,29 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 	//
 	// The empty set is skipped.
 	var nextSubsetIterator = new subsetsIterator_(nbAssets);
-	var nextSubset = nextSubsetIterator.next(); // emtpy set
+	var nextSubset = nextSubsetIterator.next(); // empty set
 	var nextSubset = nextSubsetIterator.next(); // "true" first set
 	while (nextSubset != -1) {	
 		// Extract the selected assets indexes
-		var assetsIndexes = nextSubset;
+		var subsetAssetsIdx = nextSubset;
 		
 		// Extract the covariance matrix of the selected assets
-		var subsetSigma = sigma.submatrix(assetsIndexes, assetsIndexes);
+		var subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx);
 		
 		// Compute ERC weights for the selected assets
 		var sol = self.equalRiskContributionWeights(subsetSigma, opt);
-		var assetsWeights = sol[0];
-		var portfolioVolatility = sol[1];
+		var subsetAssetsWeights = sol[0];
+		var subsetPortfolioVolatility = sol[1];
 
 		// Compute lambda_erc, c.f. the formula following the formula 3 of the reference.
-		var rcValue = portfolioVolatility * portfolioVolatility / assetsIndexes.length;
+		var rcValue = subsetPortfolioVolatility * subsetPortfolioVolatility / subsetAssetsIdx.length;
 		
 		// If the risk contribution of the current subset is lower than the current minimum risk contribution, it
 		// becomes the new minimum risk contribution and the current subset becomes the new list of selected assets.
 		if (rcValue < minRCValue) {
 			minRCValue = rcValue;
-			minRCAssetsIndexes = assetsIndexes;
-			minRCAssetsWeights = assetsWeights;
+			minRCAssetsIndexes = subsetAssetsIdx;
+			minRCAssetsWeights = subsetAssetsWeights;
 		}
 		// Otherwise, nothing needs to be done
 	
@@ -8671,7 +10348,8 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 *
 * This portfolio maximizes the Sharpe ratio if the assets mean returns are proportional to their volatilities and all pair-wise correlations are equal.
 * 
-* @see <a href="https://doi.org/10.3905/jpm.2012.38.3.056 ">Carvalho, Raul Leote de and Xiao, Lu and Moulin, Pierre, Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description (September 13, 2011). The Journal of Portfolio Management, vol. 38, no. 3, Spring 2012.</a>
+* @see <a href="https://doi.org/10.3905/jpm.2012.38.3.056">Carvalho, Raul Leote de and Xiao, Lu and Moulin, Pierre, Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description (September 13, 2011). The Journal of Portfolio Management, vol. 38, no. 3, Spring 2012.</a>
+* @see <a href="https://www.panagora.com/insights/how-naive-is-naive-risk-parity/">Qian, E. (2017). How Naive is Naive Risk Parity? PanAgora Asset Management.</a>
 * 
 * @param {Matrix_|<Array.<number>} sigma the variance vector (sigma_i),i=1..n of the n assets in the considered universe, an n by 1 matrix (i.e., vector) or an array of n real numbers statisfying sigma[i-1] = sigma_i.
 * @param {object} opt optional parameters for the algorithm, unused.
@@ -8755,8 +10433,7 @@ self.equalRiskContributionWeights = function (sigma, opt) {
 
 
 /**
- * @file Functions related to equal weights portfolio.
- * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
  
@@ -8797,7 +10474,6 @@ self.equalWeights = function (nbAssets, opt) {
 
 
 /**
- * @file Functions related to most diversified portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
@@ -8815,8 +10491,8 @@ self.equalWeights = function (nbAssets, opt) {
 * long-only global minimum variance portfolio of n assets.
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolio
-* - Maximum weight of each asset to include in the portfolio
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * This portfolio is the portfolio with the lowest volatility among all the feasible portfolios.
 *
@@ -8838,8 +10514,8 @@ self.equalWeights = function (nbAssets, opt) {
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-08.
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
-* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
-* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array.<number>} the weights corresponding to the global minimum variance portfolio, array of n real numbers.
 *
 * @example
@@ -8888,9 +10564,9 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 	
 	// ----
 	
-	// The global minimum variance portfolio is the solution to a convex quadratic
+	// The global minimum variance portfolio is the solution to a constrained convex quadratic
 	// program (e.g., the associated matrix is positive semi-definite, since this is
-	// a covariance matrix).
+	// a covariance matrix, and the constraints set is a constrained unit simplex).
 	
 		// Build the matrix and the vector of the quadratic program
 	var Q = sigma;
@@ -8957,8 +10633,8 @@ self.computeCornerPortfolios_ = computeCornerPortfolios_;
 * has the lowest attainable volatility among all the feasible portfolios
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolio
-* - Maximum weight of each asset to include in the portfolio
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * The main algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
 *
@@ -8976,8 +10652,8 @@ self.computeCornerPortfolios_ = computeCornerPortfolios_;
 * @param {number} opt.constraints.return in case opt.optimizationMethod is equal to 'targetReturn', the target return of the portfolio, a real number.
 * @param {number} opt.constraints.volatility in case opt.optimizationMethod is equal to 'targetVolatility', the target volatility of the portfolio, a positive real number.
 * @param {number} opt.constraints.maxVolatility in case opt.optimizationMethod is equal to 'maximumTargetVolatility', the maximum target volatility of the portfolio, a positive real number.
-* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
-* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array<Array.<number>} the weights corresponding to the mean-variance efficient portfolio, array of n real numbers.
 *
 * @example
@@ -10134,7 +11810,7 @@ function computeMinimumVarianceEfficientPortfolio_(cornerPortfolios) {
 *
 * The computed efficient portfolio is either:
 * - Fully invested in case its volatility is equal to or lower than the maximum desired volatility
-* - Maximally partially invested so that its volatility is equal to the maximum desired volatility, 
+* - Partially invested so that its volatility is equal to the maximum desired volatility, 
 * in case a full investment would result in its volatility being strictly greater than the desired maximum volatility
 *
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
@@ -10397,7 +12073,9 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 	}
 
 	// Internal function to compute the E-maximizing portfolio, 
-	// c.f. the method "STARTING-SOLUTION" of the second reference.
+	// c.f. the method "STARTING-SOLUTION" of the second reference, which
+	// is the greedy algorithm used to solve the continuous knapsack problem,
+	// c.f. https://en.wikipedia.org/wiki/Continuous_knapsack_problem.
 	//
 	// This function replaces the simplex algorithm described in the
 	// chapter 8 of the first reference in case:
@@ -10511,7 +12189,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 		//
 		// In this case, this asset is IN, all the assets with a return strictly higher than 
 		// this asset are UP, and all the assets with a return strictly lower than this asset
-		// are LOW, plus the linear program is is not degenerate
+		// are LOW, plus the linear program is not degenerate
 		//
 		//
 		// - The loop above has stopped on an asset because the sum of the weights of 
@@ -10521,7 +12199,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 		// this asset is UP, and all the assets with a return strictly lower than this asset
 		// are LOW, plus the linear program is degenerate
 		//
-		// To circumvene the degeneracy, this asset is forced to IN thanks to a numerical 
+		// To circumvent the degeneracy, this asset is forced to IN thanks to a numerical 
 		// perturbation of its upper bound (its weight is already strictly greater than its
 		// lower bound, otherwise, the loop would have stopped on the previous asset)
 		if (idx_i == -1 || i == nbAssets) {
@@ -11123,7 +12801,6 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 }
 
 /**
- * @file Functions related to minimax weights portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
@@ -11141,7 +12818,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 * minimax portfolio of n assets.
 *
 * Optionally, the following constraint can be added:
-* - Partial investment contraint, replacing the full investment contraint
+* - Partial investment constraint, replacing the full investment constraint
 *
 * A minimax portfolio has the property that it maximizes the minimum possible return over the period on which it is computed,
 * c.f. the first reference.
@@ -11151,7 +12828,9 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 * @see <a href="http://www.jstor.org/stable/2634472">Young, M. (1998). A Minimax Portfolio Selection Rule with Linear Programming Solution. Management Science, 44(5), 673-683.</a>
 * @see <a href="https://link.springer.com/article/10.1007/s11135-005-1054-0">Yuanyao Ding, (2006), Portfolio Selection under Maximum Minimum Criterion, Quality & Quantity: International Journal of Methodology, 40, (3), 457-468</a>
 *
-* @param {Array.<Array.<number>>} assetsReturns an array of n arrays of T real numbers representing the returns of n assets over T periods of time.
+* @param {Array.<Array.<number>>} assetsReturns an array of n arrays of T real numbers, 
+* with assetsReturns[i-1][j-1] the return of the i-th asset for the j-th period of time,
+* i = 1..n, j = 1..T..
 * @param {object} opt optional parameters for the algorithm.
 * @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
 * by a partial investment constraint; defaults to true.
@@ -11194,7 +12873,7 @@ self.minimaxWeights = function (assetsReturns, opt) {
 	// choosen to be the one of the formula 21 of the second reference instead of
 	// the one of the section 1.1 of the first reference.
 	//
-	// In other zords, no minimum return is imposed on the portfolio, 
+	// In other words, no minimum return is imposed on the portfolio, 
 	// so that the linear program is always feasible.
 
 		// Build the objective function (c.f. formula 1a of the first reference):
@@ -11360,6 +13039,367 @@ self.minimumCorrelationWeights = function (sigma, opt) {
 
 
 /**
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
+/* End Wrapper private methods - Unit tests usage only */
+
+
+/**
+* @function minimumTrackingErrorWeights
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested
+* and long-only portfolio of n assets which minimizes the tracking error with regard to
+* a provided benchmark.
+*
+* The definition of the tracking error taken is described in the first and third references, and is
+* the sum of the squared deviations of returns between the portfolio and the benchmark,
+* i.e. the tracking error volatility.
+*
+* Optionally, the following constraints can be added:
+* - Minimum number of assets to include in the portfolio
+* - Maximum number of assets to include in the portfolio
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
+*
+* Optionally, the following soft constraints can be added (these constraints will be taken into
+* account as best as possible, but their violation is possible):
+* - Any linear inequality constraints on the portfolio weights, in the form Ai * w <= bi,
+* with Ai an IE by n matrix and bi an IE by 1 matrix
+*
+* The algorithm used internally to solve the associated optimization problem is a FISTA-like 
+* convex composite optimization algorithm.
+*
+* In case cardinality constraints are imposed, the associated optimization problem becomes
+* strongly NP-hard, c.f. the third reference, so that an exhaustive computation of all 
+* the portfolios minimizing the tracking error for each possible subset of assets is enforced.
+* This approach is expected to produce an exact solution within a reasonable amount of time
+* for small n (e.g. n <= 15), but due to the combinatorial nature of the problem, 
+* the computation for greater values of n will not be tractable.
+*
+* @see <a href="https://doi.org/10.1016/S0378-4266%2898%2900076-4">Markus Rudolf and Hans-jurgen Wolter and Heinz Zimmermann. A linear model for tracking error minimization. Journal of Banking and Finance. 1998</a>
+* @see <a href="https://epubs.siam.org/doi/10.1137/0917020">R. Bramley and B. Winnicka. Solving Linear Inequalities in a Least Squares Sense. SIAM J. Sci. Comput., 17(1), 275–286.</a>
+* @see <a href="https://doi.org/10.1016/j.cor.2017.09.002">Purity Mutunge and Dag Haugland. Minimizing the tracking error of cardinality constrained portfolios. Computers & Operations Research Volume 90, February 2018, Pages 33-41</a>
+*
+* @param {Array.<Array.<number>>} assetsReturns an array of n arrays of T real numbers, 
+* with assetsReturns[i-1][j-1] the return of the i-th asset for the j-th period of time,
+* i = 1..n, j = 1..T.
+* @param {<Array.<number>} benchmarkReturns an array of T real numbers, 
+* with benchmarkReturns[j-1] the return of the benchmark for the j-th period of time,
+* j = 1..T..
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
+* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.constraints.minNbAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1 if opt.constraints.maxNbAssets is set.
+* @param {number} opt.constraints.maxNbAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets if opt.constraints.minNbAssets is set.
+* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @param {Array.<Array.<number>>} opt.softConstraints.Ai an array of IE arrays of nbAssets real numbers, 
+* with opt.softConstraints.Ai[i-1] the i-th lhs of a soft linear inequality constraint on the weights of the 
+* assets to include in the portfolio, i = 1..IE.
+* @param {<Array.<number>} opt.softConstraints.bi an array of IE real numbers, 
+* with opt.softConstraints.bi[i-1] the i-th rhs of a soft linear inequality constraint on the weights of the
+* assets to include in the portfolio, i = 1..IE.
+* @param {number} opt.softConstraints.lambdai the penalty parameter associated to the soft linear inequality constraints, 
+* a strictly positive real number; defaults to 1.
+* @return {Array.<number>} the weights corresponding to the computed portfolio, array of n real numbers.
+*
+*/
+self.minimumTrackingErrorWeights = function (assetsReturns, benchmarkReturns, opt) {
+	// Initialize the options structure
+	if (opt === undefined) {
+		opt = { constraints: {} };
+	}
+	if (opt.constraints  === undefined) {
+		opt.constraints = {};
+	}
+	if (opt.softConstraints  === undefined) {
+		opt.softConstraints = {};
+	}
+	
+	// Initialize the options default values
+	if (opt.eps === undefined) {
+		opt.eps = 1e-04;
+	}
+	if (opt.maxIter === undefined) {
+		opt.maxIter = 10000;
+	}
+	if (opt.constraints.minNbAssets === undefined && opt.constraints.maxNbAssets) {
+		opt.constraints.minNbAssets = 1;
+	}
+	if (opt.constraints.maxNbAssets === undefined && opt.constraints.minNbAssets) {
+		opt.constraints.maxNbAssets = assetsReturns.length;
+	}
+	if (opt.softConstraints.lambdai === undefined && (opt.softConstraints.Ai && opt.softConstraints.bi)) {
+		opt.softConstraints.lambdai = 1;
+	}
+	
+	// Decode the options
+	var eps = opt.eps;
+	var maxIterations = opt.maxIter;
+	
+	var minNbAssets = opt.constraints.minNbAssets;
+	var maxNbAssets = opt.constraints.maxNbAssets;
+	var cardinalityConstraints = (minNbAssets || maxNbAssets) ? true : false;
+	
+	var lowerBounds = opt.constraints.minWeights;
+	var upperBounds = opt.constraints.maxWeights;
+	
+	var Ai = opt.softConstraints.Ai;
+	var bi = opt.softConstraints.bi;
+	var lambdai = opt.softConstraints.lambdai;
+	var softInequalityConstraints = (Ai && bi) ? true : false;
+	
+	
+	// ------
+	
+	
+	// Initializations
+	var nbAssets = assetsReturns.length;
+	var nbPeriods = assetsReturns[0].length;
+	var nbSoftInequalityConstraints = softInequalityConstraints ? bi.length : 0;
+	
+	// Convert the benchmark returns to matrix format
+	var benchmarkReturns = new Matrix_(benchmarkReturns);
+	
+	// Convert the rhs of the soft inequality constraints to matrix format, if applicable
+	if (softInequalityConstraints) {
+		var bi = new Matrix_(bi);
+	}		
+	
+	// ----
+	
+
+	// Internal function to compute a portfolio minimizing the tracking error
+	// v.s. a provided benchmark for a given number of assets subsetNbAssets.
+	//
+	// The portfolio minimizing the tracking error volatility v.s. a provided benchmark
+	// is a solution to the following smooth constrained convex optimization problem, 
+	// c.f. formula 2 of the first reference, and formula 4 of the second reference
+	// for the formulation of the soft inequality constraints:
+	//
+	// argmax f(w) = 1/2 * ||X*w - Y||_2^2 + lambdai/2 * ||(Ai*w - bi)_+||_2^2, with:
+	// - X the nbPeriods by subsetNbAssets matrix of returns of the assets
+	// - Y the nbPeriods vector of benchmark returns
+	// - Ai the nbInequalityConstraints by subsetNbAssets matrix of the soft inequality constraints
+	// - bi the nbInequalityConstraints vector of the soft inequality constraints
+	// s.t. sum w_i = 1
+	//      l <= w <= u
+	//      (i.e., b belongs to a restricted unit simplex)
+	//
+	// This optimization problem is solved using a first-order method
+	// for convex minimization.
+	//
+	// To be noted that in case the problem is not feasible, this method throws an exception.
+	function computeMinimumTrackingErrorVolatilityPortfolio(subsetNbAssets, 
+	                                                        subsetAssetsReturns, benchmarkReturns, 
+															subsetLowerBounds, subsetUpperBounds, 
+															subsetAi, subsetBi) {
+		// Define the matrix X
+		var X = subsetAssetsReturns;
+
+		// Define the vector Y
+		var Y = benchmarkReturns;
+		
+		// Define the function representing f(w)
+		function f(w) {
+			var te = Matrix_.xmy(Matrix_.xy(X, w), Y).vectorNorm('two');
+			
+			if (softInequalityConstraints) {
+				var ineqe = Matrix_.xmy(Matrix_.xy(subsetAi, w), subsetBi).elemMap(function(i,j,val) { return Math.max(0, val); }).vectorNorm('two');
+				
+				return 0.5 * te * te + 0.5 * lambdai * ineqe * ineqe;
+			}
+			else {			
+				return 0.5 * te * te;
+			}
+		}
+
+		// Define the function representing the gradient of the function f(w),
+		// which is equal to X^t * (X*w - Y) + lambdai * Ai^t * (Ai*w - bi)_+, c.f.
+		// proposition 2.1 of the second reference.
+		function gradf(w) {
+			var gte = Matrix_.txy(X, Matrix_.xmy(Matrix_.xy(X, w), Y));
+			
+			if (softInequalityConstraints) {
+				var gineqe = Matrix_.txy(subsetAi, Matrix_.xmy(Matrix_.xy(subsetAi, w), subsetBi).elemMap(function(i,j,val) { return Math.max(0, val); }));
+				
+				return Matrix_.axpby(1, gte, lambdai, gineqe);
+			}
+			else {
+				return gte;
+			}
+		}
+
+		// Define the characteristic function of the restricted unit simplex
+		function g(w) {
+			return simplexCharacteristicFunction_(w.data, subsetLowerBounds, subsetUpperBounds);
+		}
+
+		// Define the proximal function associated to g, which is the orthogonal
+		// projection on the restricted simplex.
+		function proxg(w) {
+			return new Matrix_(simplexEuclidianProjection_(w.data, subsetLowerBounds, subsetUpperBounds));
+		}
+
+		// Define the initial point as the projection of the 1 vector 
+		// on the restricted unit simplex.
+		var x0 = new Matrix_(simplexEuclidianProjection_(Matrix_.ones(subsetNbAssets, 1).data, subsetLowerBounds, subsetUpperBounds));
+
+		// Solve the convex optimization problem
+		var sol = ccpsolveFISTA_(f, gradf, g, proxg, x0, {eps: eps, maxIter: maxIterations, maxLine: maxIterations});
+		
+		// Return the solution, whose first element is the computed portfolio weights
+		return sol;
+	} 
+	
+	
+	// ----
+	
+	
+	// Define the weights of the portfolio
+	var weights;
+	
+	
+	// In case no cardinality constraints are imposed, the portfolio minimizing the 
+	// tracking error is the solution of a convex program.
+	//
+	// In case cardinality constraints are imposed, an exhaustive enumeration of
+	// all the subsets of the set {1,...,nbAssets} of size between minNbAssets and
+	// maxNbAssets is done, searching for the portfolio minimizing the tracking error
+	// over all these subsets.
+	if (!cardinalityConstraints) {
+		// Extract the assets returns
+		var assetsReturns = Matrix_.fill(nbPeriods, nbAssets, function(i,j) { return assetsReturns[j-1][i-1]; });
+		
+		// Extract the soft inequality constraints lhs, if applicable
+		var Ai;
+		if (softInequalityConstraints) {
+			Ai = new Matrix_(Ai);
+		}
+		
+		// Compute the solution of the convex program associated to the
+		// portfolio minimizing the tracking error.
+		weights = computeMinimumTrackingErrorVolatilityPortfolio(nbAssets, 
+																 assetsReturns, benchmarkReturns, 
+																 lowerBounds, upperBounds,
+																 Ai, bi)[0];		
+	}
+	else {
+		// Initialize the current minimum value of the tracking error
+		// and the current list of associated assets/assets weights.
+		var minTEValue = Infinity;
+		var minTEAssetsIndexes = [];
+		var minTEAssetsWeights = [];
+
+		
+		// Proceed to an exhaustive enumeration of all the subsets of the set {1,...,nbAssets}
+		// satisfying the cardinality constraints in order to find 
+		// the portfolio minimizing the tracking error over all these subsets.
+		//
+		// The feasibility of the enumerated subsets is guaranteed per their construction.
+		for (var K = minNbAssets; K <= maxNbAssets; ++K) {
+			var nextKSubsetIterator = new kSubsetsIterator_(nbAssets, K, false);
+			var nextKSubset = nextKSubsetIterator.next();
+			
+			while (nextKSubset != -1) {
+				// Extract the selected assets indexes
+				var subsetNbAssets = nextKSubset.length;
+				var subsetAssetsIdx = typeof UInt32Array === 'function' ? new UInt32Array(subsetNbAssets) : new Array(subsetNbAssets);
+				for (var i = 0; i < nextKSubset.length; ++i) {
+					subsetAssetsIdx[i] = nextKSubset[i];
+				}
+
+				// Extract the returns of the selected assets
+				var subsetAssetsReturns = Matrix_.fill(nbPeriods, subsetNbAssets, 
+													   function(i,j) { 
+														   return assetsReturns[subsetAssetsIdx[j-1]-1][i-1]; 
+													   });
+				
+				// Extract the lower and upper bounds constraints, if applicable
+				var subsetLowerBounds;
+				if (lowerBounds) {
+					subsetLowerBounds = typeof Float64Array === 'function' ? new Float64Array(subsetNbAssets) : new Array(subsetNbAssets);
+					for (var i = 0; i < subsetNbAssets; ++i) {
+						subsetLowerBounds[i] = lowerBounds[subsetAssetsIdx[i]-1];
+					}
+				}
+				var subsetUpperBounds;
+				if (upperBounds) {
+					subsetUpperBounds = typeof Float64Array === 'function' ? new Float64Array(subsetNbAssets) : new Array(subsetNbAssets);
+					for (var i = 0; i < subsetNbAssets; ++i) {
+						subsetUpperBounds[i] = upperBounds[subsetAssetsIdx[i]-1];
+					}
+				}
+				
+				// Extract the soft inequality constraints lhs, if applicable
+				var subsetAi;
+				if (softInequalityConstraints) {
+					subsetAi = Matrix_.fill(nbSoftInequalityConstraints, subsetNbAssets, 
+											function(i,j) { 
+												return Ai[i-1][subsetAssetsIdx[j-1]-1]; 
+											});
+				}			
+				
+				// Compute the weights of the minimum tracking error portfolio for the selected assets
+				//
+				// Note: because the restricted simplex associated to the subset of selected assets
+				// might be empty, special care must be taken.
+				var subsetAssetsWeights;
+				var subsetPortfolioTrackingError = Infinity;
+				try {
+					var subsetSol = computeMinimumTrackingErrorVolatilityPortfolio(subsetNbAssets, 
+																				   subsetAssetsReturns, benchmarkReturns, 
+																				   subsetLowerBounds, subsetUpperBounds,
+																				   subsetAi, bi);
+																				   
+					subsetAssetsWeights = subsetSol[0];
+					subsetPortfolioTrackingError = subsetSol[1];
+				}
+				catch (e) {
+					if (e.message !== "infeasible problem detected: the restricted simplex is empty") {
+						throw(e);
+					}
+				}
+
+				// If the tracking error of the current subset is lower than the current tracking error,
+				// it becomes the new minimum tracking error and the current subset becomes the new 
+				// list of selected assets.
+				if (subsetPortfolioTrackingError < minTEValue) {
+					minTEValue = subsetPortfolioTrackingError;
+					minTEAssetsIndexes = subsetAssetsIdx;
+					minTEAssetsWeights = subsetAssetsWeights;
+				}
+				// Otherwise, nothing needs to be done
+
+				// Generate a new subset	
+				var nextKSubset = nextKSubsetIterator.next();
+			}
+		}
+
+		
+		// Compute the original assets weights, in case a feasible minimum tracking error
+		// portfolio has been found.
+		if (minTEValue != Infinity) {
+			weights = Matrix_.zeros(nbAssets, 1);
+			for (var i = 0; i < minTEAssetsIndexes.length; ++i) {
+				weights.data[minTEAssetsIndexes[i] - 1] = minTEAssetsWeights.data[i];
+			}
+		}
+		else {
+			throw new Error('infeasible problem detected');
+		}
+	}
+
+
+	// Return the computed weights
+	return weights.toArray();
+}
+
+
+/**
  * @file Functions related to most diversified portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
@@ -11464,8 +13504,7 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 
 
 /**
- * @file Functions related to grid search portfolios.
- * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
  
@@ -11484,8 +13523,8 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 * c.f. the first reference.
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolio
-* - Maximum weight of each asset to include in the portfolio
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * Since such a portfolio might not be unique, all the weights corresponding to the same minimum value of the function fct 
 * are provided in output.
@@ -11506,8 +13545,8 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 * which must take as first input argument an array of n real numbers corresponding to the weights w1,...,wn of the n assets 
 * in the considered universe and which must return as output a real number.
 * @param {Object} opt parameters for the numerical optimization algorithm.
-* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
-* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @param {string} opt.optimizationMethod the optimization method to use in order to minimize the function fct, a string either equals to:
 * - 'grid-search': usage of a grid search algorithm on the k-th rational grid of the unit simplex of R^n, 1/k * I_n(k), c.f. the third reference, where k is defined through the parameter opt.optimizationMethodParams.k
 ; defaults to 'grid-search'.
@@ -11555,7 +13594,6 @@ self.numericalOptimizationWeights = function (nbAssets, fct, opt) {
 
 
 /**
- * @file Functions related to proportional minimum variance (heuristic) portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
@@ -11647,8 +13685,8 @@ self.proportionalMinimumVarianceWeights = function (sigma, opt) {
 * the mean-variance portfolio optimization algorithm).
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolio
-* - Maximum weight of each asset to include in the portfolio
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * This algorithm combines the usage of a random subspace optimization method with an arbitrary portfolio
 * optimization algorithm the following way:
@@ -11692,7 +13730,7 @@ self.proportionalMinimumVarianceWeights = function (sigma, opt) {
 * - As a second input argument, a JavaScript object subsetPortfolioOptimizationMethodParams, representing optional parameters
 * to be provided to the function fct, with subsetPortfolioOptimizationMethodParams.constraints.minWeights and 
 * subsetPortfolioOptimizationMethodParams.constraints.maxWeights automatically computed from
-* opt.constraints.minWeights and opt.constraints.maxWeights if provided.
+* opt.constraints.minWeights and opt.constraints.maxWeights if provided
 * and which must return an array of sizeSubsets real numbers belonging to the unit simplex of R^sizeSubsets, representing
 * the weights w_1,...,w_sizeSubsets of the portfolio computed by the portfolio optimization method applied to the generated 
 * subset of assets. In case these weights cannot be computed, the funtion fct is expected to throw an instance of
@@ -11713,8 +13751,8 @@ self.proportionalMinimumVarianceWeights = function (sigma, opt) {
 * - 'median' in order to compute the final portfolio weights as the geometric median of all the computed portfolios weights
 ; defaults to 'average'.
 * @param {object} opt.subsetPortfolioOptimizationMethodParams optional parameters to be provided as is to the portfolio optimization method represented by the function fct, a JavaScript object 
-* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
-* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @return {Array.<number>} the weights corresponding to the computed portfolio, array of n real numbers.
 *
 * @example
@@ -11831,7 +13869,7 @@ self.randomSubspaceOptimizationWeights = function(nbAssets, fct, opt) {
 	// The assets subsets generator
 	var subsetAssetsIdxIterator; 
 	if (subsetsGenerationMethod === 'random') {
-		subsetAssetsIdxIterator = new randomKSubsetIterator_(nbAssets, sizeSubsets, false); // use no array copy in the subsets generation to improve performances
+		subsetAssetsIdxIterator = new randomKSubsetsIterator_(nbAssets, sizeSubsets, false); // use no array copy in the subsets generation to improve performances
 	}
 	else if (subsetsGenerationMethod === 'deterministic') {
 		subsetAssetsIdxIterator = new kSubsetsIterator_(nbAssets, sizeSubsets, false); // use no array copy in the subsets generation to improve performances
@@ -12083,7 +14121,23 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 		var subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx, subsetPortfolioOptimizationMethodParams.subsetSigma);
 		
 		// Return the weights of the mean-variance optimal portfolio of the selected assets
-		return self.meanVarianceOptimizationWeights(subsetMu, subsetSigma, subsetPortfolioOptimizationMethodParams);
+		//
+		// Catches non reachable return/volatility constraint, as well as infeasible problem, which all
+		// can be raised due to the subsetting of assets.
+		try {
+			return self.meanVarianceOptimizationWeights(subsetMu, subsetSigma, subsetPortfolioOptimizationMethodParams);
+		}
+		catch (e) {
+			if (e.message === 'return not reachable' ||
+			    e.message === 'volatility not reachable' ||
+				e.message === 'infeasible problem detected: the restricted simplex is empty') {
+				throw new Error('infeasible portfolio optimization problem');
+			}
+			else {
+				throw(e);
+			}
+		}
+		
 	}
 
 	// Return the computed portfolio weights using the generic random subspace optimization method
@@ -12111,8 +14165,8 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * Optionally, the following constraints can be added:
 * - Minimum number of assets to include in the portfolio
 * - Maximum number of assets to include in the portfolio
-* - Minimum weight of each asset to include in the portfolio
-* - Maximum weight of each asset to include in the portfolio
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 * - Minimum exposure of the portfolio
 * - Maximum exposure of the portfolio
 *
@@ -12132,8 +14186,8 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
 * @param {number} opt.constraints.minNbAssets the minimum number of assets to include in the portfolio, an integer i satisfying 1 <= i <= nbAssets; defaults to 1.
 * @param {number} opt.constraints.maxNbAssets the maximum number of assets to include in the portfolio, an integer j satisfying i <= j <= nbAssets; defaults to nbAssets.
-* @param {Array.<number>} opt.constraints.minWeights an array of size nbAssets (l_i),i=1..nbAssets containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..nbAssets; defaults to an array made of zeros.
-* @param {Array.<number>} opt.constraints.maxWeights an array of size nbAssets (u_i),i=1..nbAssets containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..nbAssets; defaults to an array made of ones.
+* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
 * @param {number} opt.constraints.minExposure the minimum exposure of the portfolio expressed in percent, a strictly positive real number satisfying 0 < opt.constraints.minExposure <= opt.constraints.maxExposure <= 1; defaults to 1.
 * @param {number} opt.constraints.maxExposure the maximum exposure of the portfolio expressed in percent, a strictly positive real number satisfying 0 < opt.constraints.minExposure <= opt.constraints.maxExposure <= 1; defaults to 1.
 * @return {Array.<number>} the weights corresponding to a random portfolio, array of real numbers of length nbAssets.
@@ -12195,48 +14249,7 @@ self.randomWeights = function (nbAssets, opt) {
 	
 	
 	// Core process
-	
-		
-	// Extract the mandatory minimum number of assets to include in the portfolio based 
-	// on optional lower bounds constraints.
 	//
-	// Extract the mandatory and free assets indexes based on optional lower bounds contraints.
-	var nbMandatoryAssets = 0;
-	var nbFreeAssets = nbAssets;
-	if (opt.constraints.minWeights) {
-		for (var i = 0; i < nbAssets; ++i) {
-			if (opt.constraints.minWeights[i] > 0) {
-				++nbMandatoryAssets;
-			}
-		}
-		
-		var mandatoryAssetsIdx = typeof Uint32Array === 'function' ? new Uint32Array(nbMandatoryAssets) : new Array(nbMandatoryAssets);
-		for (var i = 0, j = 0; i < nbAssets; ++i) {
-			if (opt.constraints.minWeights[i] > 0) {
-				mandatoryAssetsIdx[j++] = i + 1;
-			}
-		}
-	}
-	
-	nbFreeAssets -= nbMandatoryAssets;
-	var freeAssetsIdx = typeof Uint32Array === 'function' ? new Uint32Array(nbFreeAssets) : new Array(nbFreeAssets);
-	for (var i = 0, j = 0; i < nbAssets; ++i) {
-		if (opt.constraints.minWeights === undefined || (opt.constraints.minWeights && opt.constraints.minWeights[i] === 0)) {
-			freeAssetsIdx[j++] = i + 1;
-		}
-	}
-		
-	// In case the mandatory minimum number of assets to include in the portfolio 
-	// is strictly greater than the desired maximum number of assets, throw an error.
-	//
-	// Otherwise, override the desired minimum number of assets.
-	if (nbMandatoryAssets > nbMaxAssets) {
-		throw new Error('maximum number of assets not consistent with lower bounds contraints');
-	}
-	else {
-		nbMinAssets = Math.max(nbMinAssets, nbMandatoryAssets);
-	}
-	
 	// Repeat steps 1 - 7 until the generated weights are feasible w.r.t. all the constraints:
 	// - Cardinality constraints
 	// - Minimum/maximum weights constraints
@@ -12252,27 +14265,12 @@ self.randomWeights = function (nbAssets, opt) {
 		}
 		
 		
-		// 1 - Generate the number of assets to include in the portfolio (uniform generation)
+		// 1 - Generate the number of assets to include in the portfolio (uniform generation),
+		//     by generating a random number of free assets.
 		var nbSelectedAssets = Math.floor(Math.random() * (nbMaxAssets - nbMinAssets +1)) + nbMinAssets;
-		var nbSelectedFreeAssets = nbSelectedAssets - nbMandatoryAssets;
 		
-		// 2 - Generate the indices of the assets to include in the portfolio (uniform generation);
-		//     which is the union of the mandatory assets indices and of the selected free assets indices
-		var selectedFreeAssetsIdx = new randomKSubsetIterator_(nbFreeAssets, nbSelectedFreeAssets, false).next();
-		for (var i = 0; i < nbSelectedFreeAssets; ++i) {
-			var idx = selectedFreeAssetsIdx[i] - 1;
-			selectedFreeAssetsIdx[i] = freeAssetsIdx[idx];
-		}
-		var selectedAssetsIdx = typeof Uint32Array === 'function' ? new Uint32Array(nbSelectedAssets) : new Array(nbSelectedAssets);
-		for (var i = 0; i < nbMandatoryAssets; ++i) {
-			selectedAssetsIdx[i] = mandatoryAssetsIdx[i];
-		}
-		for (var i = nbMandatoryAssets, j = 0; i < nbSelectedAssets; ++i, ++j) {
-			selectedAssetsIdx[i] = selectedFreeAssetsIdx[j];			
-		}
-		selectedAssetsIdx.sort(function(a, b) { // sort in increasing order
-			return a - b;
-		});
+		// 2 - Generate the indices of the assets to include in the portfolio (uniform generation)
+		var selectedAssetsIdx = new randomKSubsetsIterator_(nbAssets, nbSelectedAssets, false).next();
 
 		// 3 - Generate the exposure of the portfolio (uniform generation)
 		//
@@ -12305,8 +14303,8 @@ self.randomWeights = function (nbAssets, opt) {
 		// 4 - In case minimum/maximum weights constraints are provided, automatically map
 		//     these constraints to the generated assets.
 		if (opt.constraints.minWeights) {
-			// In case default lower bounds contraints have already been set in step 3 above
-			// due to a partial investment constraint, the lowerBounds variable must not be overriden.
+			// In case default lower bounds constraints have already been set in step 3 above
+			// due to a partial investment constraint, the lowerBounds variable must not be overridden.
 			//
 			// Otherwise, there is no slack asset variable to manage.
 			if (portfolioExposure === 1) {
@@ -12322,8 +14320,8 @@ self.randomWeights = function (nbAssets, opt) {
 			// set in step 3 above
 		}
 		if (opt.constraints.maxWeights) {
-			// In case default upper bounds contraints have already been set in step 3 above
-			// due to a partial investment constraint, the upperBounds variable must not be overriden.
+			// In case default upper bounds constraints have already been set in step 3 above
+			// due to a partial investment constraint, the upperBounds variable must not be overridden.
 			//
 			// Otherwise, there is no slack asset variable to manage.
 			if (portfolioExposure === 1) {
@@ -12354,7 +14352,7 @@ self.randomWeights = function (nbAssets, opt) {
 		var selectedAssetsWeights = new simplexRandomSampler_(nbSelectedAssets + nbSlackAssets, lowerBounds, upperBounds).sample();
 		
 		// 7 - Test for the feasibility of the generated weights w.r.t. the cardinality constraint,
-        //     i.e., exactly the first nbSelectedAssets assets weights must be non zero.
+		//     i.e., exactly the first nbSelectedAssets assets weights must be non zero.
 		for (var i = 0; i < nbSelectedAssets; ++i) {
 			// In case of a zero weight, generate a whole new set of number of assets / assets indices
 			if (selectedAssetsWeights[i] == 0) { 
@@ -12370,7 +14368,7 @@ self.randomWeights = function (nbAssets, opt) {
 	
 	// Compute the final weights vector:
 	// - The weights associated to assets not included in the portfolio at step 2 are set to zero
-	// - The weights associated to assets included in the portfolio at step 2 are set to their values generated at step 5
+	// - The weights associated to assets included in the portfolio at step 2 are set to their values generated at step 6
 	var weights = Matrix_.zeros(nbAssets, 1);
 	for (var i = 0; i < nbSelectedAssets; ++i) {
 		// Extract included assets information

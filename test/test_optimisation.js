@@ -4,10 +4,759 @@ QUnit.module('Optimisation internal module', {
     // 
   }
 });
-	
 
+
+QUnit.test('Unidimensional minimization - Golden section search method', function(assert) {    	
+	// Error cases
+	{
+		// Define the function x -> x^2
+		var f = function(x) {
+			return x*x;
+		}
+		
+		//
+		assert.throws(function() { PortfolioAllocation.goldenSectionSearch_(f, 2, 1) },
+							       new Error('bracketing interval lower bound 2 greater than bracketing interval upper bound 1'),
+								  "Error case, bracketing interval lower bound greater than upper bound");
+	}
 	
-QUnit.test('Compositve convex programming solver - FISTA', function(assert) {    
+	// Limit cases
+	{
+		// Define the function x -> x
+		var f = function(x) {
+			return Math.abs(x);
+		}
+
+		//
+		var expectedSol = 0;
+		var expectedValueSol = f(expectedSol);
+
+		var sol = PortfolioAllocation.goldenSectionSearch_(f, 0, 1);
+		assert.equal(Math.abs(sol[0] - expectedSol) <= 1e-6, true, 'Limit case, bracketing interval lower bound equal to the minimum');
+		assert.equal(Math.abs(sol[1] - expectedValueSol) <= 1e-6, true, 'Limit case, bracketing interval lower bound equal to the minimum, value');
+		assert.equal(sol.length, 2, 'Limit case, bracketing interval lower bound equal to the minimum, number of elements');
+
+		var sol = PortfolioAllocation.goldenSectionSearch_(f, -1, 0);
+		assert.equal(Math.abs(sol[0] - expectedSol) <= 1e-6, true, 'Limit case, bracketing interval upper bound equal to the minimum');
+		assert.equal(Math.abs(sol[1] - expectedValueSol) <= 1e-6, true, 'Limit case, bracketing interval upper bound equal to the minimum, value');
+		assert.equal(sol.length, 2, 'Limit case, bracketing interval upper bound equal to the minimum number of elements');
+	}
+	
+	// Static test 1
+	{
+		// Define the function x -> (x-2)^2
+		var f = function(x) {
+			return (x-2)*(x-2);
+		}
+		
+		//
+		var expectedSol = 2;
+		var expectedValueSol = f(expectedSol);
+
+		var defaultPrecisionSol = PortfolioAllocation.goldenSectionSearch_(f, 1, 5);
+		assert.equal(Math.abs(defaultPrecisionSol[0] - expectedSol) <= 1e-6, true, 'Test function 1, default precision');
+		assert.equal(Math.abs(defaultPrecisionSol[0] - expectedSol) > 1e-8, true, 'Test function 1, default precision');
+		assert.equal(Math.abs(defaultPrecisionSol[1] - expectedValueSol) <= 1e-6, true, 'Test function 1, default precision, value');
+		assert.equal(sol.length, 2, 'Test function 1, default precision, number of elements');
+		
+		var HighPrecisionSol = PortfolioAllocation.goldenSectionSearch_(f, 1, 5, {eps: 1e-8});
+		assert.equal(Math.abs(HighPrecisionSol[0] - expectedSol) <= 1e-8, true, 'Test function 1, high precision');
+		assert.equal(Math.abs(HighPrecisionSol[1] - expectedValueSol) <= 1e-8, true, 'Test function 1, high precision, value');
+		assert.equal(sol.length, 2, 'Test function 1, high precision, number of elements');
+	}
+	
+	// Static test 2
+	{
+		// Define the function x -> x^4 - 14x^3 + 60x^2 - 70x, unimodal on [0,2]
+		var f = function(x) {
+			return Math.pow(x, 4) - 14*Math.pow(x, 3) + 60*Math.pow(x,2) - 70*x;
+		}
+		
+		//
+		var expectedSol = 0.7809;
+		var expectedValueSol = f(expectedSol);
+
+		var sol = PortfolioAllocation.goldenSectionSearch_(f, 0, 2);
+		assert.equal(Math.abs(sol[0] - expectedSol) <= 1e-4, true, 'Test function 2');
+		assert.equal(Math.abs(sol[1] - expectedValueSol) <= 1e-4, true, 'Test function 2, value');
+		assert.equal(sol.length, 2, 'Test function 2, number of elements');
+	}
+	
+	// Static test 3
+	{
+		// Define the function x -> exp(-x) - cos(x), unimodal on [0,1]
+		var f = function(x) {
+			return Math.exp(-x) - Math.cos(x);
+		}
+		
+		//
+		var expectedSol = 0.588533;
+		var expectedValueSol = f(expectedSol);
+
+		var sol = PortfolioAllocation.goldenSectionSearch_(f, 0, 1);
+		assert.equal(Math.abs(sol[0] - expectedSol) <= 1e-5, true, 'Test function 3, minimum in open interval');
+		assert.equal(Math.abs(sol[1] - expectedValueSol) <= 1e-5, true, 'Test function 3, minimum in open interval, value');
+		assert.equal(sol.length, 2, 'Test function 3, minimum in open interval, number of elements');
+		
+		//
+		var expectedSol = 0.4;
+		var expectedValueSol = f(expectedSol);
+
+		var sol = PortfolioAllocation.goldenSectionSearch_(f, 0, 0.4);
+		assert.equal(Math.abs(sol[0] - expectedSol) <= 1e-6, true, 'Test function 3, bracketing interval lower bound equal to the minimum');
+		assert.equal(Math.abs(sol[1] - expectedValueSol) <= 1e-6, true, 'Test function 3, bracketing interval lower bound equal to the minimum, value');
+		assert.equal(sol.length, 2, 'Test function 3, bracketing interval lower bound equal to the minimum, number of elements');
+
+	}
+});
+
+
+
+QUnit.test('Unidimensional root finding - Bisection method', function(assert) {    	
+	// Error cases
+	{
+		// Define the function x -> x^2
+		var f = function(x) {
+			return x*x;
+		}
+		
+		//
+		assert.throws(function() { PortfolioAllocation.bisection_(f, 2, 1) },
+							       new Error('bracketing interval lower bound 2 greater than bracketing interval upper bound 1'),
+								  "Error case, bracketing interval lower bound greater than upper bound");
+
+		//
+		assert.throws(function() { PortfolioAllocation.bisection_(f, 1, 2) },
+							       new Error('interval [1,2] is not a bracketing interval'),
+								  "Error case, not a bracketing interval");
+	}
+	
+	// Limit cases
+	{
+		// Define the function x -> x
+		var f = function(x) {
+			return x;
+		}
+
+		//
+		var expectedSol = 0;
+
+		var sol = PortfolioAllocation.bisection_(f, 0, 1);
+		assert.equal(Math.abs(sol - expectedSol) <= 1e-6, true, 'Limit case, bracketing interval lower bound equal to a root');
+
+		var sol = PortfolioAllocation.bisection_(f, -1, 0);
+		assert.equal(Math.abs(sol - expectedSol) <= 1e-6, true, 'Limit case, bracketing interval upper bound equal to a root');
+
+		var sol = PortfolioAllocation.bisection_(f, -1, 1);
+		assert.equal(Math.abs(sol - expectedSol) <= 1e-6, true, 'Limit case, bracketing interval halving point equal to a root');
+	}
+	
+	// Static test 1, simple root
+	{
+		// Define the function x ->  x^2 - 2
+		var f = function(x) {
+			return x*x - 2;
+		}
+		
+		//
+		var expectedSol = Math.sqrt(2);
+
+		var defaultPrecisionSol = PortfolioAllocation.bisection_(f, 0, 2);
+		assert.equal(Math.abs(defaultPrecisionSol - expectedSol) <= 1e-6, true, 'Test function 1, default precision');
+		
+		var HighPrecisionSol = PortfolioAllocation.bisection_(f, 0, 2, {eps: 1e-12});
+		assert.equal(Math.abs(HighPrecisionSol - expectedSol) <= 1e-12, true, 'Test function 1, high precision');
+	}
+	
+	// Static test 2, double root
+	{
+		// Define the function x ->  (x-1)^2 * (x-0.5)
+		var f = function(x) {
+			return (x-1)*(x-1)*(x-0.5);
+		}
+		
+		//
+		var expectedSol = 1;
+		
+		var sol = PortfolioAllocation.bisection_(f, 0, 2);
+		assert.equal(Math.abs(sol - expectedSol) <= 1e-6, true, 'Test function 2');
+	}
+	
+	// Static test 3
+	{
+		// Define the function x ->  1/1.22^(1/x) + 1/4.33^(1/x) - 1
+		var f = function(x) {
+			return Math.pow(1/1.22, 1/x) + Math.pow(1/4.33, 1/x) - 1;
+		}
+		
+		//
+		var expectedSol = 0.904;
+		
+		var sol = PortfolioAllocation.bisection_(f, 0.001, 1);
+		assert.equal(Math.abs(sol - expectedSol) <= 1e-3, true, 'Test function 3');
+	}
+});
+
+
+QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) {    	
+	// References
+	// J.J. More', B.S. Garbow and K.E. Hillstrom, "Testing Unconstrained Optimization Software", ACM Transactions on Mathematical Software, vol. 7(1), pp. 17-41, 1981.
+	// Test problems for partially separable optimization and results for the routine PSPMIN, Ph.L. Toint
+	// A Literature Survey of Benchmark Functions For Global Optimization Problems, Momin Jamil, Xin-She Yang
+
+	// Test function 1: Rosenbrock function
+	{
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			
+			return 100*Math.pow((x_2 - x_1*x_1), 2) + Math.pow((1 - x_1), 2);
+		}
+
+		// The minimum of the function f is attained at (1,1) and is equal to 0
+		var expectedSol = new PortfolioAllocation.Matrix([1, 1]); 
+		
+		// The initial point is (-1.2, 1)
+		var x0 = new PortfolioAllocation.Matrix([-1.2, 1]);
+
+		// Compute the minimum of the function f, with default values, and check the result on the located minimizer
+		var sol = PortfolioAllocation.gssSolve_(f, x0);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function Rosenbrock function, default values');
+
+		// Compute the minimum of the function f, with complete polling, and check the result on the located minimizer
+		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {pollingType: 'complete'});
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function Rosenbrock function, complete polling');
+		
+		// Compute the minimum of the function f, with custom forcing function, and check the result on the located minimizer
+		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {rho: function(alpha) { return alpha;} });
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), false, 'Rosenbrock function, custom forcing function');
+	}
+
+	// Test function 2: Freudenstein-Roth function
+	{
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			
+			return Math.pow(-13 + x_1 + ((5 - x_2)*x_2 - 2)*x_2, 2) + Math.pow(-29 + x_1 + ((x_2 + 1)*x_2 - 14) * x_2, 2);
+		}
+
+		// There are two local minimum points of the function f: 
+		// - (5,4) with value 0 (global minimum) 
+		// - (11.41, -0.8968) with value 48.9842 (local minimum)
+		var expectedSol1 = new PortfolioAllocation.Matrix([5, 4]);
+		var expectedSol2 = new PortfolioAllocation.Matrix([11.4128, -0.8968]);
+		
+		// The initial point is (0.5, -2)
+		var x0 = new PortfolioAllocation.Matrix([0.5, -2]);
+
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.gssSolve_(f, x0);
+
+		// Check the result on the located minimizer, which must be one of the two local minimum
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol1, 1e-3) ||  
+		             PortfolioAllocation.Matrix.areEqual(sol, expectedSol2, 1e-3), true, 'Freudenstein-Roth function');
+	}
+	
+	// Test function 33: Extended Freudenstein-Roth function
+	{
+		// Define n and m
+		var n = 50;
+		var m = n-1;
+		
+		var f = function(x) {
+			// Placeholder for sum f_i, i=1..m
+			var res = 0;
+
+			// Compute sum f_i, i=1..m
+			for (var i = 1; i <= m; ++i) {
+				var f_i = Math.pow(x.getValue(i, 1) + x.getValue(i+1, 1)*((5 - x.getValue(i+1, 1)) * x.getValue(i+1, 1) - 2) - 13, 2) +
+				          Math.pow(x.getValue(i, 1) + x.getValue(i+1, 1)*((x.getValue(i+1, 1) + 1) * x.getValue(i+1, 1) - 14) - 29, 2);
+				res += f_i;
+			}
+
+			return res;
+		}
+
+		// The gradient of f at (x1,...,xn)
+		var gradf = function(x) {
+			return PortfolioAllocation.Matrix.fill(n, 1, 
+												   function(i,j) { 
+														if (i === 1) {
+															var x_i = x.getValue(i, 1);
+															var x_ip = x.getValue(i+1, 1);
+															
+															return 2*(x_i + x_ip*((5 - x_ip) * x_ip - 2) - 13) + 2*(x_i + x_ip*((x_ip + 1) * x_ip - 14) - 29);
+														}
+														else if (i >= 2 && i <= n-1) {
+															var x_i = x.getValue(i, 1);
+															var x_im = x.getValue(i-1, 1);
+															var x_ip = x.getValue(i+1, 1);
+															
+															return 2*(x_i + x_ip*((5 - x_ip) * x_ip - 2) - 13) + 2*(x_i + x_ip*((x_ip + 1) * x_ip - 14) - 29)
+															     + 2*(x_im + 5*Math.pow(x_i, 2) - Math.pow(x_i, 3) - 2*x_i - 13)*(10*x_i - 3*Math.pow(x_i, 2) - 2)
+															     + 2*(x_im + + Math.pow(x_i, 3) + Math.pow(x_i, 2) - 14*x_i - 29)*(3*Math.pow(x_i, 2) + 2*x_i -14);
+														}
+														else if (i === n) {
+															var x_i = x.getValue(i, 1);
+															var x_im = x.getValue(i-1, 1);
+															
+															return 2*(x_im + 5*Math.pow(x_i, 2) - Math.pow(x_i, 3) - 2*x_i - 13)*(10*x_i - 3*Math.pow(x_i, 2) - 2)
+															     + 2*(x_im + + Math.pow(x_i, 3) + Math.pow(x_i, 2) - 14*x_i - 29)*(3*Math.pow(x_i, 2) + 2*x_i -14);
+														}
+													}); 
+		}
+		
+		// The initial point is (-2...-2)
+		var x0 = PortfolioAllocation.Matrix.ax(-2, PortfolioAllocation.Matrix.ones(n, 1));
+
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {eps: 1e-8});
+		
+		// Check the result on the located minimizer, using the nullity of the gradient as a necessary and sufficient condition
+		assert.equal(Math.abs(gradf(sol).vectorNorm('infinity')) <= 1e-3, true, 'Test function 31 extended Freudenstein-Roth function');
+	}
+	
+	// Test function 6: Jennrich-Sampson function
+	{
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			
+			// Placeholder for sum f_i^2, i=1..10
+			var res = 0;
+
+			// Compute sum f_i^2, i=1..10
+			for (var i = 1; i <= 10; ++i) {
+				var f_i = 2 + 2*i - (Math.exp(i*x_1) + Math.exp(i*x_2));
+				res += f_i * f_i;
+			}
+
+			return res;
+		}
+
+		// The global minimum is located at (0.25782521321500883,0.25782521381356827),
+		// with value 124.36218235561473896
+		var expectedSol = new PortfolioAllocation.Matrix([0.25782521321500883, 0.25782521381356827]);
+		
+		// The initial point is (0.3, 0.4)
+		var x0 = new PortfolioAllocation.Matrix([0.3, 0.4]);
+
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.gssSolve_(f, x0);
+
+		// Check the result on the located minimizer
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-4), true, 'Jennrich-Sampson function');
+	}
+	
+	// Test function 8: Bard function
+	{
+		// Define n and m
+		var n = 3;
+		var m = 15;
+		
+		// Define the coefficients y
+		var y = [0.14, 0.18, 0.22, 0.25, 0.29, 0.32, 0.35, 0.39, 0.37, 0.58, 0.73, 0.96, 1.34, 2.10, 4.39];
+		
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			var x_3 = x.getValue(3, 1);
+			
+			// Placeholder for sum f_i^2, i=1..m
+			var res = 0;
+
+			// Compute sum f_i^2, i=1..m
+			for (var i = 1; i <= m; ++i) {
+				var u_i = i;
+				var v_i = 16 - i;
+				var w_i = Math.min(u_i, v_i);
+				var f_i = y[i-1] - (x_1 + u_i/(v_i*x_2 + w_i*x_3));
+				res += f_i * f_i;
+			}
+
+			return res;
+		}
+
+		// The minimum reported is of ~8.21487...10^-3, at point below
+		var expectedSol = new PortfolioAllocation.Matrix([0.08241040, 1.133033, 2.343697]);
+		
+		// The initial point is (1, 1, 1)
+		var x0 = new PortfolioAllocation.Matrix([1, 1, 1]);
+
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.gssSolve_(f, x0);
+
+		// Check the result on the located minimizer
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Bard function');
+	}
+
+	// Test function 10: Meyer function
+	// This one is very hard unfortunately
+	{
+		// Define n and m
+		var n = 3;
+		var m = 16;
+		
+		// Define the coefficients y
+		var y = [34780, 28610, 23650, 19630, 16370, 13720, 11540, 9744, 8261, 7030, 6005, 5147, 4427, 3820, 3307, 2872];
+		
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			var x_3 = x.getValue(3, 1);
+			
+			// Placeholder for sum f_i^2, i=1..m
+			var res = 0;
+
+			// Compute sum f_i^2, i=1..m
+			for (var i = 1; i <= m; ++i) {
+				var t_i = 45 + 5*i;
+				var f_i = x_1 * Math.exp(x_2 / (t_i + x_3)) - y[i-1];
+				res += f_i * f_i;
+			}
+
+			return res;
+		}
+
+		// The minimum reported value is ~87.945855171
+		// The associated optimal values of the parameters are as below.
+		// Reference: https://www.itl.nist.gov/div898/strd/nls/data/LINKS/v-mgh10.shtml
+		var expectedSol = new PortfolioAllocation.Matrix([5.6096364710E-03, 6.1813463463E+03, 3.4522363462E+02]);
+		
+		// Three different starting values:
+		// - (2, 400000, 25000)
+		// - (0.02, 4000, 250)
+		// - (5.6096364710E-03, 6.1813463463E+03, 3.4522363462E+02)
+		//var x0 = new PortfolioAllocation.Matrix([2, 400000, 25000]);
+		//var x0 = new PortfolioAllocation.Matrix([0.02, 4000, 250]);
+		var x0 = new PortfolioAllocation.Matrix([5.6096364710E-03, 6.1813463463E+03, 3.4522363462E+02]);
+
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.gssSolve_(f, x0);
+
+		// Check the result on the located minimizer
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Meyer function');
+	}
+	
+	// Test function 11: Gulf research problem function
+	{
+		// Define n and m
+		var n = 3;
+		var m = 99;
+		
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			var x_3 = x.getValue(3, 1);
+			
+			// Placeholder for sum f_i^2, i=1..m
+			var res = 0;
+
+			// Compute sum f_i^2, i=1..m
+			for (var i = 1; i <= m; ++i) {
+				var t_i = i/100;
+				var y_i = 25 + Math.pow(-50*Math.log(t_i), 2/3)
+				var f_i = Math.exp(- Math.pow(y_i - x_2, x_3) / x_1) - t_i;
+				res += f_i * f_i;
+			}
+
+			return res;
+		}
+
+		// The minimum value is 0 at (50, 25, 1.5)
+		var expectedSol = new PortfolioAllocation.Matrix([50, 25, 1.5]);
+		
+		// The initial point is (5, 2.5, 0.15)
+		var x0 = new PortfolioAllocation.Matrix([5, 2.5, 0.15]);
+
+		// Compute the minimum of the function f, with standard lower bounds constraints
+		// but upper bounds constraints equal to the expected solution instead of the standard
+		// upper bounds constraints [100, 25.6, 5].
+		//
+		// Otherwise, the convergence is too slow.
+		var sol = PortfolioAllocation.gssSolve_(f, x0, [0.1, 0, 0], [50, 25, 1.5], { eps: 1e-7, maxIter: 800000});
+
+		// Check the result on the located minimizer
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Gulf research problem function');
+	}
+	
+	// Test function 30: broydn3d
+	{
+		// Define n and m
+		var n = 50;
+		var m = n;
+		
+		var f = function(x) {
+			// Placeholder for sum f_i^2, i=1..m
+			var res = 0;
+		
+			// Compute f_1^2
+			var f_1 = (3 - 2*x.getValue(1, 1))*x.getValue(1, 1) - 2*x.getValue(2, 1) + 1;
+			res += f_1 * f_1;
+			
+			// Compute sum f_i^2, i=2..n-1
+			for (var i = 2; i <= n-1; ++i) {
+				var f_i = (3 - 2*x.getValue(i, 1))*x.getValue(i, 1) - x.getValue(i-1, 1) - 2*x.getValue(i+1, 1) + 1;
+				res += f_i * f_i;
+			}
+			
+			// Compute f_n^2
+			var f_n = (3 - 2*x.getValue(n, 1))*x.getValue(n, 1) - x.getValue(n-1, 1) + 1;
+			res += f_n * f_n;
+			
+			return res;
+		}
+		
+		// There are several global minimums of the function f, in which f value is 0
+		var expectedFunctionValue = 0;
+		
+		// The initial point is (-1,...,-1)
+		var x0 = PortfolioAllocation.Matrix.ax(-1, PortfolioAllocation.Matrix.ones(n, 1));
+
+		// Compute the minimum of the function f, with probabilistic descent directions
+		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, { unconstrainedPollingSet: 'probabilisticDescentDirections'});
+		
+		// Check the result on f value
+		assert.equal(Math.abs(f(sol) - expectedFunctionValue) <= 1e-3, true, 'Test function 30 broydn3d');
+	}
+	
+	// Test function 32: arglina
+	{
+		// Define n and m
+		var n = 100;
+		var m = n;
+		
+		var f = function(x) {
+			// Placeholder for sum f_i^2, i=1..m
+			var res = 0;
+			
+			// Pre-compute sum x_j, j=1..n
+			var sum_x_j = 0;
+			for (var j = 1; j <= n; ++j) {
+				sum_x_j += x.getValue(j, 1);
+			}
+			
+			// Compute sum f_i^2, i=1..n
+			for (var i = 1; i <= n; ++i) {
+				var f_i = x.getValue(i, 1) - 2/m * sum_x_j - 1;
+				res += f_i * f_i;
+			}
+			
+			// Compute sum f_i^2, i=n+1..m
+			for (var i = n+1; i <= m; ++i) {
+				var f_i = - 2/m * sum_x_j - 1;
+				res += f_i * f_i;
+			}
+						
+			return res;
+		}
+
+		// There is one global minimum of the function f: (-1,...,-1), in which f value is m - n
+		var expectedSol = PortfolioAllocation.Matrix.ax(-1, PortfolioAllocation.Matrix.ones(n, 1));
+		
+		// The initial point is (1,...,1)
+		var x0 = PortfolioAllocation.Matrix.ones(n, 1);
+
+		// Compute the minimum of the function f, with probabilistic descent directions
+		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {unconstrainedPollingSet: 'probabilisticDescentDirections'});
+		
+		// Check the result on the located minimizer
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function 32 arglina');
+	}
+	
+	// Test function 33: arglinb	
+	{
+		// Define n and m
+		var n = 50;
+		var m = n;
+		
+		var f = function(x) {
+			// Placeholder for sum f_i^2, i=1..m
+			var res = 0;
+			
+			// Pre-compute sum j*x_j, j=1..n
+			var sum_j_x_j = 0;
+			for (var j = 1; j <= n; ++j) {
+				sum_j_x_j += j * x.getValue(j, 1);
+			}
+			
+			// Compute sum f_i^2, i=1..m
+			for (var i = 1; i <= m; ++i) {
+				var f_i = i * sum_j_x_j - 1;
+				res += f_i * f_i;
+			}
+						
+			return res;
+		}
+
+		// There are several global minimums of the function f, at which f value is m(m-1)/(2*(2m+1));
+		// These points x_j, j=1..n are such that sum j*x_j, j=1..n = 3/(2m+1)
+		var expectedFunctionValue = m * (m - 1) / ( 2 * (2*m + 1) );
+		
+		// The initial point is (1,...,1)
+		var x0 = PortfolioAllocation.Matrix.ones(n, 1);
+
+		// Compute the minimum of the function f, with probabilistic descent directions
+		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {unconstrainedPollingSet: 'probabilisticDescentDirections'});
+		
+		// Check the result on f value
+		assert.equal(Math.abs(f(sol) - expectedFunctionValue) <= 1e-3, true, 'Test function 33 arglinb, #1');
+		
+		// Check the result on the located minimizer
+		var sum_j_sol_j = 0;
+		for (var j = 1; j <= n; ++j) {
+			sum_j_sol_j += j * sol.getValue(j, 1);
+		}
+		assert.equal(Math.abs(sum_j_sol_j - 3 / (2*m +1 )) <= 1e-3, true, 'Test function 33 arglinb, #2');
+	}
+	
+	// Test function dqrtic
+	// Reference:  A.R. Buckley, "Test functions for unconstrained minimization"
+	{
+		// Define n and m
+		var n = 50;
+		var m = n;
+		
+		var f = function(x) {
+			// Placeholder for sum f_i^2, i=1..m
+			var res = 0;
+
+			// Compute sum f_i^2, i=1..m
+			for (var i = 1; i <= m; ++i) {
+				var f_i = Math.pow((x.getValue(i, 1) - i), 2);
+				res += f_i * f_i;
+			}
+						
+			return res;
+		}
+		
+		// There is one global minimum of the function f at point (1,2,...,n), where f value is 0
+		var expectedSol = PortfolioAllocation.Matrix.fill(n, 1, function(i,j) { return i; });
+		
+		// The initial point is (2,...,2)
+		var x0 = PortfolioAllocation.Matrix.ax(2, PortfolioAllocation.Matrix.ones(n, 1));
+
+		// Compute the minimum of the function f, with default values
+		 var sol = PortfolioAllocation.gssSolve_(f, x0);
+
+		// Check the result on the located minimizer
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function dqrtic');
+	}
+	
+	// Test function engval1
+	// Reference: Test problems for partially separable optimization and results for the routine PSPMIN, Ph.L. Toint, problem 31
+	{
+		// Define n and m
+		var n = 50;
+		var m = n-1;
+		
+		var f = function(x) {
+			// Placeholder for sum f_i, i=1..m
+			var res = 0;
+
+			// Compute sum f_i, i=1..m
+			for (var i = 1; i <= m; ++i) {
+				var f_i = Math.pow(x.getValue(i, 1)*x.getValue(i, 1) + x.getValue(i+1, 1)*x.getValue(i+1, 1), 2) - 4*x.getValue(i, 1) + 3
+				res += f_i;
+			}
+						
+			return res;
+		}
+		
+		// The gradient of f at (x1,...,xn) is (4x1(x1^2 + x2^2) - 4,...,4xi(xi^2 + xi+1^2) - 4 + 4xi(xi-1^2 + xi^2),...,4xn(xn-1^2 + xn^2))
+		var gradf = function(x) {
+			return PortfolioAllocation.Matrix.fill(n, 1, 
+												   function(i,j) { 
+														if (i === 1) {
+															return 4*x.getValue(i, 1)*(x.getValue(i, 1)*x.getValue(i, 1) + x.getValue(i+1, 1)*x.getValue(i+1, 1)) - 4;
+														}
+														else if (i >= 2 && i <= n-1) {
+															return 4*x.getValue(i, 1)*(x.getValue(i, 1)*x.getValue(i, 1) + x.getValue(i+1, 1)*x.getValue(i+1, 1)) - 4 
+															     + 4*x.getValue(i, 1)*(x.getValue(i-1, 1)*x.getValue(i-1, 1) + x.getValue(i, 1)*x.getValue(i, 1));
+														}
+														else if (i === n) {
+															return 4*x.getValue(i, 1)*(x.getValue(i-1, 1)*x.getValue(i-1, 1) + x.getValue(i, 1)*x.getValue(i, 1));
+														}
+													}); 
+		}
+		
+		// The initial point is (2,...,2)
+		var x0 = PortfolioAllocation.Matrix.ax(2, PortfolioAllocation.Matrix.ones(n, 1));
+		
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {eps: 1e-8});
+
+		// Check the result on the located minimizer, using the nullity of the gradient as a necessary and sufficient condition
+		assert.equal(Math.abs(gradf(sol).vectorNorm('infinity')) <= 1e-4, true, 'Test function engval1');
+	}
+
+	// Test function: Adjiman function
+	{
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			
+			return Math.cos(x_1)*Math.sin(x_2) - x_1/(x_2*x_2 + 1);
+		}
+
+		// Three local minimas have been identified in the original Adjiman paper:
+		// f = -2.02181 at (2,0.10578) <-- global optima
+		// f = -0.99495 at (0.63627, -1)
+		// f = 0.95465 at (-1, 1)
+		var expectedSol = new PortfolioAllocation.Matrix([2, 0.10578]); 
+		
+		// The initial point is (0, 0)
+		var x0 = new PortfolioAllocation.Matrix([0, 0]);
+		
+		// Compute the minimum of the function f, with upper and lower bounds
+		var sol = PortfolioAllocation.gssSolve_(f, x0, [-1, -1], [2, 1]);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Adjiman function');
+	}
+	
+	// Test function: Bartels Conn function
+	{
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			
+			return Math.abs(x_1*x_1 + x_2*x_2 +x_1*x_2) + Math.abs(Math.sin(x_1)) + Math.abs(Math.cos(x_2));
+		}
+
+		// The global minimum is located at (0,0) with f = 0
+		var expectedSol = new PortfolioAllocation.Matrix([0, 0]); 
+		
+		// The initial point taken is (-250, 250)
+		var x0 = new PortfolioAllocation.Matrix([-250, 250]);
+		
+		// Compute the minimum of the function f, with upper and lower bounds
+		var sol = PortfolioAllocation.gssSolve_(f, x0, [-500, -500], [500, 500]);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Bartels Conn function');
+	}
+	
+	// Test function: Beale function
+	{
+		var f = function(x) {
+			var x_1 = x.getValue(1, 1);
+			var x_2 = x.getValue(2, 1);
+			
+			return Math.pow(1.5 - x_1 + x_1*x_2, 2) + Math.pow(2.25 - x_1 + x_1*x_2*x_2, 2) + Math.pow(2.625 - x_1 + x_1*x_2*x_2*x_2, 2);
+		}
+
+		// The global minimum is located at (3,0.5) with f = 0
+		var expectedSol = new PortfolioAllocation.Matrix([3, 0.5]); 
+		
+		// The initial point taken is (3, 0)
+		var x0 = new PortfolioAllocation.Matrix([3, 0]);
+		
+		// Compute the minimum of the function f, with upper and lower bounds
+		var sol = PortfolioAllocation.gssSolve_(f, x0, [-4.5, -4.5], [4.5, 4.5]);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Beale function');
+	}
+});
+
+
+QUnit.test('Composite convex programming solver - FISTA', function(assert) {    
 	// Functions used to generate random optimization problems
 	function generateRandomDimension(min, max) {
 		return Math.floor(Math.random()*(max-min+1) + min);

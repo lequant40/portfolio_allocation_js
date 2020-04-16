@@ -237,3 +237,91 @@ QUnit.test('Random subspace mean variance portfolio - internal target max volati
 		assert.equal(portfolioVolatility <= targetMaxVolatility, true, 'Random subspace mean variance portfolio - internal max target volatility weights portfolio #1');
 	}
 });	
+
+
+
+QUnit.test('Random weights portfolio - internal tests requiring access to internal functions', function(assert) {    
+	// Test with random data, min and max weights constraints
+	{
+	  // Setup static parameters of the random test
+	  var nbTests = 50;
+	  var nbAssetsMin = 1;
+	  var nbAssetsMax = 50;
+	  
+	  // Aim of these tests is to check that the generated weights are compatible with lower, upper and 
+	  // lower and upper bounds.
+	  for (var i = 0; i < nbTests; ++i) {
+		  // Generate a random number of assets
+		  var nbAssets = Math.floor(Math.random()*(nbAssetsMax - nbAssetsMin + 1) + nbAssetsMin);
+
+		  
+		  // Generate random feasible lower bounds with sum l_i = k with k < 1.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, nbAssets).next();
+		  var feasibleLowerBounds = new Array(nbAssets);
+		  var feasibleLowerBoundsFactor = Math.random()*(0.9 - 0.1) + 0.1;
+		  for (var j = 0; j < nbAssets; ++j) {
+			  feasibleLowerBounds[j] = integerBounds[j] * feasibleLowerBoundsFactor/100;
+		  }
+		   
+		  // Generate a random portfolio with lower bounds constraints
+		  var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minWeights: feasibleLowerBounds } });
+		  
+			// Check that the weights belong to the interval [l_i, 1] in case the assets have been selected
+			var weightsBelongInterval = true;
+			for (var k = 0; k < randomWeights.length; ++k) {
+				if (randomWeights[k] != 0 && (randomWeights[k] > 1 || randomWeights[k] < feasibleLowerBounds[k])) {
+					weightsBelongInterval = false;
+					break;
+				}
+			}
+			assert.equal(weightsBelongInterval, true, "Random weights portfolio with lower bounds constraints - Test " + i);
+
+
+		  // Generate random feasible upper bounds with sum u_i = k with k > 1.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, nbAssets).next();
+		  var feasibleUpperBounds = new Array(nbAssets);
+		  var feasibleUpperBoundsFactor = Math.random()*(1.9 - 1.1) + 1.1;
+		  for (var j = 0; j < nbAssets; ++j) {
+			  feasibleUpperBounds[j] = Math.min(1, integerBounds[j] * feasibleUpperBoundsFactor/100);
+		  }
+
+		  // Generate a random portfolio with upper bounds constraints
+		  var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { maxWeights: feasibleUpperBounds } });
+
+			// Check that the weights belong to the interval [0, u_i]
+			var weightsBelongInterval = true;
+			for (var k = 0; k < randomWeights.length; ++k) {
+				if (randomWeights[k] != 0 && (randomWeights[k] > feasibleUpperBounds[k] || randomWeights[k] < 0)) {
+					weightsBelongInterval = false;
+					break;
+				}
+			}
+			assert.equal(weightsBelongInterval, true, "Random weights portfolio with upper bounds constraints - Test " + i);
+
+			
+		  // Generate random feasible upper bounds with sum u_i = k with k > 1.
+		  //
+		  // Ensure u_i >= l_i.
+		  var integerBounds = new PortfolioAllocation.randomCompositionsIterator_(100, nbAssets).next();
+		  var feasibleUpperBounds = new Array(nbAssets);
+		  var feasibleUpperBoundsFactor = Math.random()*(1.9 - 1.1) + 1.1;
+		  for (var j = 0; j < nbAssets; ++j) {
+			  feasibleUpperBounds[j] = Math.max(feasibleLowerBounds[j], Math.min(1, integerBounds[j] * feasibleUpperBoundsFactor/100));
+	      }
+		  		  
+		  // Generate a random portfolio with lower and upper bounds constraints
+		  var randomWeights = PortfolioAllocation.randomWeights(nbAssets, { constraints: { minWeights: feasibleLowerBounds, maxWeights: feasibleUpperBounds } });
+		  
+			// Check that the weights belong to the interval [l_i, u_i]
+			var weightsBelongInterval = true;
+			for (var k = 0; k < randomWeights.length; ++k) {
+				if (randomWeights[k] != 0 && (randomWeights[k] > feasibleUpperBounds[k] || randomWeights[k] < feasibleLowerBounds[k])) {
+					weightsBelongInterval = false;
+					break;
+				}
+			}
+			assert.equal(weightsBelongInterval, true, "Random weights portfolio with lower and upper bounds constraints - Test " + i);
+	  }
+	}
+});
+

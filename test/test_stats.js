@@ -7,6 +7,67 @@ QUnit.module('Statistics internal module', {
 
 
 
+QUnit.test('Box grid sampler point computation', function(assert) {    
+  // Test with static data, in dimension 1
+  {
+	var expectedValues = [[0],[0.1],[0.2],[0.3],[0.4],[0.5], 
+	                      [0.6], [0.7], [0.8], [0.9], [1], -1];
+	
+	var boxSampler = new PortfolioAllocation.boxGridSampler_(1, 11);
+	  for (var i = 0; i < expectedValues.length; ++i) {
+		var nextSample = boxSampler.sample();
+		
+		var sampleOk = true;
+		for (var j = 0; j < 1; ++j) {
+		   if (Math.abs(expectedValues[i][j] - nextSample[j]) > 1e-12) {
+		     sampleOk = false;
+		     break;
+		   }
+		}	  
+		assert.equal(sampleOk, true, 'Box grid sample - Test 1 #' + i);
+	  } 
+  }
+  
+  // Test with static data, in dimension 2
+  // Additional test: using a custom number of grid points per dimension, plus upper and lower bounds
+  {
+	var expectedValues = [[0, 0],[0, 0.2],[0, 0.4],[0, 0.6],[0, 0.8],[0, 1], 
+	                      [0.2, 0], [0.2, 0.2], [0.2, 0.4], [0.2, 0.6], [0.2, 0.8], [0.2, 1], -1];
+	
+	var boxSampler = new PortfolioAllocation.boxGridSampler_(2, [2, 6], [0, 0], [0.2, 1]);
+	  for (var i = 0; i < expectedValues.length; ++i) {
+		var nextSample = boxSampler.sample();
+
+		var sampleOk = true;
+		for (var j = 0; j < 1; ++j) {
+		   if (Math.abs(expectedValues[i][j] - nextSample[j]) > 1e-12) {
+		     sampleOk = false;
+		     break;
+		   }
+		}	  
+		assert.equal(sampleOk, true, 'Box grid sample - Test 2 #' + i);
+	  } 
+  }
+
+});
+
+
+
+QUnit.test('Permutation entropy computation', function(assert) {    
+  // Tests with static data
+  {
+	  var pE = PortfolioAllocation.permutationEntropy_([6,9,11,12,8,13,5], 3);
+	  assert.equal(Math.abs(pE - 1.5219) <= 1e-4, true, 'Permutation entropy computation #1');
+  }
+
+  {
+	  var pE = PortfolioAllocation.permutationEntropy_([4, 7, 9, 10, 6, 11, 3 ], 2);
+	  assert.equal(Math.abs(pE - 0.918) <= 1e-3, true, 'Permutation entropy computation #2');
+  }
+});
+
+
+
 QUnit.test('Median computation', function(assert) {    
   // Test with static data
   {

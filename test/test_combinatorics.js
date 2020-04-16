@@ -6,6 +6,7 @@ QUnit.module('Combinatorics internal module', {
 });
 
 
+
 QUnit.test('Alias method sampler', function(assert) {    
   // Test with random data
   {
@@ -144,9 +145,9 @@ QUnit.test('Next k-subset computation', function(assert) {
 	  var expectedValues = [[1,2,3], [1,2,4], [1,2,5], [1,3,4], [1,3,5], 
 	                        [1,4,5], [2,3,4],[2,3,5], [2,4,5], [3,4,5]];
 	  
-	  var nextKSubsetIterator = new PortfolioAllocation.kSubsetsIterator_(5, 3);
+	  var nextKSubsetsIterator = new PortfolioAllocation.kSubsetsIterator_(5, 3);
 	  for (var i = 0; i < expectedValues.length; ++i) {
-		var nextKSubset = nextKSubsetIterator.next();
+		var nextKSubset = nextKSubsetsIterator.next();
 		
 		var subsetOk = true;
 		for (var j = 0; j < nextKSubset.length; ++j) {
@@ -158,10 +159,16 @@ QUnit.test('Next k-subset computation', function(assert) {
 		assert.equal(subsetOk, true, 'Next k-subset - Test 1 #' + i);
 	  }
 
-	  var nextKSubset = nextKSubsetIterator.next();
-	  assert.equal(nextKSubset, -1, 'Next k-subset - End value');
+	  var nextKSubset = nextKSubsetsIterator.next();
+	  assert.equal(nextKSubset, -1, 'Next k-subset - Test 1 End value');
   }
-
+  
+  // Static test with empty subset
+  {
+	  var nextKSubsetsIterator = new PortfolioAllocation.kSubsetsIterator_(2, 0);
+	  assert.equal(nextKSubsetsIterator.next().length, 0, 'Next k-subset - Test 2');
+	  assert.equal(nextKSubsetsIterator.next(), -1, 'Next k-subset - Test 2 End value');
+  }
 });
 
 
@@ -180,7 +187,7 @@ QUnit.test('Next random k-subset computation', function(assert) {
 		 // Generate a random n-set, and an associated k-subset iterator
 		 var n = Math.floor(Math.random()*(maxN - minN + 1) + minN);
 		 var k  = Math.floor(Math.random()*(n - 1 + 1) + 1);
-		 var nextRandomKSubsetIterator = new PortfolioAllocation.randomKSubsetIterator_(n, k);
+		 var nextRandomKSubsetIterator = new PortfolioAllocation.randomKSubsetsIterator_(n, k);
 		 
 		 for (var j = 0; j < nbSubTests; ++j) {
 			 // Generate a random k-subset
@@ -213,6 +220,109 @@ QUnit.test('Next random k-subset computation', function(assert) {
 	  }
   }
 
+});
+
+
+
+QUnit.test('Next permutation computation', function(assert) {    
+  // Test with static data: the set {1..4}
+  {
+	  //
+	  var expectedValues = [[1, 2, 3, 4],[2, 1, 3, 4],[3, 1, 2, 4],[1, 3, 2, 4],[2, 3, 1, 4],[3, 2, 1, 4],
+							[4, 2, 1, 3],[2, 4, 1, 3],[1, 4, 2, 3],[4, 1, 2, 3],[2, 1, 4, 3],[1, 2, 4, 3],
+							[1, 3, 4, 2],[3, 1, 4, 2],[4, 1, 3, 2],[1, 4, 3, 2],[3, 4, 1, 2],[4, 3, 1, 2],
+							[4, 3, 2, 1],[3, 4, 2, 1],[2, 4, 3, 1],[4, 2, 3, 1],[3, 2, 4, 1],[2, 3, 4, 1]];
+							
+	  //
+	  var nextPermutationsIterator = new PortfolioAllocation.permutationsIterator_(4);
+
+	  //
+	  for (var i = 0; i < expectedValues.length; ++i) {
+		var nextPermutation = nextPermutationsIterator.next();
+		var permutationOk = true;
+		for (var j = 0; j < nextPermutation.length; ++j) {
+		   if (expectedValues[i][j] != nextPermutation[j]) {
+		     permutationOk = false;
+		     break;
+		   }
+		}	  
+		assert.equal(permutationOk, true, 'Next permutation - Test 1 #' + i);
+	  }
+
+	  var nextPermutation = nextPermutationsIterator.next();
+	  assert.equal(nextPermutation, -1, 'Next permutation - End value');;	  
+  }
+  
+});
+
+QUnit.test('Next random permutation computation', function(assert) {    
+  // Test with random data
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var nbSubTests = 100;
+	  var minN = 1;
+	  var maxN = 1000;
+
+	  // Aim of these tests is to check that for any generated permutation of a n-set, 
+	  // an array of n distinct integers belonging to {1..n} is returned
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random n-set, and an associated k-subset iterator
+		 var n = Math.floor(Math.random()*(maxN - minN + 1) + minN);
+		 var nextRandomPermutationIterator = new PortfolioAllocation.randomPermutationsIterator_(n);
+		 
+		 for (var j = 0; j < nbSubTests; ++j) {
+			 // TODO TEST WITH PROVIDED ARRAY
+			 
+			 // Generate a random permutation
+			 var generatedPermutation = nextRandomPermutationIterator.next();
+			 
+			 // Compute the length of the generatedPermutation
+			 var generatedPermutationLength = generatedPermutation.length;
+			 assert.equal(generatedPermutationLength, n, "Next random permutation computation, permutation length - Test " + i + "," + j);
+			 
+			 // Check that the permutation elements are distinct and belong to {1..n}
+			 var generatedPermutationElementsBelongToNSet = true;
+			 var generatedPermutationElementsDuplicated = false;
+			 var foundPermutationElementsInNSet = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
+			 for (var m = 0; m < n; ++m) {
+				 foundPermutationElementsInNSet[m] = false;
+			 }
+			 
+			 for (var k = 0; k < n; ++k) {
+				var generatedPermutationElement = generatedPermutation[k];
+				
+				// Check no element lower than 1 or greater than n
+				if (generatedPermutationElement > n ||generatedPermutationElement < 0) {
+					generatedPermutationElementsBelongToNSet = false;
+					break;
+				}
+				
+				// Check for duplicate elements
+				if (foundPermutationElementsInNSet[generatedPermutationElement-1] === true) {
+					generatedPermutationElementsDuplicated = true;
+					break;
+				}
+				else {
+					foundPermutationElementsInNSet[generatedPermutationElement-1] = true;
+				}
+			 }
+			 // Final check that all elements in the set {1..n} have been found
+			 var foundAllElementsInNSet = true;
+			 for (var k = 0; k < n; ++k) {
+				if (foundPermutationElementsInNSet[k] === false) {
+					foundAllElementsInNSet = false;
+					break;
+				}
+			 }
+			 
+			 assert.equal(generatedPermutationElementsBelongToNSet, true, "Next random permutation computation, elements in {1..n} - Test " + i + "," + j);
+			 assert.equal(generatedPermutationElementsDuplicated, false, "Next random permutation computation, no duplicate element - Test " + i + "," + j);
+			 assert.equal(foundAllElementsInNSet, true, "Next random permutation computation, all elements found - Test " + i + "," + j);
+		  }
+	  }
+  }
+  
 });
 
 

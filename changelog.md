@@ -1,6 +1,18 @@
-### 0.0.8 - XX/YY/20ZZ
+### 0.0.8 - 16/04/2020
 - Introduced a function simplexEmptinessCheck_ to avoid copy/pasting feasibility checks on the restricted simplex everywhere
-- Added min/max exposure constraints, and min/max weights contraints in the random portfolio generation method
+- Added min/max exposure constraints, and min/max weights constraints in the random portfolio generation method
+- Proper management of infeasible subsets in the randomSubspaceMeanVarianceOptimizationWeights method
+- Added a method to generate random permutations of integers
+- Used an accurate algorithm to compute the l2 norm of vectors in the methods hypersphereRandomSampler_ and simplexDirectionRandomSampler_
+- Added a method to generate all the permutations of a n-set (Heap's algorithm)
+- Added a method to compute the permutation entropy of a time series
+- Added an hyper rectangle regular grid sampler
+- Added a unidimensional root finding method: the bisection method
+- Added the computation of the best constantly rebalanced portfolio
+- Improved the convergence of the geometric median computation
+- Added a unidimensional optimization method method: the golden section search method
+- Added a generating set search optimization method
+- Added the computation of the minimum tracking error portfolio
 
 ### 0.0.7 - 25/05/2019
 - Redesigned the meanVarianceEfficientFrontier method to compute a desired number of efficient portfolios with their returns and volatilities
