@@ -27,7 +27,7 @@ QUnit.test('Simplex characteristic function computation', function(assert) {
 });
 
 
-QUnit.test('Simplex sparse euclidian projection computation', function(assert) {    
+QUnit.test('Simplex sparse euclidean projection computation', function(assert) {    
   // Test with static data
   // Reference for the initial point: Nelson Maculan, Geraldo Galdinode, Paula Jr., A linear-time median-finding algorithm for projecting a vector on the simplex of R^n
   {
@@ -55,14 +55,73 @@ QUnit.test('Simplex sparse euclidian projection computation', function(assert) {
 				 break;
 			   }
 			}	  
-			assert.equal(pointOk, true, 'Simplex sparse euclidian projection - Test 1 #' + i + '/' + (k+1));
+			assert.equal(pointOk, true, 'Simplex sparse euclidean projection - Test 1 #' + i + '/' + (k+1));
 		  }
       } 
+  }
+  
+  // Test with static data, and upper bounds constraints
+  // Reference: Efficient projected gradient methods for cardinality constrained optimization
+  {
+      // Definition of the test variables
+      var points = [[1, -1, 0.5, 2, -1.5], [1, 1.5, -1], [1,-0.2,-0.6, 1.3], [1.5, 1, 1, 1.5], [0.4, 0.3, 0.2,-0.5]];
+	  var upperBounds= [[0.5, 1, 0.5, 1, 0.5], [0.3, 0.5, 0.7], [0.1, 0.3, 0.9, 0.3], [0.1, 0.6, 0.8, 0.2], [0.35, 0.45, 0.65, 0.15]];
+	  var sparsities = [2, 2, 2, 2, 2];
+	  var expectedProjections = [
+	                            [0, 0, 0, 1, 0],
+	                            [0, 0.5, 0.5],
+								[0, 0, 0.7, 0.3],
+								[0, 0, 0.8, 0.2],
+								[0.35, 0, 0.65, 0]
+								];
 	  
+	  for (var i = 0; i < points.length; ++i) {
+	    // Compute a projection
+		var projection = PortfolioAllocation.simplexSparseEuclidianProjection_(points[i], sparsities[i], null, upperBounds[i]);
+		
+		// Check that the projection corresponds to the expected projection
+		for (var j = 0; j < expectedProjections[i].length; ++j) {
+			assert.equal(Math.abs(projection[j] - expectedProjections[i][j]) <= 1e-6, true, 'Simplex sparse euclidean projection with upper bounds - Test ' + i + ', ' + j);
+		}
+	  }
+  }
+  
+  // Test an infeasible problem
+  //
+  // There is no 2 subset of the upper bounds which sums to >= 1, 
+  // so the constraint sum = 1 is not feasible.
+  {
+	assert.throws(function() { 
+		PortfolioAllocation.simplexSparseEuclidianProjection_([0.4, 0.3, 0.2,-0.5], 2, null, [0.35, 0.45, 0.35, 0.15]) },
+		new Error('infeasible problem detected'),
+		"Simplex sparse euclidean projection with bounds, infeasible problem");
+  }
+  
+  // Test with static data, and bounds constraints
+  {
+      // Definition of the test variables
+      var points = [[1, -1, 0.5, 2, -1.5], [1, -1, 0.5, 2, -1.5]];
+	  var lowerBounds= [[0.3, 0.2, 0.5, 0.1, 0], [0.3, 0.2, 0.5, 0.1, 0]];
+	  var upperBounds= [[0.5, 1, 0.5, 1, 0.5], [0.5, 1, 0.5, 0.5, 0.5]];
+	  var sparsities = [2, 2];
+	  var expectedProjections = [
+	                            [0, 0, 0, 1, 0],
+								[0.5, 0, 0, 0.5, 0]
+								];
+	  
+	  for (var i = 0; i < points.length; ++i) {
+	    // Compute a projection
+		var projection = PortfolioAllocation.simplexSparseEuclidianProjection_(points[i], sparsities[i], lowerBounds[i], upperBounds[i]);
+
+		// Check that the projection corresponds to the expected projection
+		for (var j = 0; j < expectedProjections[i].length; ++j) {
+			assert.equal(Math.abs(projection[j] - expectedProjections[i][j]) <= 1e-6, true, 'Simplex sparse euclidean projection with bounds - Test ' + i + ', ' + j);
+		}
+	  }
   }
 });
 
-QUnit.test('Simplex euclidian projection computation', function(assert) {    
+QUnit.test('Simplex euclidean projection computation', function(assert) {    
   // Test with static data
   // Reference for the initial point: Nelson Maculan, Geraldo Galdinode, Paula Jr., A linear-time median-finding algorithm for projecting a vector on the simplex of R^n
   {
@@ -70,11 +129,9 @@ QUnit.test('Simplex euclidian projection computation', function(assert) {
 	  var expectedValues = [[0.38333333333333336, 0, 0.08333333333333336, 0.08333333333333336, 0.18333333333333335, 0.08333333333333336, 0.18333333333333335]];
 	  
 	  for (var i = 0; i < testValues.length; ++i) {
-	      assert.deepEqual(PortfolioAllocation.simplexEuclidianProjection_(testValues[i]), expectedValues[i], 'Simplex euclidian projection - Test 1 #' + i);
+	      assert.deepEqual(PortfolioAllocation.simplexEuclidianProjection_(testValues[i]), expectedValues[i], 'Simplex euclidean projection - Test 1 #' + i);
       } 
   }
-  
-  // Test with static data, restricted unit simplex, TODO
 });
 
 
@@ -114,6 +171,7 @@ QUnit.test('Simplex grid sampler point computation', function(assert) {
 	  
 	  assert.equal(sampler.sample(), -1, "Simplex grid sampler - Test 1 #end");
   }
+
   
 });
 

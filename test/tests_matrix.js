@@ -46,7 +46,10 @@ QUnit.test('Matrix basic manipulations', function(assert) {
       
       // Ensure the matrix is not square
       assert.equal(nsMat.isSquare(), false, 'Matrix not square');
-    
+
+      // Ensure the matrix is not symmetric
+      assert.equal(nsMat.isSymmetric(), false, 'Matrix not symmetric');
+	  
       // Ensure the matrix is equal to itself
       assert.equal(PortfolioAllocation.Matrix.areEqual(nsMat,nsMat), true, 'Matrix equal to itself');
       
@@ -96,6 +99,28 @@ QUnit.test('Matrix basic manipulations', function(assert) {
       for (var i = 1; i <= sMat.nbRows; ++i) {
           assert.equal(diag.getValueAt(i, 1), sMat.getValueAt(i, i), 'Matrix diagonal elements');
       }
+  }
+  
+  // Test symmetric matrix using random data
+  {
+	  // Create a square matrix
+	  var sMat = new PortfolioAllocation.Matrix(this.sMatValues);
+	  
+	  // Perturbate it to ensure it is not symmetric
+	  sMat.setValueAt(1,2, 1);
+	  sMat.setValueAt(2,1, -1);
+	  assert.equal(sMat.isSymmetric(), false, 'Matrix not symmetric');
+	  
+	  // Multiply it with its transpose, which ensures the resulting matrix is symmetric
+	  var symMat = PortfolioAllocation.Matrix.txy(sMat, sMat);
+	  assert.equal(sMat.isSymmetric(), false, 'Matrix symmetric');
+	  
+	  // Perturbate it to ensure it is numerically symmetric, depending on the precision
+	  symMat.setValueAt(1,2, 1);
+	  symMat.setValueAt(2,1, 1.01);
+	  assert.equal(symMat.isSymmetric(), false, 'Matrix not numerically symmetric');
+	  assert.equal(symMat.isSymmetric(1e-2), false, 'Matrix not numerically symmetric');
+	  assert.equal(symMat.isSymmetric(1e-1), true, 'Matrix numerically symmetric');
   }
 
 });
@@ -235,7 +260,7 @@ QUnit.test('Diagonal matrix creation', function(assert) {
 
 QUnit.test('Symetric matrix creation', function(assert) {    
   // Test using static data
-  var mat = PortfolioAllocation.Matrix.fillSymetric(2, function(i,j) { return i+j; });
+  var mat = PortfolioAllocation.Matrix.fillSymmetric(2, function(i,j) { return i+j; });
   var expectedMat = new PortfolioAllocation.Matrix([[2,3], [3,4]]);
   assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Symetric matrix creation');
 });
@@ -249,13 +274,20 @@ QUnit.test('Submatrix extraction', function(assert) {
   assert.equal(PortfolioAllocation.Matrix.areEqual(subMat, expectedMat), true, 'Submatrix extraction');
 });
 
-QUnit.test('Matrix row extraction', function(assert) {    
+QUnit.test('Matrix rows and columns extraction', function(assert) {    
   // Test using static data
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
   var expected_row_1 =  new PortfolioAllocation.Matrix([1,2,3]);
   var expected_row_2 =  new PortfolioAllocation.Matrix([4,5,6]);
+  var expected_col_1 =  new PortfolioAllocation.Matrix([1,4]);
+  var expected_col_2 =  new PortfolioAllocation.Matrix([2,5]);
+  var expected_col_3 =  new PortfolioAllocation.Matrix([3,6]);
+  
   assert.equal(PortfolioAllocation.Matrix.areEqual(mat.row(1), expected_row_1), true, 'Matrix row extraction #1');
   assert.equal(PortfolioAllocation.Matrix.areEqual(mat.row(2), expected_row_2), true, 'Matrix row extraction #2');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.column(1), expected_col_1), true, 'Matrix column extraction #1');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.column(2), expected_col_2), true, 'Matrix column extraction #2');
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.column(3), expected_col_3), true, 'Matrix column extraction #3');
 });
 
 QUnit.test('Zeros matrix creation', function(assert) {    
@@ -263,6 +295,13 @@ QUnit.test('Zeros matrix creation', function(assert) {
   var mat = PortfolioAllocation.Matrix.zeros(3, 2);
   var expectedMat = new PortfolioAllocation.Matrix([[0,0], [0,0], [0,0]]);
   assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Zeros matrix creation');
+});
+
+QUnit.test('Ones matrix creation', function(assert) {    
+  // Test using static data
+  var mat = PortfolioAllocation.Matrix.ones(3, 2);
+  var expectedMat = new PortfolioAllocation.Matrix([[1,1], [1,1], [1,1]]);
+  assert.equal(PortfolioAllocation.Matrix.areEqual(mat, expectedMat), true, 'Ones matrix creation');
 });
 
 QUnit.test('Identity matrix creation', function(assert) {    
@@ -515,6 +554,170 @@ QUnit.test('Matrix copy', function(assert) {
   // TODO: Test random data
 });
 
+
+QUnit.test('Random matrix generation', function(assert) {     
+  // Test normal generation using random data
+  {
+	  // Define the number of tests and the min/max dimensions
+	  var nbTests = 10;
+	  var minDimension = 1;
+	  var maxDimension = 100;
+	  
+	  //
+	  var size = true
+	  for (var i = 0; i < nbTests; ++i) {
+		// Generate the dimensions
+		var m = Math.floor(Math.random()*(maxDimension-minDimension+1) + minDimension)
+		var n = Math.floor(Math.random()*(maxDimension-minDimension+1) + minDimension)
+		
+		// Generate the matrix
+		var mat = PortfolioAllocation.Matrix.normrnd(m, n);
+
+		// Check the size of the matrix
+		assert.equal(mat.nbRows == m, true, 'Random matrix generation, positive normal - Test #' + i + ', number of rows');
+		assert.equal(mat.nbColumns == n, true, 'Random matrix generation, positive normal - Test #' + i + ', number of columns');
+	  }
+  }
+});
+
+
+
+QUnit.test('Random orthogonal matrix generation', function(assert) {    
+  // Test using random data that the generated matrices O are orthogonal:
+  // - O must be n by n
+  // - O must be such that O*O^t = O^t * O = Identity(n)
+  {
+      var nbTests = 10;
+	  
+	  for (var i = 0; i < nbTests; ++i) {
+		  // Generate a random dimension
+		  var n_max = 200;
+		  var n_min = 2;
+		  var n = Math.floor(Math.random()*(n_max-n_min+1) + n_min);
+		  
+		  // Generate a random matrix
+		  var mat = PortfolioAllocation.Matrix.randomOrthogonal(n);
+		  
+		  // Check that the matrix is square
+		  assert.equal(mat.nbRows == n && mat.nbColumns == n, true, 'Random orthogonal matrix generation, square - Test #' + i);
+		  
+		  // Check that the matrix is orthogonal
+		  var mat_p_t_mat = PortfolioAllocation.Matrix.axty(1,mat,mat);
+		  assert.equal(PortfolioAllocation.Matrix.areEqual(mat_p_t_mat, PortfolioAllocation.Matrix.identity(n), 1e-12), true,'Random orthogonal matrix generation, orthogonal 1 - Test #' + i);
+		  
+		  var t_mat_p_mat = PortfolioAllocation.Matrix.atxy(1,mat,mat);
+		  assert.equal(PortfolioAllocation.Matrix.areEqual(t_mat_p_mat, PortfolioAllocation.Matrix.identity(n), 1e-12), true,'Random orthogonal matrix generation, orthogonal 2 - Test #' + i);
+	  }
+  }
+});
+
+QUnit.test('Random correlation matrix generation', function(assert) {    
+	// Test using random data that the generated matrices C are correlation matrix:
+	// - C must be n by n
+	// - C must be symmetric positive semidefinite, with unit diagonal
+	{
+		var nbTests = 10;
+		
+		for (var l = 0; l < nbTests; ++l) {
+			// Generate a random dimension
+			var n_max = 200;
+			var n_min = 2;
+			var n = Math.floor(Math.random()*(n_max-n_min+1) + n_min);
+			
+			// Generate a random matrix
+			var mat = PortfolioAllocation.Matrix.randomCorrelation(n);
+
+			// Check that the matrix is square
+			assert.equal(mat.nbRows == n && mat.nbColumns == n, true, 'Random correlation matrix generation, square - Test #' + l);
+			
+			// Check that the matrix is numerically symmetric
+			assert.equal(mat.isSymmetric(1e-14), true, 'Random correlation matrix generation, symmetric - Test #' + l);
+			
+			// Check that the matrix has true unit diagonal
+			var unit_diagonal = true;
+			for (var i = 1; i <= n; ++i) {
+				if (mat.getValue(i,i) != 1) {
+					unit_diagonal = false;
+				}
+			}
+			assert.equal(unit_diagonal, true, 'Random correlation matrix generation, unit diagonal - Test #' + l);
+			
+			// Check that the matrix is positive semidefinite
+			// Check that the determinant is >= 0
+			assert.equal(mat.determinant() >= 0, true, 'Random correlation matrix generation, semi-positive definite - Test #' + l);
+			
+			// Check that all the eigenvalues are >= 0
+			// TODO
+		}
+	}
+	
+	// Test using static data conditions on eigenvalues when they are provided
+	{
+		// The number of eigenvalues must equal the dimension
+		assert.throws(function() { PortfolioAllocation.Matrix.randomCorrelation(3, {lambda: [1, 2]}) },
+		                           new Error('number of input eigenvalues not equal to 3, but to 2'),
+		                           "Random correlation matrix generation, incorrect number of provided eigenvalues");
+		
+		// The eigenvalues must sum to the dimension
+		assert.throws(function() { PortfolioAllocation.Matrix.randomCorrelation(3, {lambda: [1, 2, 3]}) },
+		                           new Error('input eigenvalues not summing to 3'),
+		                           "Random correlation matrix generation, provided eigenvalues not summing to 1");
+	}
+	
+	// Test using random data that when eigenvalues are provided, they
+	// correspond to the eigenvalues of the generated matrix
+	{
+		var nbTests = 10;
+		
+		for (var l = 0; l < nbTests; ++l) {
+			// Generate a random dimension
+			var n_max = 100;
+			var n_min = 2;
+			var n = Math.floor(Math.random()*(n_max-n_min+1) + n_min);
+			
+			// Generate random eigenvalues
+			//
+			// For ease of testing, let's take 1..n, and then normalize them so that they sum to n
+			var lambdas = new Array(n);
+			var sum_lambas = n*(n+1)/2;
+			var gg=0;
+			for (var i = 1; i <= n; ++i) {
+				lambdas[i-1] = n * i/sum_lambas;
+			}
+			
+			// Generate a random matrix
+			var mat = PortfolioAllocation.Matrix.randomCorrelation(n, {lambda: lambdas});
+
+			// Check that the matrix is square
+			assert.equal(mat.nbRows == n && mat.nbColumns == n, true, 'Random correlation matrix generation, provided eigenvalues, square - Test #' + l);
+			
+			// Check that the matrix is numerically symmetric
+			assert.equal(mat.isSymmetric(1e-14), true, 'Random correlation matrix generation, provided eigenvalues, symmetric - Test #' + l);
+			
+			// Check that the matrix has true unit diagonal
+			var unit_diagonal = true;
+			for (var i = 1; i <= n; ++i) {
+				if (mat.getValue(i,i) != 1) {
+					unit_diagonal = false;
+				}
+			}
+			assert.equal(unit_diagonal, true, 'Random correlation matrix generation, provided eigenvalues, unit diagonal - Test #' + l);
+			
+			// Check that the eigenvalues of the matrix are the provided eigenvalues
+			//
+			// Note: lambda is an eigenvalue of matrix A iif det(A - lambda*Id) == 0
+			var providedEigenvaluesMatching = true;
+			var eye = PortfolioAllocation.Matrix.identity(n);
+			for (var i = 0; i < n; ++i) {
+				if ( Math.abs(PortfolioAllocation.Matrix.axpby(1, mat, -lambdas[i], eye).determinant()) > 1e-14) {
+					providedEigenvaluesMatching = false;
+					break;
+				}
+			}
+			assert.equal(providedEigenvaluesMatching, true, 'Random correlation matrix generation, provided eigenvalues matching - Test #' + l);
+		}
+	}
+});
 
 QUnit.test('Matrix AXPBY', function(assert) {    
   // Test using static data

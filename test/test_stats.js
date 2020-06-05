@@ -293,6 +293,32 @@ QUnit.test('FTCA computation', function(assert) {
 });
 
 
+QUnit.test('Random normal numbers computation', function(assert) {    
+  var r = PortfolioAllocation.normrnd_();
+  assert.equal(true, true, 'Random normal numbers computation - Test #1');  
+});
+
+QUnit.test('Positive random normal numbers computation', function(assert) {    
+  // Test with random data
+  {
+	  // Define the number of tests
+	  var nbTests = 50;
+	  
+	  //
+	  var positiveValues = true;
+	  for (var i = 0; i < nbTests; ++i) {
+		var r = PortfolioAllocation.pnormrnd_(-7.5);
+
+		if (r < 0) {
+			positiveValues = false;
+			break;
+		}
+	  }
+	  assert.equal(positiveValues, true, 'Positive random normal numbers computation - Test #1');  
+  }
+});
+
+
 QUnit.test('Normcdf computation', function(assert) {    
   // Boundaries
   assert.equal(PortfolioAllocation.normcdf_(0), 0.5, 'Normcdf 0'); 

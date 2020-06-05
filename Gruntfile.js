@@ -7,6 +7,7 @@ module.exports = function(grunt) {
   grunt.loadNpmTasks('grunt-strip-code');
   grunt.loadNpmTasks('grunt-contrib-concat');
   grunt.loadNpmTasks('grunt-replace');
+  grunt.loadNpmTasks('grunt-stripcomments');
 
   grunt.initConfig({
     pkg: grunt.file.readJSON('package.json'),
@@ -35,6 +36,17 @@ module.exports = function(grunt) {
         files: [
 		  { src: ['dist/portfolio_allocation.dev.js'], dest: 'dist/portfolio_allocation.dist.js'}
 		]
+      },
+    },
+	
+    comments: {
+      portfolio_allocation_gs: {
+        options: {
+            singleline: true,
+            multiline: true,
+            keepSpecialComments: false
+        },
+        src: [ 'dist/gs/portfolio_allocation.gs']
       },
     },
 
@@ -128,8 +140,9 @@ module.exports = function(grunt) {
   
   //
   grunt.registerTask('deliver-gs', 'Builds the app into a distributable package for Google Sheets.', function() {
-    // Starting from dist mode, remove header/footer
+    // Remove header/footer, and remove comments
 	grunt.task.run('strip_code:portfolio_allocation_gs');
+	grunt.task.run('comments:portfolio_allocation_gs');
 	
 	// Then change function definitions
 	grunt.task.run('replace:portfolio_allocation_gs')

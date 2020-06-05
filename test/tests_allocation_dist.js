@@ -82,10 +82,44 @@ QUnit.test('Equal risk contributions portfolio', function(assert) {
 
 	// Example 1 p. 65 of reference with constant correlation equals to 0
 	{
+		// Test default parameters
 		var weights = PortfolioAllocation.equalRiskContributionWeights([[0.01, 0, 0, 0], [0, 0.04, 0, 0], [0, 0, 0.09, 0], [0, 0, 0, 0.16]]); 
-		var expectedWeights =  [48, 24, 16, 12];
+		var expectedWeights = [48, 24, 16, 12];
 		for (var i = 0; i < expectedWeights.length; ++i) {
 			assert.equal(Math.round(100 * weights[i]), expectedWeights[i], 'ERC - Values #1 ' + i);
+		}
+		
+		// Test a number of cycles equal to 0, which must output
+		// the initial internal weights, corresponding to an equally weighted portfolio
+		var weights = PortfolioAllocation.equalRiskContributionWeights([[0.01, 0, 0, 0], [0, 0.04, 0, 0], [0, 0, 0.09, 0], [0, 0, 0, 0.16]], {nbCycles: 0}); 
+		var expectedWeights = [25, 25, 25, 25];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.round(100 * weights[i]), expectedWeights[i], 'ERC - Values #1, no cycle ' + i);
+		}
+		
+		// Test a number of cycles equal to 1
+		//
+		// Note: weights taken from running the algorithm once
+		var weights = PortfolioAllocation.equalRiskContributionWeights([[0.01, 0, 0, 0], [0, 0.04, 0, 0], [0, 0, 0.09, 0], [0, 0, 0, 0.16]], {nbCycles: 1}); 
+		var expectedWeights = [0.38407763703774006, 0.24824686014490746, 0.1979048506362147, 0.16977065218113782];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.round(100 * weights[i]), Math.round(100 * expectedWeights[i]), 'ERC - Values #1, one cycle ' + i);
+		}
+		
+		// Test a number of cycles equal to 10, which must converge to the
+		// same solution as the default parameters
+		var weights = PortfolioAllocation.equalRiskContributionWeights([[0.01, 0, 0, 0], [0, 0.04, 0, 0], [0, 0, 0.09, 0], [0, 0, 0, 0.16]], {nbCycles: 10}); 
+		var expectedWeights = [48, 24, 16, 12];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.round(100 * weights[i]), expectedWeights[i], 'ERC - Values #1, ten cycles ' + i);
+		}
+		
+		// Test a number of cycles equal to 100, which must converge to the
+		// same solution as the default parameters
+		var weights = PortfolioAllocation.equalRiskContributionWeights([[0.01, 0, 0, 0], [0, 0.04, 0, 0], [0, 0, 0.09, 0], [0, 0, 0, 0.16]], {nbCycles: 100}); 
+		var expectedWeights = [48, 24, 16, 12];
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			assert.equal(Math.round(100 * weights[i]), expectedWeights[i], 'ERC - Values #1, hundred cycles ' + i);
 		}
 	}
 
@@ -122,13 +156,13 @@ QUnit.test('Equal risk contributions portfolio', function(assert) {
 	//
 	// To be noted that this test also test the option of providing the portfolio volatility in output.
 	{
-		var covMar = [[94.868,33.750,12.325,-1.178,8.778],
+		var covMat = [[94.868,33.750,12.325,-1.178,8.778],
 					[33.750,445.642,98.955,-7.901,84.954],
 					[12.325,98.955,117.265,0.503,45.184],
 					[-1.178,-7.901,0.503,5.460,1.057],
 					[8.778,84.954,45.184,1.057,34.126]];
 		
-		var weights = PortfolioAllocation.equalRiskContributionWeights(covMar, {outputPortfolioVolatility: true}); 
+		var weights = PortfolioAllocation.equalRiskContributionWeights(covMat, {outputPortfolioVolatility: true}); 
 		var expectedWeights = [0.125, 0.047, 0.083, 0.613, 0.132];
 		var expectedVolatility = 3.0406150258182514;
 		for (var i = 0; i < expectedWeights.length; ++i) {
@@ -140,6 +174,9 @@ QUnit.test('Equal risk contributions portfolio', function(assert) {
 	// Reference: https://github.com/lequant40/portfolio_allocation_js/issues/3
 	//
 	// This is a test of the ERC method wit a semi-positive definite covariance matrix
+	//
+	// The ERC method converges in this case to a MV portfolio, and risk contributions
+	// cannot be equal (there is no risk anymore).
 	{
 		var cov = PortfolioAllocation.sampleCovarianceMatrix([-0.001697998787, 0.001427530069, -0.0005054947277, 0.0001213800916, -0.0001618204804],
                                                    [-0.002961208738, 0.001640864801, -0.0001441519189, 0.0004640260466, 0.000206138145],
@@ -154,12 +191,103 @@ QUnit.test('Equal risk contributions portfolio', function(assert) {
 		
 		var weights = PortfolioAllocation.equalRiskContributionWeights(cov, {outputPortfolioVolatility: true}); 
 		
+		// Check the expected weights and the expected volatility
 		var expectedWeights = [0.27653353547900505, 0.08992490010322292, 0.07660067915254527, 0.10281081303356884, 0.00627339817004538, 0.07548939567866735, 0.004543021673884871, 0.0858506918300374, 0.02204534860588049, 0.25992821627314233];
 		var expectedVolatility = 0;
 		for (var i = 0; i < expectedWeights.length; ++i) {
-			assert.equal(Math.abs(weights[0][i] - expectedWeights[i]) <= 1e-8, true, 'ERC - Values #5 ' + i);
+			assert.equal(Math.abs(weights[0][i] - expectedWeights[i]) <= 1e-4, true, 'ERC, semi-positive definite covariance matrix - Weight #' + i);
 		}
-		assert.equal(Math.abs(weights[1] - expectedVolatility) <= 1e-8, true, 'ERC - Values #5, volatility');
+		assert.equal(Math.abs(weights[1] - expectedVolatility) <= 1e-8, true, 'ERC, semi-positive definite covariance matrix - Volatility');
+	}
+	
+	// Reference: Table 9 from the paper Constrained Risk Budgeting Portfolios https://arxiv.org/abs/1902.05710
+	//
+	// Test different coordinates sampling methods
+	{
+		/* The covariance matrix below has been obtained through Diag(STD)*CORR*Diag(STD)
+		var stdDev = [0.05,0.05,0.07,0.1,0.15,0.15,0.15,0.18];
+		var corrMat = [[100,  80,  60, -20, -10, -20, -20, -20],
+						[ 80, 100,  40, -20, -20, -10, -20, -20],
+						[ 60,  40, 100,  50,  30,  20,  20,  30],
+						[-20, -20,  50, 100,  60,  60,  50,  60],
+						[-10, -20,  30,  60, 100,  90,  70,  70],
+						[-20, -10,  20,  60,  90, 100,  60,  70],
+						[-20, -20,  20,  50,  70,  60, 100,  70],
+						[-20, -20,  30,  60,  70,  70,  70, 100]]/100;
+		*/
+		var covMat = [[ 0.0025 ,  0.002  ,  0.0021 , -0.001  , -0.00075, -0.0015 , -0.0015 , -0.0018 ],
+                      [ 0.002  ,  0.0025 ,  0.0014 , -0.001  , -0.0015 , -0.00075, -0.0015 , -0.0018 ],
+                      [ 0.0021 ,  0.0014 ,  0.0049 ,  0.0035 ,  0.00315,  0.0021 , 0.0021 ,  0.00378],
+                      [-0.001  , -0.001  ,  0.0035 ,  0.01   ,  0.009  ,  0.009  , 0.0075 ,  0.0108 ],
+                      [-0.00075, -0.0015 ,  0.00315,  0.009  ,  0.0225 ,  0.02025, 0.01575,  0.0189 ],
+                      [-0.0015 , -0.00075,  0.0021 ,  0.009  ,  0.02025,  0.0225 , 0.0135 ,  0.0189 ],
+                      [-0.0015 , -0.0015 ,  0.0021 ,  0.0075 ,  0.01575,  0.0135 , 0.0225 ,  0.0189 ],
+                      [-0.0018 , -0.0018 ,  0.00378,  0.0108 ,  0.0189 ,  0.0189 , 0.0189 ,  0.0324 ]];
+					  
+       var expectedWeights = [26.8306, 28.6769, 11.4095,  9.7985,  5.6135,  5.9029,  6.656,   5.1121];
+	   
+	   
+	   // Check that the default coordinates sampler is 'cyclic', and that it converges
+	   var defaultSamplingWeights = PortfolioAllocation.equalRiskContributionWeights(covMat);
+	   var cyclicWeights = PortfolioAllocation.equalRiskContributionWeights(covMat, {coordinatesSampler: 'cyclic'});
+	   assert.deepEqual(defaultSamplingWeights, cyclicWeights, 'ERC - Default coordinates sampler');
+	   
+	   for (var i = 0; i < expectedWeights.length; ++i) {
+	      assert.equal(Math.abs(defaultSamplingWeights[i] - expectedWeights[i]/100) <= 1e-5, true, 'ERC - Default coordinates sampler weights ' + i);
+	   }
+	   
+	   
+	   // Check that the shuffled cyclic coordinates sampler converges
+	   var shuffledCyclicWeights = PortfolioAllocation.equalRiskContributionWeights(covMat, {coordinatesSampler: 'shuffledCyclic'});
+	   for (var i = 0; i < expectedWeights.length; ++i) {
+	      assert.equal(Math.abs(defaultSamplingWeights[i] - expectedWeights[i]/100) <= 1e-5, true, 'ERC - Shuffled cyclic coordinates sampler weights ' + i);
+	   }
+	   
+	   
+	   // Check that the randomized coordinates sampler converges
+	   //
+	   // Note: There is no theoretical guarantees that the algorithm converges to a solution of the problem,
+	   // but in practice with these data, it seems to converge.
+	   var randomizedWeights = PortfolioAllocation.equalRiskContributionWeights(covMat, {coordinatesSampler: 'randomized'});
+	   for (var i = 0; i < expectedWeights.length; ++i) {
+	      assert.equal(Math.abs(randomizedWeights[i] - expectedWeights[i]/100) <= 1e-5, true, 'ERC - Randomized coordinates sampler weights ' + i);
+	   }
+	   
+	   
+	   // Check that the ACF coordinates samples converges
+	   var acfWeights = PortfolioAllocation.equalRiskContributionWeights(covMat, {coordinatesSampler: 'acf'});
+	   for (var i = 0; i < expectedWeights.length; ++i) {
+	      assert.equal(Math.abs(acfWeights[i] - expectedWeights[i]/100) <= 1e-5, true, 'ERC - ACF coordinates sampler weights ' + i);
+	   }
+	}
+	
+	// Reference: Table 6 from the paper Constrained Risk Budgeting Portfolios https://arxiv.org/abs/1902.05710
+	//
+	// Test weights constraints on ERC portfolios
+	{
+		var covMat = [[0.0225, 0.003, 0.015, 0.0225, 0.0075],
+		              [0.003, 0.04, 0.035, 0.024, 0.008],
+					  [0.015, 0.035, 0.0625, 0.06, 0.00125],
+					  [0.0225, 0.024, 0.06, 0.09, 0.003],
+					  [0.0075, 0.008, 0.00125, 0.003, 0.01]];
+		
+		// Compute the min/max weights constraints
+		var initWeights = [25.00, 25.00, 10.00, 10.00, 30.00];
+		var minWeights = new Array(5);
+		var maxWeights = new Array(5);
+		for (var i = 0; i < minWeights.length; ++i) {
+			minWeights[i] = initWeights[i]/100 - 0.05;
+			maxWeights[i] = initWeights[i]/100 + 0.05;
+		}
+		
+		// Compute the min/max weights-constrained ERC portfolio
+		var weights = PortfolioAllocation.equalRiskContributionWeights(covMat, {constraints: { minWeights: minWeights, maxWeights: maxWeights } } );
+
+		//
+		var expectedWeights = [22.89, 20.00, 11.69, 10.42, 35.00];
+	    for (var i = 0; i < expectedWeights.length; ++i) {
+	       assert.equal(Math.abs(weights[i] - expectedWeights[i]/100) <= 1e-4, true, 'ERC - Bounds constraints weights ' + i);
+	    }
 	}
 });
 
@@ -231,6 +359,64 @@ QUnit.test('Risk budgeting portfolio', function(assert) {
 		}
 		for (var i = 0; i < nbAssets; ++i) {
 			assert.equal(Math.abs(weights[i] - Math.sqrt(rb[i]) * 1/Math.sqrt(sigma[i][i]) / denom) <= 1e-8, true, 'RB - Values #2 ' + i);  
+		}
+	}
+	
+	// Reference: Table 1 from the paper Constrained Risk Budgeting Portfolios https://arxiv.org/abs/1902.05710
+	//
+	// Test weights constraints on ERC and RB portfolios
+	{
+		var covMat = [[0.01,0.0075,0.01,0.015],
+		              [0.0075,0.0225,0.015,0.0225],
+					  [ 0.01,0.015,0.04,0.045],
+					  [0.015,0.0225,0.045,0.09]];
+					  
+		// Compute ERC weights with no bounds constraints
+		{
+			var expectedWeights = [41.01, 27.34, 18.99, 12.66];
+			
+			var rb = [0.25, 0.25, 0.25, 0.25];
+			var weights = PortfolioAllocation.riskBudgetingWeights(covMat, rb);
+
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				assert.equal(Math.abs(weights[i] - expectedWeights[i]/100) <= 1e-3, true, 'RB - Test #3 ERC, ' + i);
+			}
+		}
+
+		// Compute ERC weights with bounds constraints x_i <= 30%, i=1..4
+		{
+			var expectedWeights = [30, 30, 24.00, 16.00]; // the weights in the reference paper are [30, 30, 24.57, 15.43]
+			
+			var rb = [0.25, 0.25, 0.25, 0.25];
+			var weights = PortfolioAllocation.riskBudgetingWeights(covMat, rb, {constraints: { maxWeights: [0.3, 0.3, 0.3, 0.3] } } );
+			
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				assert.equal(Math.abs(weights[i] - expectedWeights[i]/100) <= 1e-3, true, 'RB - Test #3 ERC with bounds constraints, ' + i);
+			}
+		}
+		
+		// Compute RB weights with no bounds constraints
+		{
+			var expectedWeights = [45.05, 30.04, 14.67, 10.24];
+			
+			var rb = [0.3, 0.3, 0.195, 0.205];
+			var weights = PortfolioAllocation.riskBudgetingWeights(covMat, rb);
+			
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				assert.equal(Math.abs(weights[i] - expectedWeights[i]/100) <= 1e-3, true, 'RB - Test #3 RB, ' + i);
+			}
+		}
+		
+		// Compute RB weights with bounds constraints x_i <= 30%, i=1..4
+		{
+			var expectedWeights = [30, 30, 23.56, 16.43]; // the weights in the reference are [30, 30, 24.43, 15.57]
+			
+			var rb = [0.3, 0.3, 0.195, 0.205];
+			var weights = PortfolioAllocation.riskBudgetingWeights(covMat, rb, {constraints: { maxWeights: [0.3, 0.3, 0.3, 0.3] } } );
+
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				assert.equal(Math.abs(weights[i] - expectedWeights[i]/100) <= 1e-3, true, 'RB - Test #3 RB with bounds constraints, ' + i);
+			}
 		}
 	}
 });
@@ -1368,9 +1554,9 @@ QUnit.test('Mean variance portfolio - maximum target volatility weights portfoli
 		var minAttainableVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
 		var maxAttainableVolatility = Math.sqrt(covMat[1][1]);
 		for (var k = 0; k < nbSamples; ++k) {	
-			// In case the maximum target volatility is lower than the mimimum attainable volatility,
+			// In case the maximum target volatility is lower than the minimum attainable volatility,
 			// the portfolio cannot be fully invested and must correspond to the efficient portfolio with cash
-			// and with a target volatility constaint 
+			// and with a target volatility constraint 
 			var maxTargetVolatility = generateRandomValue(0, minAttainableVolatility - 1e-6); // < minAttainableVolatility
 			var weights_mtv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat,
 			                                                                      { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxTargetVolatility}});
@@ -1396,7 +1582,7 @@ QUnit.test('Mean variance portfolio - maximum target volatility weights portfoli
 			                                                                  { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxTargetVolatility}});
 			assert.deepEqual(weights, [0, 1, 0], 'Mean variance portfolio - maximum target volatility weights portfolio #2');
 			
-			// Otherwise, the portfolio must correspond to the efficient portfolio with a target volatility constaint
+			// Otherwise, the portfolio must correspond to the efficient portfolio with a target volatility constraint
 			var maxTargetVolatility = generateRandomValue(minAttainableVolatility + 1e-6, maxAttainableVolatility - 1e-6); // > minAttainableVolatility && < maxAttainableVolatility
 			var weights_mtv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
 			                                                                      { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxTargetVolatility}});
@@ -1441,6 +1627,41 @@ QUnit.test('Mean variance portfolio - maximum target volatility weights portfoli
 		var expectedWeights = [0, 0, 0];
 		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'maximumTargetVolatility', constraints: {maxVolatility: maxVolatility}});
 		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - Test negative returns');
+	}
+	
+	
+	// Test using static data for bug fix https://github.com/lequant40/portfolio_allocation_js/issues/5
+	// Test that min/max weights constraints are properly managed in case a risk free asset is added internally
+	{
+		// Problem data
+		var covMat = [[0.0004246616877,-0.00005520852069,0.0003954256465,0.00000001152437917,0.0001590470407,0.0002580332644,0.0003335881244,0.0003605784739],
+					  [-0.00005520852069,0.00002480135555,-0.00005059666822,-0.00000001082496581,-0.00001673167975,-0.00003073486553,-0.00003900214181,-0.00004548279667],
+					  [0.0003954256465,-0.00005059666822,0.0003976604822,-0.000000008144301394,0.0001740534739,0.0002593777442,0.0003420673729,0.0003593307083],
+					  [0.00000001152437917,-0.00000001082496581,-0.000000008144301394,0.00000001790999881,-0.00000008021468402,-0.00000006461917657,-0.00000007037516421,0.00000004991265269],
+					  [0.0001590470407,-0.00001673167975,0.0001740534739,-0.00000008021468402,0.000110482962,0.0001154225601,0.000157800705,0.0001589926655],
+					  [0.0002580332644,-0.00003073486553,0.0002593777442,-0.00000006461917657,0.0001154225601,0.0002185122484,0.0002506289478,0.0002558291246],
+					  [0.0003335881244,-0.00003900214181,0.0003420673729,-0.00000007037516421,0.000157800705,0.0002506289478,0.0003278326867,0.0003411302813],
+					  [0.0003605784739,-0.00004548279667,0.0003593307083,0.00000004991265269,0.0001589926655,0.0002558291246,0.0003411302813,0.0004078706675]];
+		var returns = [0.02836270809, 0.01289860823, 0.003013461519, 0.0009824011995, -0.002791817978, -0.003228292398, -0.01390104713, -0.01415404063];
+		
+		var minWeights = [0, 0, 0, 0, 0, 0, 0, 0];
+		var maxWeights = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 1, 1];
+		
+		// Compute the desired maximum volatility
+		var maxVolatility = 0.05/Math.sqrt(252);
+		
+		// Test that the algorithm is behaving properly
+		var expectedWeights = [0.17660422287563507, 0.25, 0, 0.25, 0, 0, 0, 0];
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: 'maximumTargetVolatility', 
+		                                                                                     constraints: {maxVolatility: maxVolatility, minWeights: minWeights, maxWeights: maxWeights}});
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-6) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Mean variance portfolio - maximum target volatility weights portfolio #5');
 	}
 });	
 
@@ -1622,9 +1843,9 @@ QUnit.test('Mean variance portfolio - efficient portfolios computation', functio
 		
 		// Test a small number of efficient portfolios
 		var expectedEfficientPortfolios = [[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482], 
-											 [[0, 0.39839572192513373, 0.6016042780748663], 0.1351711229946524, 0.1702926860745384], 
-											 [[0, 0.5989304812834225, 0.4010695187165775], 0.13878074866310158, 0.20069797992103716], 
-											 [[0, 0.7994652406417113, 0.20053475935828874], 0.1423903743315508, 0.24306339262469084], 
+											 [[0.8793297501999342, 0, 0.12067024980006583], 0.06996423648680435, 0.12160182948150385], 
+											 [[0.4207025920873124, 0.11248404158307494, 0.4668133663296126], 0.10225834167073272, 0.13608702325065056], 
+											 [[0, 0.4187260623746124,0.5812739376253876], 0.13553706912274302, 0.17262859662810146], 
 											 [[0, 1, 0], 0.146, 0.29223278392404917]];
 										
 		var efficientPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { nbPortfolios: 5 });

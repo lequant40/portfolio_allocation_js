@@ -215,21 +215,25 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 
 		// The minimum of the function f is attained at (1,1) and is equal to 0
 		var expectedSol = new PortfolioAllocation.Matrix([1, 1]); 
+		var expectedSolValue = 0; 
 		
 		// The initial point is (-1.2, 1)
 		var x0 = new PortfolioAllocation.Matrix([-1.2, 1]);
 
 		// Compute the minimum of the function f, with default values, and check the result on the located minimizer
-		var sol = PortfolioAllocation.gssSolve_(f, x0);
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function Rosenbrock function, default values');
+		var sol = PortfolioAllocation.gssSolve_(f, x0);		
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Test function Rosenbrock function, default values');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-3, true, 'Test function Rosenbrock function, default values #2');
 
 		// Compute the minimum of the function f, with complete polling, and check the result on the located minimizer
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {pollingType: 'complete'});
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function Rosenbrock function, complete polling');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Test function Rosenbrock function, complete polling');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-3, true, 'Test function Rosenbrock function, complete polling #2');
 		
 		// Compute the minimum of the function f, with custom forcing function, and check the result on the located minimizer
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {rho: function(alpha) { return alpha;} });
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), false, 'Rosenbrock function, custom forcing function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), false, 'Rosenbrock function, custom forcing function');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-3, false, 'Rosenbrock function, custom forcing function #2');
 	}
 
 	// Test function 2: Freudenstein-Roth function
@@ -245,7 +249,9 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		// - (5,4) with value 0 (global minimum) 
 		// - (11.41, -0.8968) with value 48.9842 (local minimum)
 		var expectedSol1 = new PortfolioAllocation.Matrix([5, 4]);
+		var expectedSol1Value = 0;
 		var expectedSol2 = new PortfolioAllocation.Matrix([11.4128, -0.8968]);
+		var expectedSol2Value= 48.9842;
 		
 		// The initial point is (0.5, -2)
 		var x0 = new PortfolioAllocation.Matrix([0.5, -2]);
@@ -254,8 +260,11 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0);
 
 		// Check the result on the located minimizer, which must be one of the two local minimum
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol1, 1e-3) ||  
-		             PortfolioAllocation.Matrix.areEqual(sol, expectedSol2, 1e-3), true, 'Freudenstein-Roth function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol1, 1e-3) ||  
+		             PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol2, 1e-3), true, 'Freudenstein-Roth function');
+		assert.equal(Math.abs(sol[1] - expectedSol1Value) <= 1e-3 ||  
+		             Math.abs(sol[1]-  expectedSol2Value) <= 1e-3, true, 'Freudenstein-Roth function #2');
+
 	}
 	
 	// Test function 33: Extended Freudenstein-Roth function
@@ -314,7 +323,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {eps: 1e-8});
 		
 		// Check the result on the located minimizer, using the nullity of the gradient as a necessary and sufficient condition
-		assert.equal(Math.abs(gradf(sol).vectorNorm('infinity')) <= 1e-3, true, 'Test function 31 extended Freudenstein-Roth function');
+		assert.equal(Math.abs(gradf(sol[0]).vectorNorm('infinity')) <= 1e-3, true, 'Test function 31 extended Freudenstein-Roth function');
 	}
 	
 	// Test function 6: Jennrich-Sampson function
@@ -346,7 +355,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0);
 
 		// Check the result on the located minimizer
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-4), true, 'Jennrich-Sampson function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-4), true, 'Jennrich-Sampson function');
 	}
 	
 	// Test function 8: Bard function
@@ -388,7 +397,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0);
 
 		// Check the result on the located minimizer
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Bard function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Bard function');
 	}
 
 	// Test function 10: Meyer function
@@ -436,7 +445,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0);
 
 		// Check the result on the located minimizer
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Meyer function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Meyer function');
 	}
 	
 	// Test function 11: Gulf research problem function
@@ -478,7 +487,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0, [0.1, 0, 0], [50, 25, 1.5], { eps: 1e-7, maxIter: 800000});
 
 		// Check the result on the located minimizer
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Gulf research problem function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Gulf research problem function');
 	}
 	
 	// Test function 30: broydn3d
@@ -518,7 +527,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, { unconstrainedPollingSet: 'probabilisticDescentDirections'});
 		
 		// Check the result on f value
-		assert.equal(Math.abs(f(sol) - expectedFunctionValue) <= 1e-3, true, 'Test function 30 broydn3d');
+		assert.equal(Math.abs(sol[1] - expectedFunctionValue) <= 1e-3, true, 'Test function 30 broydn3d');
 	}
 	
 	// Test function 32: arglina
@@ -562,7 +571,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {unconstrainedPollingSet: 'probabilisticDescentDirections'});
 		
 		// Check the result on the located minimizer
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function 32 arglina');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Test function 32 arglina');
 	}
 	
 	// Test function 33: arglinb	
@@ -601,12 +610,12 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {unconstrainedPollingSet: 'probabilisticDescentDirections'});
 		
 		// Check the result on f value
-		assert.equal(Math.abs(f(sol) - expectedFunctionValue) <= 1e-3, true, 'Test function 33 arglinb, #1');
+		assert.equal(Math.abs(sol[1] - expectedFunctionValue) <= 1e-3, true, 'Test function 33 arglinb, #1');
 		
 		// Check the result on the located minimizer
 		var sum_j_sol_j = 0;
 		for (var j = 1; j <= n; ++j) {
-			sum_j_sol_j += j * sol.getValue(j, 1);
+			sum_j_sol_j += j * sol[0].getValue(j, 1);
 		}
 		assert.equal(Math.abs(sum_j_sol_j - 3 / (2*m +1 )) <= 1e-3, true, 'Test function 33 arglinb, #2');
 	}
@@ -641,7 +650,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		 var sol = PortfolioAllocation.gssSolve_(f, x0);
 
 		// Check the result on the located minimizer
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Test function dqrtic');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Test function dqrtic');
 	}
 	
 	// Test function engval1
@@ -688,7 +697,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {eps: 1e-8});
 
 		// Check the result on the located minimizer, using the nullity of the gradient as a necessary and sufficient condition
-		assert.equal(Math.abs(gradf(sol).vectorNorm('infinity')) <= 1e-4, true, 'Test function engval1');
+		assert.equal(Math.abs(gradf(sol[0]).vectorNorm('infinity')) <= 1e-4, true, 'Test function engval1');
 	}
 
 	// Test function: Adjiman function
@@ -711,7 +720,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		
 		// Compute the minimum of the function f, with upper and lower bounds
 		var sol = PortfolioAllocation.gssSolve_(f, x0, [-1, -1], [2, 1]);
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Adjiman function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Adjiman function');
 	}
 	
 	// Test function: Bartels Conn function
@@ -731,7 +740,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		
 		// Compute the minimum of the function f, with upper and lower bounds
 		var sol = PortfolioAllocation.gssSolve_(f, x0, [-500, -500], [500, 500]);
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Bartels Conn function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Bartels Conn function');
 	}
 	
 	// Test function: Beale function
@@ -751,7 +760,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 		
 		// Compute the minimum of the function f, with upper and lower bounds
 		var sol = PortfolioAllocation.gssSolve_(f, x0, [-4.5, -4.5], [4.5, 4.5]);
-		assert.equal(PortfolioAllocation.Matrix.areEqual(sol, expectedSol, 1e-3), true, 'Beale function');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(sol[0], expectedSol, 1e-3), true, 'Beale function');
 	}
 });
 

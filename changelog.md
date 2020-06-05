@@ -1,3 +1,19 @@
+### 0.0.9 - XX/XX/XXXX
+- Removed comments from the generated Google Sheet script using a new grunt plugin
+- Added a method to extract the columns of a matrix
+- Added a method to generate random normal numbers, using the inverse method
+- Added a method to generate random matrices made of random normal numbers
+- Added a method to generate random orthogonal matrices
+- Added a method to generate random correlation matrices
+- Reworked the internals of the risk budgeting portfolio algorithm, and implemented 3 new coordinates sampler algorithms
+- Fixed bug https://github.com/lequant40/portfolio_allocation_js/issues/5 related to MVO optimization with maxTargetVolatility optimization method
+- Added min/max weights constraints in the ERC and RB portfolio allocation methods
+- Redesigned the meanVarianceEfficientFrontierPortfolios method to output portfolios less concentrated in high volatility; now, the generation is uniform on all efficient segments
+- Added a method to generate random normal numbers, with positive support (i.e., truncated to R^+)
+- Added a method to generate random covariance matrices
+- Added a method to test if a matrix is symmetric
+- 
+
 ### 0.0.8 - 16/04/2020
 - Introduced a function simplexEmptinessCheck_ to avoid copy/pasting feasibility checks on the restricted simplex everywhere
 - Added min/max exposure constraints, and min/max weights constraints in the random portfolio generation method

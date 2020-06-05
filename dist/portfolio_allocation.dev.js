@@ -430,6 +430,52 @@ Matrix_.prototype = {
 	isSquare: function() {
 	    return this.nbRows === this.nbColumns;
 	},
+	
+	/**
+	* @function isSymmetric
+	*
+	* @summary Determines if the matrix is symmetric.
+	*
+	* @description This function determines if the matrix (a_ij), i=1..m,j=1..n 
+	* is numerically symmetric, that is, if (a_ij) is square and 
+	* a_ij = a_ji +- eps, i=1..m, j=1..n.
+	* 
+	* @memberof Matrix_
+	* @param {number} eps, an optional real number; by default, eps is equal to zero.
+	*
+	* @return {boolean} true if the matrix is symmetric, false otherwise.
+	*
+	* @example
+	* Matrix_([[1,2,3], [4,5,10]]).isSymmetric();
+	* // false
+	*
+	* @example
+	* Matrix_([[1,2], [2,1]]).isSymmetric();
+	* // true
+	*/
+	isSymmetric: function(eps) {
+		// Decode the numerical precision
+		if (eps == undefined) {
+			eps = 0;
+		}	
+		
+		// Preliminary check, the matrix must be square
+		if (!this.isSquare()) {
+			return false;
+		}
+		
+		// Core loop, checking that a_ij = a_ji +- eps
+		for (var i = 0; i < this.nbRows; ++i) {
+			for (var j = 0; j < this.nbColumns; ++j) {
+				if (Math.abs(this.data[i * this.nbColumns + j] - this.data[j * this.nbColumns + i]) > eps) {
+					return false;
+				}
+			}
+		}
+		
+		// Arrived here, the matrix is symmetric
+	    return true;
+	},
 
 	/**
 	* @function isVector
@@ -747,13 +793,13 @@ Matrix_.prototype = {
 	*
 	* @summary Returns the row elements of a matrix.
 	*
-	* @description This function returns, as a column matrix (i.e., vector) of m elements, 
+	* @description This function returns, as a m by 1 matrix, 
 	* the row elements (a_ij), j=1..m from the original matrix (a_ij),i=1..n,j=1..m.
 	*
 	* @memberof Matrix_
-	* @param {number} i the row index of the matrix for wich to return the elements, a natural integer belonging to 1..number of matrix rows.
-	* @param {Matrix_} out an optional n by 1 matrix.
-	* @return {Matrix_} a n by 1 matrix (i.e., vector) containing the elements of the i-th row of the original matrix, 
+	* @param {number} i the row index of the matrix for which to return the elements, a natural integer belonging to 1..number of matrix rows.
+	* @param {Matrix_} out an optional m by 1 matrix.
+	* @return {Matrix_} a m by 1 matrix (i.e., vector) containing the elements of the i-th row of the original matrix, 
 	* either stored in the matrix out or in a new matrix.
 	*
 	* @example
@@ -774,6 +820,44 @@ Matrix_.prototype = {
     	// Extraction of the elements of the i-th row of A
     	for (var j = 0; j < this.nbColumns; ++j) {
     		obj.data[j] = this.data[(i-1) * this.nbColumns + j] ;
+    	}
+    	
+    	// Return the computed vector
+        return obj;
+    },
+	
+	/**
+	* @function column
+	*
+	* @summary Returns the column elements of a matrix.
+	*
+	* @description This function returns, as a n by 1 matrix, 
+	* the column elements (a_ij), i=1..n from the original matrix (a_ij),i=1..n,j=1..m.
+	*
+	* @memberof Matrix_
+	* @param {number} j the column index of the matrix for which to return the elements, a natural integer belonging to 1..number of matrix columns.
+	* @param {Matrix_} out an optional n by 1 matrix.
+	* @return {Matrix_} a n by 1 matrix (i.e., vector) containing the elements of the i-th row of the original matrix, 
+	* either stored in the matrix out or in a new matrix.
+	*
+	* @example
+	* Matrix_([[1,2], [4,5]]).column(1);
+	* // Matrix_([1,4])
+	*/
+    column: function (j, out) {
+		// Bounds check
+		if (j < 1 || j > this.nbColumns) {
+			throw new Error(
+			'index out of bounds when getting matrix column, (' + j + 
+			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
+		}
+    	
+    	// Result matrix allocation
+		var obj = allocateMatrix_(this.nbRows, 1, out);
+		
+    	// Extraction of the elements of the j-th column of A
+    	for (var i = 0; i < this.nbRows; ++i) {
+    		obj.data[i] = this.data[i * this.nbColumns + (j-1)] ;
     	}
     	
     	// Return the computed vector
@@ -804,7 +888,7 @@ Matrix_.prototype = {
 		// Result matrix allocation
 		var obj = allocateMatrix_(this.nbRows, this.nbColumns, out);
 		
-		// Computation of the fonction fct applied to the coefficients of A
+		// Computation of the function fct applied to the coefficients of A
 		for (var i = 0; i < obj.nbRows; ++i) {
 			for (var j = 0; j < obj.nbColumns; ++j) {
 				obj.data[i * obj.nbColumns + j] = fct(i+1, j+1, this.data[i * this.nbColumns + j]);
@@ -1380,11 +1464,11 @@ Matrix_.copy = function(A, out) {
 /**
 * @function elementwiseProduct
 *
-* @summary Returns the elementwise product of a matrix with another matrix.
+* @summary Returns the element wise product of a matrix with another matrix.
 *
-* @description This function computes the elementwise product Z = X.*Y of a matrix X with another matrix Y,
-* where X is a n by m matrix and Y is either a n by m matrix (full matrix elementwise product), or
-* a n by 1 matrix (row matrix elementwise product) or a 1 by m matrix (column matrix elementwise product).
+* @description This function computes the element wise product Z = X.*Y of a matrix X with another matrix Y,
+* where X is a n by m matrix and Y is either a n by m matrix (full matrix element wise product), or
+* a n by 1 matrix (row matrix element wise product) or a 1 by m matrix (column matrix element wise product).
 *
 * When used with an n by 1 matrix Y, this function mimics the behavior of a left multiplication of X with
 * a diagonal n by n matrix Diag(Y): Z = Diag(Y) * X.
@@ -1395,7 +1479,7 @@ Matrix_.copy = function(A, out) {
 * @param {Matrix_} X a n by m matrix.
 * @param {Matrix_} Y a m by p matrix, a n by 1 matrix or a 1 by m matrix.
 * @param {Matrix_} out an optional n by m matrix.
-* @return {Matrix_} the matrix elementwise product A.*B, either stored in the matrix out or in a new matrix, a n by m matrix.
+* @return {Matrix_} the matrix element wise product A.*B, either stored in the matrix out or in a new matrix, a n by m matrix.
 *
 * @example
 * elementwiseProduct(Matrix_([[1,2,3], [4,5,6]]), Matrix_([[1,2,3]]));
@@ -1875,9 +1959,9 @@ Matrix_.diagonal = function(x, out) {
 
 
 /**
-* @function fillSymetric
+* @function fillSymmetric
 *
-* @summary Returns a symetric matrix constructed from a function.
+* @summary Returns a symmetric matrix constructed from a function.
 *
 * @description This function computes a square matrix (a_ij),i=1..n,j=1..n from a function, 
 * with coefficients a_ij satisfying a_ij = a_ji = fct(i,j).
@@ -1889,14 +1973,14 @@ Matrix_.diagonal = function(x, out) {
 * which should take 2 arguments: row index i=1..n, column index j=i..n and which
 * should return a number, which will be inserted into the matrix as its a_ij coefficient.
 * @param {Matrix_} out an optional n by n matrix.
-* @return {Matrix_} a n by n symetric matrix with its elements computed by the fonction fct,
+* @return {Matrix_} a n by n symmetric matrix with its elements computed by the function fct,
 * either stored in the matrix out or in a new matrix..
 *
 * @example
 * fillSymetric(2, function(i,j) { return 0; });
 * // == Matrix_([[0,0], [0,0]])
 */
-Matrix_.fillSymetric = function(n, fct, out) {
+Matrix_.fillSymmetric = function(n, fct, out) {
 	// Checks
 	if (n < 1) {
 		throw new Error('input number of rows and columns out of bounds: ' + n);
@@ -2060,6 +2144,39 @@ Matrix_.identity = function(n) {
     return obj;
 }
 
+/**
+* @function normrnd
+*
+* @summary Returns a matrix made of random numbers from the normal distribution.
+*
+* @description This function builds an n by m matrix (a_ij),i=1..n,j=1..m satisfying 
+* a_ij is a random number from the normal distribution with mean parameter mu and 
+* standard deviation parameter sigma.
+* 
+* @param {number} n the row length of the matrix to construct, natural integer greater than or equal to 1.
+* @param {number} m the column length of the matrix to construct, natural integer greater than or equal to 1.
+* @param {number} mu mean parameter of the  normal distribution, real number; defaults to 0.
+* @param {number} sigma standard deviation parameter of the normal distribution, real number; defaults to 1.
+* @return {Matrix_} the constructed matrix.
+*
+* @example
+* normrnd(2, 2);
+* // Matrix_([[0.5377,0.5377], [0.5377,0.5377]])
+*/
+Matrix_.normrnd = function(n, m, mu, sigma) {
+	// Result matrix allocation
+	var obj = allocateMatrix_(n, m);
+	
+	// Result matrix computation
+	var nbElements = n * m;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = normrnd_(mu, sigma);
+	}
+	
+	// Return the computed matrix
+    return obj;
+}
+
 
 /**
 * @function vectorHadamardProduct
@@ -2162,7 +2279,7 @@ Matrix_.qrDecomposition = function(A, opt) {
     * @description Given real numbers a and b, this function computes c = cos(theta), s = sin(theta) and r >= 0 
     * satisfying [[c, s], [-s, c]]^T * [[a], [b]] = [[r], [0]].
     * 
-    * C.f. the second refence for details.
+    * C.f. the second reference for details.
     * 
     * @param {number} a, a real number
     * @param {number} b, a real number
@@ -2484,8 +2601,8 @@ Matrix_.svdDecomposition = function(A, opt) {
 		var singVal_j = Math.sqrt(u_columns_two_norm_sq[j-1]); // == uu.vectorNorm('two', 'column', j);
 		sigmas[j-1] = singVal_j; 
 		
-		// TODO: Replace "numerically zero" singular values with 0
-		
+		// At this stage, "numerically zero" singular values could be replaced
+		// with 0, if needed.
 		sigmas_idx[j-1] = j;
 	}
 	sigmas_idx.sort(function(a, b) { return sigmas[b-1] - sigmas[a-1]; });
@@ -2818,6 +2935,213 @@ Matrix_.linsolveBackSubstitution = function(A, b, out) {
 }
 
 
+
+/**
+* @function randomOrthogonal
+*
+* @summary Returns a random orthogonal matrix.
+*
+* @description This function computes a random orthogonal n by n matrix from 
+* the Haar distribution, using the O(n^3) algorithm described in the references.
+* 
+* @see <a href="https://www.tandfonline.com/doi/abs/10.1080/00207169508804364">Francesco Mezzadri, Howto Generate RandomMatrices from the Classical Compact Groups, Notices of the AMS, Volume 54, Number 5</a>
+* @see <a href="http://home.lu.lv/~sd20008/papers/essays/Random%20unitary%20[paper].pdf">Maris Ozols. How to generate a random unitary matrix, 2009.</a>
+*
+* @param {number} n the row/column length of the matrix to construct, natural integer greater than or equal to 1.
+* @return {Matrix_} the constructed matrix.
+*
+*/
+Matrix_.randomOrthogonal = function(n) {
+	// 1 - Generate an n by n matrix whose entries are standard normal random variables
+	var z = Matrix_.normrnd(n, n); // Unlike the first reference, and like the second reference, no division by SQRT(2) is made
+	
+	// 2 - Feed Z into any QR decomposition routine, and
+	// let (Q,R), where Z = QR, be the output
+	var qr = Matrix_.qrDecomposition(z);
+	var q = qr[0];
+	var r = qr[1];
+	
+	// 3 - Create the diagonal matrix Lambda with Lambda_ii = r_ii/|r_ii|,
+	// c.f. formula 38 of the reference.
+	var lambda = Matrix_.fill(1, n, function(i,j) { return r.data[(j-1) * r.nbColumns + (j-1)] >= 0 ? 1 : -1; });
+
+	// 4 - The matrix Q*Lambda is distributed with Haar measure.
+	return Matrix_.elementwiseProduct(q, lambda);
+}
+
+
+/**
+* @function randomCorrelation
+*
+* @summary Returns a random correlation matrix.
+*
+* @description This function computes a random n by n correlation matrix, 
+* using the O(n^3) algorithm described in the reference.
+* 
+* @see <a href="https://link.springer.com/article/10.1023/A:1022384216930">Philip I. Davies and Nicholas J. Higham, Numerically Stable Generation of Correlation Matrices and Their Factors,BIT Numerical Mathematics volume 40, pages 640–651 (2000)</a>
+*
+* @param {number} n the row/column length of the matrix to construct, natural integer greater than or equal to 1.
+* @param {object} opt optional parameters for the algorithm.
+* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-14.
+* @param {Array.<number>} opt.lambda the desired eigenvalues lambda_i, i=1..n of the generated correlation matrix, an array of n real numbers lambda_i,
+* which must satisfy 0 <= lambda_i, i = 1..n and sum_i lambda_i = n; defaults to an array of random numbers belonging to [0,1] and summing to one.
+* @param {number} opt.epsLambda tolerance for the condition that the provided eigenvalues must sum to one; defaults to 1e-8.
+* @return {Matrix_} the constructed matrix.
+*
+*/
+Matrix_.randomCorrelation = function(n, opt) {
+	// Initialize the options structure
+	if (opt === undefined) {
+		opt = { };
+	}
+	
+	// Initialize the options default values
+	if (opt.eps === undefined) {
+		opt.eps = 1e-14;
+	}
+	if (opt.epsLambda === undefined) {
+		opt.epsLambda = 1e-8;
+	}
+	if (opt.lambda === undefined) {
+		opt.lambda = new simplexRandomSampler_(n).sample();
+		for (var i = 0; i < n; ++i) {
+			opt.lambda[i] *= n;
+		}
+	}
+
+	// Check if the number of provided eigenvalues is correct
+	if (opt.lambda.length != n) {
+		throw new Error('number of input eigenvalues not equal to ' + n + ', but to ' + opt.lambda.length);
+	}
+	
+	// Check if the provided eigenvalues sum to n
+	var sum_lambda = 0;
+	for (var i = 0; i < n; ++i) {
+		sum_lambda += opt.lambda[i];
+	}
+	if (Math.abs(sum_lambda - n) > opt.epsLambda) {
+		throw new Error('input eigenvalues not summing to ' + n);
+	}
+
+	// Decode the options
+	var eps = opt.eps;
+	var lambda = Matrix_.fill(1, n, function(i,j) { return opt.lambda[j-1]; });
+	
+
+	// 1 - Form a random orthogonal matrix U from the Haar distribution
+	var u = Matrix_.randomOrthogonal(n);
+	
+	// 2 - Let A = U diag(lambda) U^t
+	var a = Matrix_.axty(1, Matrix_.elementwiseProduct(u, lambda), u);
+	
+	// 3 - While some a_ii <> 1, apply a Givens rotation to set a_ii = 1
+	// 
+	// This step takes at most n-1 iterations, this is important to enforce
+	// to avoid numerical issues.
+	for (var k = 1; k < n; ++k) {
+		// Check if all the elements of the diagonal of the matrix a
+		// are numerically equal to 1, in which case the algorithm
+		// has converged.
+		//
+		// At the same time, force the non-numerically equal to 1 elements
+		// to 1, as the algorithm below guarantees this.
+		var converged = true;
+		for (var l = 1; l <= n; ++l) {
+			var a_ll = a.data[(l-1) * a.nbColumns + (l-1)];
+			
+			if (Math.abs(a_ll - 1) > eps) {
+				converged = false;
+				break;
+			}
+			else {
+				if (a_ll != 1) {
+					a.data[(l-1) * a.nbColumns + (l-1)] = 1;
+				}
+			}
+		}
+		if (converged) {
+			break;
+		}
+
+		
+		// Find indices i and j with i < j so that a_ii < 1 < a_jj or a_ii > 1 > a_jj
+		
+		// Tentative a_ii < 1 < a_jj
+		var i = -1; // first index for which a_ii < 1
+		var j = -1; // last index for which a_jj >1
+		for (var l = 1; l <= n; ++l) {
+			if (a.data[(l-1) * a.nbColumns + (l-1)] < 1 && i === -1) {
+				i = l;
+			}
+			if (a.data[(l-1) * a.nbColumns + (l-1)] > 1) {
+				j = l;
+			}
+		}
+		
+		// Tentative above failed, new tentative with a_ii > 1 > a_jj
+		if (i > j) {
+			i = -1; // first index for which a_ii > 1
+			j = -1; // last index for which a_jj < 1
+			for (var l = 1; l <= n; ++l) {
+				if (a.data[(l-1) * a.nbColumns + (l-1)] > 1 && i === -1) {
+					i = l;
+				}
+				if (a.data[(l-1) * a.nbColumns + (l-1)] < 1) {
+					j = l;
+				}
+			}
+		}
+		
+		
+		// Apply a Givens rotation in the (i, j) plane to set a_ii = 1
+		
+		//
+		var a_ii = a.data[(i-1) * a.nbColumns + (i-1)];
+		var a_ij = a.data[(i-1) * a.nbColumns + (j-1)];
+		var a_jj = a.data[(j-1) * a.nbColumns + (j-1)];
+		
+		//
+		var t = (a_ij + Math.sqrt(a_ij*a_ij - (a_ii-1)*(a_jj-1) )) / (a_jj - 1);
+		var c = 1/Math.sqrt(1 + t*t);
+		var s = c*t;
+		
+		// a_old = a
+		// Update a(i,:) = c*a_old(i,:) - s*a_old(j,:);
+		// Update a(j,:) = s*a_old(i,:) + c*a_old(j,:);
+		for (var l = 1; l <= n; ++l) {
+			var t1 = a.data[(i-1) * a.nbColumns + (l-1)]; // a(i,l)
+			var t2 = a.data[(j-1) * a.nbColumns + (l-1)]; // a(j,l)
+			
+			a.data[(i-1) * a.nbColumns + (l-1)] = c*t1 - s*t2;
+			a.data[(j-1) * a.nbColumns + (l-1)] = s*t1 + c*t2;
+		}
+		
+		// a_old = a
+		// Update a(:,i) = c*a_old(:,i) - s*a_old(:,j);
+		// Update a(:,j) = s*a_old(:,i) + c*a_old(:,j);
+		for (var l = 1; l <= n; ++l) {
+			var t1 = a.data[(l-1) * a.nbColumns + (i-1)]; // a(l,i)
+			var t2 = a.data[(l-1) * a.nbColumns + (j-1)]; // a(l,j)
+			
+			a.data[(l-1) * a.nbColumns + (i-1)] = c*t1 - s*t2;
+			a.data[(l-1) * a.nbColumns + (j-1)] = s*t1 + c*t2;
+		}
+		
+		
+		// In order to avoid numerical issue, explicitly set a_ii to 1
+		a.data[(i-1) * a.nbColumns + (i-1)] = 1;
+	}
+
+	// 3, bis - Polish the diagonal elements of the matrix a
+	for (var l = 1; l <= n; ++l) {
+		a.data[(l-1) * a.nbColumns + (l-1)] = 1;
+	}
+	
+	// 4 - Return the computed matrix
+	return a;
+}
+
+
 /**
 * @function linsolveExtendedKaczmarz
 *
@@ -3092,9 +3416,8 @@ Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 }
 
 /**
- * @file Functions related to covariance matrix computations for portfolio allocation.
- * @author Roman Rubsamen <roman.rubsamen@gmail.com>
- */
+* @author Roman Rubsamen <roman.rubsamen@gmail.com>
+*/
 
  
 /* Start Wrapper private methods - Unit tests usage only */
@@ -3187,11 +3510,53 @@ self.sampleCovarianceMatrix = function(varg_args) {
 }
 
 /**
+* @function randomCovarianceMatrix
+*
+* @summary Returns a random covariance matrix.
+*
+* @description This function computes a random n by n covariance matrix, 
+* using:
+* - The algorithm described in the reference to compute a random n by n correlation
+* matrix
+* - The unidimensional standard normal distribution with positive support to generate
+* n independent random standard deviations
+* 
+* @see <a href="https://link.springer.com/article/10.1023/A:1022384216930">Philip I. Davies and Nicholas J. Higham, Numerically Stable Generation of Correlation Matrices and Their Factors,BIT Numerical Mathematics volume 40, pages 640–651 (2000)</a>
+*
+* @param {number} n the row/column length of the matrix to construct, natural integer greater than or equal to 1.
+* @param {object} opt optional parameters for the random correlation matrix generation algorithm.
+* @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-14.
+* @param {Array.<number>} opt.lambda the desired eigenvalues lambda_i, i=1..n of the generated correlation matrix, an array of n real numbers lambda_i,
+* which must satisfy 0 <= lambda_i, i = 1..n and sum_i lambda_i = n; defaults to an array of random numbers belonging to [0,1] and summing to one.
+* @param {number} opt.epsLambda tolerance for the condition that the provided eigenvalues must sum to one; defaults to 1e-8.
+* @return {Matrix_} the computed matrix.
+*
+*/
+self.randomCovarianceMatrix = function(n, opt) {
+	// Generate the random correlation matrix
+	var corr = Matrix_.randomCorrelation(n, opt);
+	
+	// Generate the random standard deviations vector
+	var sigma = Matrix_.fill(n, 1, function(i,j) { return pnormrnd_(0, 1); });
+	
+	// Generate the covariance matrix using the formula 
+	// cov_ij = corr_ij * sigma_i * sigma_j, i=1..n, j=1..n.
+	var cov = corr.elemMap(function(i,j,val) { return val * sigma.data[i-1] * sigma.data[j-1];}, corr);
+
+	// Add covariance matrix methods
+	addCovarianceMatrixMethods_(cov);
+	
+	// Return it
+	return cov;
+}
+
+
+/**
 * @function toCovarianceMatrix
 *
 * @summary Returns a copy of the original matrix to which is added the methods of a covariance matrix.
 *
-*@description This function computes a copy of the original matrix and adds the methods of a covariance matrix to it.
+* @description This function computes a copy of the original matrix and adds the methods of a covariance matrix to it.
 *
 * @memberof Matrix_
 * @return {Matrix_} a copy of the original matrix to which is added the methods of a covariance matrix.
@@ -3204,7 +3569,7 @@ Matrix_.prototype.toCovarianceMatrix = function() {
 	// Construct the covariance matrix
 	var cov = new Matrix_(this);
 	
-	// No checks: square, symetric, semidefinite positive, etc
+	// No checks: square, symmetric, semidefinite positive, etc
 	
 	// Add covariance matrix methods
 	addCovarianceMatrixMethods_(this);
@@ -3244,8 +3609,8 @@ function addCovarianceMatrixMethods_(matrix) {
 		* either stored in the matrix out or in a new matrix.
     	*
     	* @example
-    	* fromDoubleArray([[1,0.1], [0.1,1]]).getCorrelationMatrix();
-    	* // Matrix_([[1,0.1], [0.1,1]])
+    	* Matrix_([[1, 1, 8.1], [1, 16, 18], [8.1, 18, 81]]).getCorrelationMatrix();
+    	* // Matrix_([[1, 0.25, 0.9], [0.25, 1, 0.5], [0.9, 0.5, 1]])
     	*/
 		'getCorrelationMatrix': function(out) { 
 			// Result matrix allocation
@@ -3253,7 +3618,7 @@ function addCovarianceMatrixMethods_(matrix) {
 			
 			// Computation of the correlation matrix
 			for (var i = 0; i < obj.nbRows; ++i) {
-				// Standard devation of a_ii
+				// Standard deviation of a_ii
 				var stdDevI = Math.sqrt(this.data[i * this.nbColumns + i]);
 				
 				// Copy from upper triangular part
@@ -3263,7 +3628,7 @@ function addCovarianceMatrixMethods_(matrix) {
 				
 				// Computation part
 				for (var j = i; j < obj.nbColumns; ++j) {
-					// Standard devation of a_jj
+					// Standard deviation of a_jj
 					var stdDevJ = Math.sqrt(this.data[j * this.nbColumns + j]);
 				
 					obj.data[i * obj.nbColumns + j] = this.data[i * this.nbColumns + j] / ( stdDevI * stdDevJ );
@@ -3275,7 +3640,7 @@ function addCovarianceMatrixMethods_(matrix) {
 		},
 		
     	/**
-    	* @function getVariancesVector
+    	* @function getVariances
     	*
     	* @summary Returns the variances associated to a covariance matrix.
     	*
@@ -3288,11 +3653,32 @@ function addCovarianceMatrixMethods_(matrix) {
 		* either stored in the matrix out or in a new matrix.
     	*
     	* @example
-    	* fromDoubleArray([[1,0.1], [0.1,1]]).getVariancesVector();
-    	* // Vector_([1,1])
+    	* Matrix_([[1, 1, 8.1], [1, 16, 18], [8.1, 18, 81]]).getVariances();
+    	* // Matrix_([1, 16, 81])
     	*/
-		'getVariancesVector': function(out) { 
+		'getVariances': function(out) { 
 			return this.diagonal(out);
+		},
+		
+    	/**
+    	* @function getStandardDeviations
+    	*
+    	* @summary Returns the standard deviations associated to a covariance matrix.
+    	*
+    	* @description This function returns, as a n by 1 matrix, the square of the diagonal elements SQRT(a_ii), i=1..n from the original
+    	* square matrix (a_ij),i=1..n,j=1..n.
+    	*
+    	* @memberof Matrix_
+		* @param {Matrix_} out an optional n by 1 matrix.
+    	* @return {Matrix_} a n by 1 column matrix containing the standard deviations vector associated to the covariance matrix,
+		* either stored in the matrix out or in a new matrix.
+    	*
+    	* @example
+    	* Matrix_([[1, 1, 8.1], [1, 16, 18], [8.1, 18, 81]]).getStandardDeviations();
+    	* //  Matrix_([1, 4, 9])
+    	*/
+		'getStandardDeviations': function(out) { 
+			return this.diagonal(out).elemMap(function(i,j,val) { return Math.sqrt(val);}, out);
 		},
 		
     	/**
@@ -3868,9 +4254,8 @@ BitSet_.prototype = {
 };
 
 /**
- * @file Misc. combinatorics functions.
- * @author Roman Rubsamen <roman.rubsamen@gmail.com>
- */
+* @author Roman Rubsamen <roman.rubsamen@gmail.com>
+*/
 
 /* Start Wrapper private methods - Unit tests usage only */
 self.aliasMethodSampler_ = aliasMethodSampler_;
@@ -4313,40 +4698,46 @@ function randomCompositionsIterator_(n, k) {
 /**
 * @function randomPermutationsIterator_
 *
-* @summary Returns an infinite iterator to compute random permutations of letters.
+* @summary Returns an infinite iterator to compute random permutations.
 *
 * @description This function constructs an infinite iterator to compute random permutations of 
-* the set {1..n} (equivalent to a set of n letters), using the algorithm RANPER described in 
-* section 8 of the reference.
+* the set {1,2,...,n} (equivalent to a set of n letters) or of the elements of any set, 
+* using the algorithm RANPER described in section 8 of the reference.
 *
 * The random permutations are generated uniformly at random.
 *
 * @see Nijenhuis, A., & Wilf, H. S. (1978). Combinatorial algorithms for computers and calculators. 2d ed. New York: Academic Press.
 *
 * @param {number} n a non-negative integer.
-* @param {out} TODO.
+* @param {Array.<Object>} outputArray an optional array containing elements to be randomly permuted.
+* @param {boolean} reuseOutputArray an optional boolean that can be set to true to re-use the same output array throughout
+* all the computations (this improves the performances, but requires the caller to NOT alter the output array); defaults to false.
+*
 * @return {function} a function to be used as an infinite iterator through its .next() method, computing  
-* random permutations of the set {1..n}.
+* random permutations of the array [1,2,...,n] if outputArray is not provided, or random permutations of the array 
+* outputArray if outputArray is provided.
 *
 * @example
 * var myIterator = new randomPermutationsIterator_(6);
 * myIterator.next();
 * // [1,3,2,4,6,5]
 */
-function randomPermutationsIterator_(n, out) {
-	// Initialize n
-	this.n = n;
-	
+function randomPermutationsIterator_(n, outputArray, reuseOutputArray) {
 	// Initialize the array holding the permutation to 1..n, if needed
-	if (out === undefined) {
+	if (outputArray === undefined) {
 		this.r = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
-		for (var i = 0; i < this.n; ++i) {
+		for (var i = 0; i < n; ++i) {
 			this.r[i] = i+1;
 		}
 	}
 	else {
-		this.r = out;
+		this.r = outputArray;
 	}
+	this.rrlen = this.r.length;
+	
+	// Initialize the re-use array variable
+	this.reuseOutputArray = reuseOutputArray;
+
 
 	/**
 	* @function uniformrv
@@ -4375,7 +4766,7 @@ function randomPermutationsIterator_(n, out) {
 	}
 	
 	/**
-	* @function next
+	* @function next TOODO
 	*
 	* @summary Returns a random permutation of the set {1..n}.
 	*
@@ -4386,17 +4777,17 @@ function randomPermutationsIterator_(n, out) {
 	* @return {Array.<number>|Uint32Array} an array of n elements containing the computed random permutation of the set {1..n}.
 	*/
 	this.next = function() {
-		// Construct a copy of the r array, so that the caller can alter it, if applicable
-		if (out === undefined) {
-			var rr = this.r.slice(0);
+		// Construct a copy of the r array so that the caller can alter it, if applicable
+		if (this.reuseOutputArray) {
+			var rr = this.r;
 		}
 		else {
-			var rr = out;
+			var rr = this.r.slice(0);
 		}
 		
 		// Main logic of the RANPER algorithm
-		for (var m = 1; m <= this.n; ++m) {
-			var l = m + Math.floor( uniformrv()*(this.n + 1 - m) );
+		for (var m = 1; m <= this.rrlen; ++m) {
+			var l = m + Math.floor( uniformrv()*(this.rrlen + 1 - m) );
 			
 			var tmp = rr[l-1];
 			rr[l-1] = rr[m-1];
@@ -5150,8 +5541,10 @@ self.permutationEntropy_ = permutationEntropy_;
 self.hypot_ = hypot_;
 self.rank_ = rank_;
 self.ftca_ = ftca_;
-self.normcdf_ = function(x) { return normcdf_(x); }
+self.normcdf_ = normcdf_;
 self.norminv_ = norminv_;
+self.normrnd_ = normrnd_;
+self.pnormrnd_ = pnormrnd_;
 self.hypersphereRandomSampler_ = hypersphereRandomSampler_;
 self.boxGridSampler_ = boxGridSampler_;
 /* End Wrapper private methods - Unit tests usage only */
@@ -6175,9 +6568,9 @@ function stddev_(x) {
 /**
 * @function sampleStddev_
 *
-* @description Compute the sample standard deviation of a serie of values.
+* @description Compute the sample standard deviation of a series of values.
 *
-* @description This function returns the sample standard deviation of a serie of values [x_1,...,x_p], 
+* @description This function returns the sample standard deviation of a series of values [x_1,...,x_p], 
 * which is defined as the square root of the sample variance of the p values x_1,...,x_p.
 *
 * The algorithm implemented uses a two pass formula in order to reduce the computation error, c.f. the function sampleVariance_.
@@ -6198,16 +6591,16 @@ function sampleStddev_(x) {
 /**
 * @function normcdf_
 *
-* @summary Compute the the standard normal cumulative distribution function.
+* @summary Compute the standard normal cumulative distribution function.
 *
 * @description This function returns an approximation of the standard normal cumulative distribution function, i.e.
 * given x a real number, it returns an approximation to p = Pr{Z <= x} where Z is a
 * random variable following a standard normal distribution law.
 *
-* This function is also called Phi in the statistical litterature.
+* This function is also called Phi in the statistical literature.
 *
 * The algorithm uses a Taylor expansion around 0 of a well chosen function of Phi,
-* and has a theorical absolute error of less than 8e−16.
+* and has a theoretical absolute error of less than 8e−16.
 *
 * @author George Marsaglia
 *
@@ -6236,7 +6629,7 @@ function normcdf_(x) {
 		return 1.0;
 	}
 	
-	// The main loop corresponds to the computation of the Taylor serie of the function B around 0, 
+	// The main loop corresponds to the computation of the Taylor series of the function B around 0, 
 	// c.f. page 5 of the reference.
 	//
 	// In a nutshell, the Taylor expansion is computed term by term until the addition of a new term 
@@ -6247,6 +6640,131 @@ function normcdf_(x) {
 
 	// The formula linking Phi and the Taylor expansion above if Phi = 1/2 + normal density * B, c.f. page 5 of the reference.
 	return 0.5 + sum * Math.exp(-0.5 * power - 0.91893853320467274178)
+}
+
+
+/**
+* @function normrnd_
+*
+* @summary Computes a random number from the normal distribution.
+*
+* @description This function generates a random number from the normal distribution
+* with mean parameter mu and standard deviation parameter sigma.
+*
+* The algorithm used is based on the inverse method.
+*
+* @param {number} mu mean parameter of the random number to generate, real number; defaults to 0.
+* @param {number} sigma standard deviation parameter of the random number to generate, real number; defaults to 1.
+* @return {number} the computed random number.
+*
+* @example
+* normrnd_(0,1);
+* // 0.5377
+*/
+function normrnd_(mu, sigma) {
+	// Initialize default parameter
+	if (!mu) {
+		mu = 0;
+	}
+	if (!sigma) {
+		sigma = 1;
+	}
+	
+	// Generate a random variable from N(0,1), using the inverse method
+	var u = Math.random(); // u ~ U[0,1[
+	while (u === 0.0) {
+		u = Math.random();
+	} // u ~ U]0,1[
+	var r = norminv_(u); // r ~ N(0,1)
+	
+	// Convert the random variable from N(0,1) to N(mu, sigma)
+	return mu + sigma*r;
+}
+
+
+/**
+* @function pnormrnd_
+*
+* @summary Computes a random number from the normal distribution with
+* positive support.
+*
+* @description This function generates a random number from the normal distribution
+* with positive support and with mean parameter mu and standard deviation parameter sigma.
+*
+* The algorithm used is described in the reference.
+*
+* The code below has been adapted from the initial Matlab code rpnorm.m done by Vincent Mazet,
+* vincent.mazet@unistra.fr, 06/2005, 10/2010.
+*
+* @see <a href="http://miv.u-strasbg.fr/mazet/publis/mazet05_ssp.pdf">V. Mazet, D. Brie, J. Idier. Simulation of Positive Normal Variables using several Proposal Distributions. IEEE Workshop Statistical Signal Processing 2005</a>
+* 
+* @param {number} mu mean parameter of the random number to generate as if the distribution was not truncated, real number; defaults to 0.
+* @param {number} sigma standard deviation parameter of the random number to generate as if the distribution was not truncated, real number; defaults to 1.
+* @return {number} the computed random number.
+*
+* @example
+* pnormrnd_(0,1);
+* // 0.5377
+*/
+function pnormrnd_(mu, sigma) {
+	// Initialize default parameter
+	if (mu == undefined) {
+		mu = 0;
+	}
+	if (sigma == undefined) {
+		sigma = 1;
+	}
+	var sigma_sq = sigma*sigma;
+	
+	
+	// Misc. initializations
+	var A = 1.136717791056118;
+	var mu_a = (1 - A*A)/A*sigma;
+	var mu_b = 0;
+	var mu_c = sigma * Math.sqrt(Math.PI/2);
+	
+	
+	// Core loop of the algorithm, converging per lemma 1 of the reference
+	var z;
+	while (true) {
+		//
+		var rho;
+		
+		// 4. Exponential distribution
+		if (mu < mu_a) {
+			var a = (-mu + Math.sqrt(mu*mu + 4*sigma_sq)) / 2 / sigma_sq;
+			
+			z = -Math.log(1 - Math.random())/a;
+			rho = Math.exp( -(z-mu)*(z-mu) / 2 / sigma_sq - a*(mu-z+a*sigma_sq/2) );
+		}
+		// 3. Normal distribution truncated at the mean, with equality because 3 is faster to compute than 2
+		else if (mu <= mu_b) { 
+			z = Math.abs(normrnd_())*sigma + mu;
+			rho = (z >= 0) ? 1 : 0;
+		}
+		// 2. Normal distribution coupled with the uniform one
+		else if (mu < mu_c) { 
+			var r = (Math.random() < mu/(mu + Math.sqrt(Math.PI/2)*sigma)) ? 1 : 0;
+			var u = Math.random()*mu;
+			var g = Math.abs(normrnd_()*sigma) + mu;
+			
+			z = r*u + (1-r)*g;
+			rho = r*Math.exp(-(z-mu)*(z-mu) / 2 /sigma_sq) + (1-r);
+		}
+		// 1. Normal distribution
+		else { 
+			z = normrnd_()*sigma + mu;
+			rho = (z >= 0) ? 1 : 0;
+		}
+		
+		// Acceptance/rejection step
+		if (Math.random() <= rho){
+			break;
+		}		
+	}
+	
+	// Return the computed value
+	return z;
 }
 
 
@@ -6386,12 +6904,8 @@ function hypersphereRandomSampler_(n, reuseOutputArray) {
 		var t = 0;
 		var s = 1;
 		for (var i = 0; i < this.n; ++i) {
-			// Generate a random variable from N(0,1), using the inverse method
-			var u = Math.random(); // u ~ U[0,1[
-			while (u === 0.0) {
-				u = Math.random();
-			} // u ~ U]0,1[
-			var r = norminv_(u); // r ~ N(0,1)
+			// Generate a random variable from N(0,1)
+			var r = normrnd_();
 			
 			// Set the i-th coordinate of the point being sampled.
 			this.x[i] = r;
@@ -7068,8 +7582,8 @@ self.goldenSectionSearch_ = goldenSectionSearch_;
 		}
 	}
 
-	// Return the computed x_k value
-	return x_k;	
+	// Return the computed x_k value, as well as f(x_k)
+	return [x_k, f_x_k];
 }
 
 /**
@@ -7832,7 +8346,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 		// Initialize x(t).
 		var x_t = Matrix_.zeros(n, 1);
 		
-		// Compute x(t) componentwise, using formula 2.6 of the first reference.
+		// Compute x(t) component wise, using formula 2.6 of the first reference.
 		for (var i = 0; i < n; ++i) {
 			var x_i;
 			if (t_star <= T_u[i]) {
@@ -7897,7 +8411,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 
 	// ------
 	
-	// Initialisations    
+	// Initializations    
 	var n = b.nbRows;
 	
 	var abs_r = Math.abs(r);
@@ -7982,7 +8496,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	}
 	// Otherwise, proceed with the core algorithm 3.1 of the first reference.
 	else {
-		// Step 0: initialisations, with some initialisations already done.
+		// Step 0: initializations, with some initializations already done.
 		var t_l = t_1; // t_1 was already computed to check feasibility, so there is no need to use t_0
 		var t_u = t_r; // t_r was already computed to check feasibility, so there is no need to use t_rp
 
@@ -8132,7 +8646,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 * @see <a href="http://ieeexplore.ieee.org/document/6789464/">S. S. Keerthi, S. K. Shevade, C. Bhattacharyya and K. R. K. Murthy, "Improvements to Platt's SMO Algorithm for SVM Classifier Design," in Neural Computation, vol. 13, no. 3, pp. 637-649, March 1 2001.</a>
 * @see <a href="https://www.ncbi.nlm.nih.gov/pubmed/15941003">Takahashi N, Nishi T., Rigorous proof of termination of SMO algorithm for support vector machines., IEEE Trans Neural Netw. 2005 May;16(3):774-6.</a>
 *
-* @param {Matrix_} Q a square symetric positive semi-definite n by n matrix.
+* @param {Matrix_} Q a square symmetric positive semi-definite n by n matrix.
 * @param {Matrix_} p an n by 1 matrix.
 * @param {Matrix_} b an n by 1 matrix with strictly positive elements.
 * @param {number} r a real number.
@@ -9006,75 +9520,203 @@ function simplexEmptinessCheck_(n, l, u) {
 *
 * @summary Returns a closest point on the unit simplex subject to a sparsity constraint.
 *
-* @description This function computes a closest point (relative to the euclidean distance) 
-* with at most k non-zero elements on the unit simplex of R^n to a point x = (x_1,...,x_n) in R^n, 
-* using an O(n) implementation of the algorithm 1 of the reference.
+* @description This function computes an at most k-sparse euclidean projection of a point
+* x = (x_1,...,x_n) in R^n onto the unit simplex of R^n.
+* 
+* Optionally, lower bounds and upper bounds constraints can be added to the problem, in which case 
+* the unit simplex becomes a restricted unit simplex, and the bounds constraints are then to be understood
+* as applying only to the at most k coordinates selected to be part of the computed projection.
 *
-* In other words, this function computes an at most k-sparse euclidean projection of 
-* a point x in R^n onto the unit simplex of R^n.
+* In case there are no bounds constraints, the algorithm used is an O(n) implementation of
+* the algorithm 1 of the first reference.
 *
+* In case there are bounds constraints, the problem is NP-complete in general, c.f. the third reference,
+* so that the only way to guarantee an exact solution is through an exhaustive computation 
+* over all the subsets of size <= k of the set of indexes {1,...,n}, searching for an optimal and feasible
+* index set solving the projection problem, c.f. section 5.1 of the second reference.
+*
+* This is unfortunately only tractable for small n in general (n <= XX), as well as for the
+* (n, k) pairs with k << n or k ~ n.
+* 
 * @see <a href="https://arxiv.org/abs/1206.1529">Anastasios Kyrillidis, Stephen Becker, Volkan Cevher and, Christoph Koch, Sparse projections onto the simplex, arXiv:1206.1529 [cs.LG]</a>
+* @see <a href="https://link.springer.com/article/10.1007/s11425-016-9124-0">Fengmin Xu, Yuhong Dai, Zhihu Zhao and Zongben Xu, Efficient projected gradient methods for cardinality constrained optimization, Science China Mathematics volume 62, pages245–268(2019)</a>
+* @see <a href="https://epubs.siam.org/doi/abs/10.1137/140978077">Oleg P. Burdakov, Christian Kanzow, and Alexandra Schwartz, Mathematical Programs with Cardinality Constraints: Reformulation by Complementarity-Type Conditions and a Regularization Method, SIAM J. Optim., 26(1), 397–425.</a>
 *
 * @param {Array.<number>} x, a point belonging to R^n, array of n real numbers.
 * @param {number} k, a natural integer strictly greater than one corresponding to the maximum desired sparsity
 * (i.e., non-zero elements) of the projected point.
+* @param {Array.<number>} l the optional lower bounds constraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; 
+* defaults to an array made of zeros if u is provided, otherwise to null.
+* @param {Array.<number>} u the optional upper bounds constraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n;
+defaults to an array made of ones if l is provided, otherwise to null.
+*
 * @return {Array.<number>|Float64Array} the computed closest point to x with at most k non-zero elements, array of n real numbers.
 *
 * @example
 * simplexSparseEuclidianProjection_([0.5, 0.1, 0.2], 1);
 * //[1,0,0]
 */
-function simplexSparseEuclidianProjection_(x, k) {
+function simplexSparseEuclidianProjection_(x, k, l, u) {
 	// Initializations
 	var n = x.length;
 	
 	
 	// Short circuit in case there is no sparsity
 	if (k === n) {
-		return simplexEuclidianProjection_(x);
+		return simplexEuclidianProjection_(x, l, u);
 	}
 	
 	
-	// Otherwise, compute the support of the projection, i.e., the k largest elements of x.
-	
-	// Initialize the indexes of the elements of x
-	var idx = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n);
-	for (var i = 0; i < n; ++i) {
-		idx[i] = i;
-	}
-	
-	// Per property of the SELECT algorithm of Floyd and Rivest, the array idx is permuted
-	// so that the indexes of the largest k elements of x are at the indexes 0..k-1 of the
-	// array idx.
-	var compareIndexes = function (a, b) {
-	    return x[b] - x[a];
-	};
-	select_(idx, k, compareIndexes);
+	// In case no bounds constraints are provided, use the algorithm 1 of the first reference.
+	if (!l && !u) {
+		// Compute the support of the projection, i.e., the k largest elements of x.
+		
+		// Initialize the indexes of the elements of x
+		var idx = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			idx[i] = i;
+		}
+		
+		// Per property of the SELECT algorithm of Floyd and Rivest, the array idx is permuted
+		// so that the indexes of the largest k elements of x are at the indexes 0..k-1 of the
+		// array idx.
+		var compareIndexes = function (a, b) {
+			return x[b] - x[a];
+		};
+		select_(idx, k, compareIndexes);
 
-	// Extract the k largest elements of x
-	var x_k = x.slice(0, k);
-	for (var i = 0; i < k; ++i) {
-		x_k[i] = x[idx[i]];
+		// Extract the k largest elements of x
+		var x_k = x.slice(0, k);
+		for (var i = 0; i < k; ++i) {
+			x_k[i] = x[idx[i]];
+		}
+		
+		
+		// Compute the projection on the unit simplex of the k largest elements of x.
+		var proj_x_k = simplexEuclidianProjection_(x_k);
+		
+		
+		// Compute the final projection by re-conciliating the support of the
+		// projection above and its complementary set.
+		var y = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < k;  ++i) {
+			y[idx[i]] = proj_x_k[i];
+		}
+		for (var i = k; i < n;  ++i) {
+			y[idx[i]] = 0;
+		}
+		
+		
+		// Return the computed projection
+		return y;
 	}
-	
-	
-	// Compute the projection on the unit simplex of the k largest elements of x.
-	var proj_x_k = simplexEuclidianProjection_(x_k);
-	
-	
-	// Compute the final projection by re-conciliating the support of the
-	// projection above and its complementary set.
-	var y = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
-	for (var i = 0; i < k;  ++i) {
-		y[idx[i]] = proj_x_k[i];
+	// In case bounds constraints are provided, the computation is unfortunately 
+	// NP-complete in general, c.f. the third reference.
+	else {
+		// Convert x to Matrix format to ease the computations below
+		var x = new Matrix_(x);
+		
+		// Initialize the current minimum euclidean distance between x and the
+		// best at most k-sparse projection of x, as well as the current list of 
+		// associated indexes.
+		var minDistanceValue = Infinity;
+		var minDistanceIndexes = [];
+		var minDistanceProjX = null;
+		
+		// An exhaustive enumeration of all the subsets of the set {1,...,n} 
+		// of size between 1 and k is done, searching for the best feasible 
+		// projection over all these subsets.
+		for (var K = 1; K <= k; ++K) {
+			var nextKSubsetIterator = new kSubsetsIterator_(n, K, false);
+			var nextKSubset = nextKSubsetIterator.next();
+			
+			while (nextKSubset != -1) {
+				// Extract the selected indexes of {1..n}
+				var subsetNbIndexes = nextKSubset.length;
+				var subsetIndexes = typeof UInt32Array === 'function' ? new UInt32Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				for (var i = 0; i < subsetNbIndexes; ++i) {
+					subsetIndexes[i] = nextKSubset[i];
+				}
+
+				// Extract the coordinates of the vector x associated to the selected indexes
+				var subsetX = typeof Float64Array === 'function' ? new Float64Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				for (var i = 0; i < subsetNbIndexes; ++i) {
+					subsetX[i] = x.data[subsetIndexes[i]-1];
+				}
+
+				// Extract the lower and upper bounds constraints associated to the selected indexes
+				var subsetL = typeof Float64Array === 'function' ? new Float64Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				if (l) {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetL[i] = l[subsetIndexes[i]-1];
+					}
+				}
+				else {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetL[i] = 0;
+					}
+				}
+				var subsetU = typeof Float64Array === 'function' ? new Float64Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				if (u) {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetU[i] = u[subsetIndexes[i]-1];
+					}
+				}
+				else {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetU[i] = 1;
+					}
+				}
+				
+				// Compute the projection of the selected indexes of x on the restricted simplex.
+				//
+				// If the projection is better (in the sense of the euclidean distance to x) than the current
+				// best projection, it becomes the new best projection and the current subset of indexes
+				// becomes the new optimal subset of indexes.
+				//
+				// Note: because the restricted simplex associated to the subset of selected indexes
+				// might be empty, special care must be taken.
+				try {
+					// Compute the projection
+					var proj_subsetX = simplexEuclidianProjection_(subsetX, subsetL, subsetU);
+					
+					// Transform the projection into an at most k sparse vector of R^n
+					var proj_x = Matrix_.zeros(n, 1);
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						proj_x.data[subsetIndexes[i] - 1] = proj_subsetX[i];
+					}
+					
+					// Compute the euclidean distance between the initial x and the 
+					// at most k sparse vector above.
+					var d_x_proj_x = Matrix_.axpby(1, x, -1, proj_x).vectorNorm('two');
+					
+					// Determine if the projection above is better than the current best projection
+					if (d_x_proj_x < minDistanceValue) {
+						minDistanceValue = d_x_proj_x;
+						minDistanceIndexes = subsetIndexes;
+						minDistanceProjX = proj_x;
+					}
+					
+				}
+				catch (e) {
+					if (e.message !== "infeasible problem detected: the restricted simplex is empty") {
+						throw(e);
+					}
+				}
+
+				// Generate a new subset	
+				var nextKSubset = nextKSubsetIterator.next();
+			}
+		}
+		
+		// In case a best projection has been found, return it.
+		if (minDistanceValue != Infinity) {
+			return minDistanceProjX.toArray();
+		}
+		else {
+			throw new Error('infeasible problem detected');
+		}
 	}
-	for (var i = k; i < n;  ++i) {
-		y[idx[i]] = 0;
-	}
-	
-	
-	// Return the computed projection
-	return y;
 }
 
 /**
@@ -9082,11 +9724,8 @@ function simplexSparseEuclidianProjection_(x, k) {
 *
 * @summary Returns the closest point on the unit simplex.
 *
-* @description This function computes the closest point (relative to the euclidian distance)
-* lying on the unit simplex of R^n to the input point x = (x_1,...,x_n) in R^n.
-*
-* In other words, this function computes the euclidian projection of the point x in R^n
-* onto the unit simplex of R^n.
+* @description This function computes the euclidean projection of a point
+* x = (x_1,...,x_n) in R^n onto the unit simplex of R^n.
 *
 * Optionally, lower bounds and upper bounds constraints can be added to the problem, in which case 
 * the unit simplex becomes a restricted unit simplex.
@@ -9097,8 +9736,8 @@ function simplexSparseEuclidianProjection_(x, k) {
 * for the continuous quadratic knapsack problem, Math. Program. (2008) 112: 473</a>
 *
 * @param {Array.<number>} x a point belonging to R^n, array of n real numbers.
-* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of zeros.
-* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of ones.
+* @param {Array.<number>} l the optional lower bounds constraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of zeros.
+* @param {Array.<number>} u the optional upper bounds constraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n; defaults to an array made of ones.
 * @return {Array.<number>} the computed closest point to x, array of n real numbers.
 *
 * @example
@@ -9232,8 +9871,8 @@ function simplexGridSampler_(n, k, reuseOutputArray) {
 * 15 January 2000, Pages 113-120</a>
 *
 * @param {number} n the dimension of the unit simplex of R^n, natural integer superior or equal to 1.
-* @param {Array.<number>} l the optional lower bounds contraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
-* @param {Array.<number>} u the optional upper bounds contraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {Array.<number>} l the optional lower bounds constraints, an array of n real numbers l_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
+* @param {Array.<number>} u the optional upper bounds constraints, an array of n real numbers u_i which must satisfy 0 <= l_i <= u_i <= 1, i = 1..n.
 * @param {function} rnd an optional random vector generator in the unit hypercube of R^n-1, a function taking no input argument and
 * returning an array of n-1 points each belonging to the interval (0, 1).
 * @return {function} a function computing the random points to be used through its .sample() method.
@@ -10398,18 +11037,32 @@ self.equalRiskBudgetWeights = function (sigma, opt) {
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 *
-* To be noted that the algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
+* Optionally, the following constraints can be added:
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
+*
+* To be noted that in case weights constraints are defined, the concept of "equal risk contribution"
+* does not make any sense, c.f. the third reference.
+*
+* The algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is semi-definite positive.
 *
 * @see <a href="https://doi.org/10.3905/jpm.2010.36.4.060">Maillard, S., Roncalli, T., Teiletche, J.: The properties of equally weighted risk contribution portfolios. J. Portf. Manag. 36, 60–70 (2010)</a>
 * @see <a href="https://arxiv.org/abs/1311.4057">Théophile Griveau-Billion, Jean-Charles Richard, Thierry Roncalli; A Fast Algorithm for Computing High-dimensional Risk Parity Portfolios. eprint arXiv:1311.4057</a>
-* 
+* @see <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3331184">RONCALLI Thierry, RICHARD Jean-Charles, CONSTRAINED RISK BUDGETING PORTFOLIOS, </a>
+*
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
-* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.epsSdp the tolerance parameter for testing the semi-definite positiveness of the covariance matrix, a strictly positive real number; defaults to 1e-12.
+* @param {number} opt.maxCycles the maximum number of cycles of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.nbCycles the exact number of cycles of the algorithm, a strictly positive natural integer, in which case the values of opt.eps and opt.maxCycles are discarded,
+* or -1; defaults to -1.
 * @param {boolean} opt.outputPortfolioVolatility a boolean indicating whether the portfolio volatility should be provided in output
 * (if set to true) or not (if set to false); defaults to false.
+* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+*
 * @return {Array.<number>|Array.<Array.<number>>} if opt.outputPortfolioVolatility is set to false, the weights corresponding to the equal risk contribution portfolio, 
 * array of n real numbers, and if opt.outputPortfolioVolatility is set to true, an array arr of two elements:
 * - arr[0], the weights corresponding to the equal risk contribution portfolio, array of n real numbers
@@ -10761,8 +11414,8 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * portfolio excess return over a constant risk-free rate to the portfolio volatility.
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolio
-* - Maximum weight of each asset to include in the portfolio
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * When it exists, this portfolio is mean-variance efficient and is unique.
 *
@@ -11031,7 +11684,7 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
 	
 	
-	// Retrict the efficient frontier to the domain of definition
+	// Restrict the efficient frontier to the domain of definition
 	// of the Sharpe ratio by determining the "first" efficient portfolio 
 	// with a strictly positive volatility.
 	//
@@ -11073,7 +11726,7 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	}
 
 	
-	// Further retrict the efficient frontier to the domain of strict positivity
+	// Further restrict the efficient frontier to the domain of strict positivity
 	// of the Sharpe ratio.
 	//
 	// To be noted that the domain of strict positivity of the Sharpe ratio
@@ -11109,7 +11762,7 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	}
 
 
-	// On the retricted efficient frontier, the Sharpe ratio is a pseudo-concave 
+	// On the restricted efficient frontier, the Sharpe ratio is a pseudo-concave 
 	// function, c.f. the first reference, so that it is strictly unimodal.
 	//
 	// This property allows to search for the corner portfolio with the maximum
@@ -11196,13 +11849,12 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 * portfolio to the highest return/volatility portfolio.
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolios
-* - Maximum weight of each asset to include in the portfolios
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * The main algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
 *
-* The algorithm used internally generates the portfolios uniformly on the efficient frontier with
-* regard to the interval of variation of the risk aversion parameter.
+* The algorithm used internally generates the portfolios uniformly on the efficient frontier.
 *
 * @see Harry M. Markowitz, Mean-Variance Analysis in Portfolio Choice and Capital Markets, Revised issue (2000), McGraw-Hill Professional;
 *
@@ -11229,19 +11881,23 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 	}
 	var nbPortfolios = opt.nbPortfolios || 100;
 
+	
 	// ------
 	
 	// Convert mu and sigma to matrix format
 	var mu = new Matrix_(mu);
 	var sigma = new Matrix_(sigma);
 
+	
 	// Compute the corner portfolios defining the efficient frontier,
 	// as well the minimum/maximum values of the risk aversion parameter.
 	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
 	
+	
 	// Initializations
 	var nbAssets = sigma.nbColumns;
 	var efficientFrontier = new Array(nbPortfolios);
+	
 	
 	// Limit cases: 
 	// - If there is only one corner portfolio on the efficient frontier,
@@ -11271,97 +11927,58 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 		}
 	}
 	
-	// Generate nbPortfolios distinct points lambda_i, i=1..nbPortfolios, corresponding to
-	// strictly increasing values of the risk aversion parameter, uniformly
-	// spaced on the interval [lambda_min, lambda_max], using the formula
-	// lambda_i = lambda_min + i * (lambda_max - lambda_min)/(nbPortfolios - 1).
-	//
-	// Then, for each of these points, compute the two enclosing corner portfolios 
-	// w_i_min, w_i_max satisfying lambda_i_min <= lambda_i < lambda_i_max or
-	// lambda_i_min < lambda_i <= lambda_i_max.
-	//
-	// In this case, the weights corresponding to the associated efficient
-	// portfolio are a convex combination of the weights of the two computed enclosing
-	// corner portfolios (c.f. the reference): w_i = t*w_i_min + (1-t)*w_i_max, t in [0,1],
-	// with t now to be determined.
-	//
-	// As the relationship between lambda_i and and w_i is the identity, we have
-	// lambda_i = (1-t)*lambda_i_min + t*lambda_i_max
-	// <=>
-	// t = (lambda_i - lambda_i_min)/(lambda_i_max - lambda_i_min)
 	
+	// Generate nbPortfolios regularly spaced distinct points t_i, i=0..nbPortfolios-1, 
+	// belonging to the interval [1, cornerPortfolios.length], using the formula
+	// t_i = 1 + i * (cornerPortfolios.length - 1)/(nbPortfolios - 1).
+	//
+	// Then, for each of these points, compute the indexes of the two enclosing corner 
+	// portfolios i_min, i_max satisfying i_min <= t_i <= i_max.
+	//
+	// Then, compute the weights corresponding to the associated efficient
+	// portfolio as a convex combination of the weights of the two enclosing
+	// corner portfolios (c.f. the reference): w_i = (1-tt_i)*w_i_min + tt_i*w_i_max, 
+	// with tt_i = t_i - i_min mapping the interval [i_min, i_max]
+	// to the interval [0,i_max - i_min] = [0, 1] (or to the singleton {0} in case
+	// i_min == i_max, which is a specific case).
+
 	// Initializations
-	var lambda_min = cornerPortfolios[cornerPortfolios.length - 1][1];
-	var lambda_max = cornerPortfolios[0][1];
-	var delta_lambda = (lambda_max - lambda_min)/(nbPortfolios - 1);
-	
-	var lambda_i = lambda_min; // the first lambda_i point is lambda_min
-	var lambda_i_min_idx = cornerPortfolios.length - 1;
-	var lambda_i_max_idx = lambda_i_min_idx - 1;
-	var lambda_i_min = cornerPortfolios[lambda_i_min_idx][1];
-	var lambda_i_max = cornerPortfolios[lambda_i_max_idx][1];
-	var w_i_min = cornerPortfolios[lambda_i_min_idx][0];
-	var w_i_max = cornerPortfolios[lambda_i_max_idx][0];
-	
-	// Specific process for the first efficient portfolio (the
-	// minimum variance portfolio).
-	{
-		var minimumVariancePortfolioWeights = cornerPortfolios[lambda_i_min_idx][0];
-		var portfolioReturn = Matrix_.vectorDotProduct(mu, minimumVariancePortfolioWeights);
-		var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, minimumVariancePortfolioWeights), 
-																	minimumVariancePortfolioWeights));
+	var t_min = 1;
+	var t_max = cornerPortfolios.length;
+	var delta_t = (t_max - t_min)/(nbPortfolios - 1);
+
+	// Core process, which generates the efficient portfolios
+	// from the highest return/volatility ones to the lowest
+	// return/volatility ones.
+	//
+	// For example, at i == 0, we have t_i == 1 so that w_i_min == the first corner portfolio,
+	// which corresponds to the highest return/volatility portfolio on the
+	// efficient frontier.
+	for (var i = 0; i < nbPortfolios; ++i) {
+		// Generate the current point t_i
+		var t_i = t_min + i * delta_t;
 		
-		efficientFrontier[0] = [minimumVariancePortfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
-	}
-	
-	
-	// Core process for the nbPortfolios-2 middle efficient portfolios
-	for (var i = 1; i < nbPortfolios - 1; ++i) {
-		// Generate the current risk aversion point
-		var lambda_i = lambda_min + i * delta_lambda;
+		// Compute the two enclosing corner portfolios indexes
+		var i_min = Math.floor(t_i);
+		var i_max = Math.min(i_min + 1, cornerPortfolios.length); // Math.min for the specific case t_i == cornerPortfolios.length
 		
-		// Compute the two enclosing corner portfolios 
-		//
-		// Note: the associated indexes and values are updated
-		// only when the current risk aversion point goes beyond
-		// the current [lambda_i_min, lambda_i_max] interval
-		while (lambda_i > lambda_i_max) {
-			--lambda_i_min_idx;
-			--lambda_i_max_idx;
-			
-			lambda_i_min = cornerPortfolios[lambda_i_min_idx][1];
-			lambda_i_max = cornerPortfolios[lambda_i_max_idx][1];
-			
-			w_i_min = cornerPortfolios[lambda_i_min_idx][0];
-			w_i_max = cornerPortfolios[lambda_i_max_idx][0];
-		}
-				
-		// Compute the efficient portfolios weights, returns and volatilities
-		var t = (lambda_i - lambda_i_min)/(lambda_i_max - lambda_i_min);
+		// Compute the two enclosing corner portfolios weights
+		var w_i_min = cornerPortfolios[i_min - 1][0];
+		var w_i_max = cornerPortfolios[i_max - 1][0];
+		
+		// Compute the efficient portfolios weights, returns and volatilities 
+		var tt_i = t_i - i_min;
 		var portfolioWeights = Matrix_.fill(nbAssets, 1, 
-								function(i,j) { 
-									return (1-t)*w_i_min.getValue(i, 1) + t*w_i_max.getValue(i, 1); 
-								})
+											function(i,j) { 
+												return (1-tt_i)*w_i_min.getValue(i, 1) + tt_i*w_i_max.getValue(i, 1); 
+											});
 		var portfolioReturn = Matrix_.vectorDotProduct(mu, portfolioWeights);
 		var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, portfolioWeights), 
-																	   portfolioWeights));
+																	 portfolioWeights));
 		
-		efficientFrontier[i] = [portfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
-	}
-	
-	
-	// Specific process for the last efficient portfolio (the
-	// maximum return portfolio).
-	lambda_i = lambda_max;
-	lambda_i_min_idx = 1;
-	lambda_i_max_idx = lambda_i_min_idx - 1;
-	{
-		var maximumReturnPortfolioWeights = cornerPortfolios[lambda_i_max_idx][0];
-		var portfolioReturn = Matrix_.vectorDotProduct(mu, maximumReturnPortfolioWeights);
-		var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, maximumReturnPortfolioWeights), 
-																	 maximumReturnPortfolioWeights));
-		
-		efficientFrontier[nbPortfolios - 1] = [maximumReturnPortfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
+		// Save the computed values, with the highest return/volatility portfolios 
+		// provided last and the lowest return/volatility portfolios to be provided first.
+		efficientFrontier[(nbPortfolios - 1) - i] = [portfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
 	}
 	
 	
@@ -11382,8 +11999,8 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 * portfolio to the highest return/volatility portfolio.
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolios
-* - Maximum weight of each asset to include in the portfolios
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * The algorithm used internally is the Markowitz critical line algorithm, c.f. the reference.
 *
@@ -11456,7 +12073,7 @@ self.meanVarianceCornerPortfolios = function(mu, sigma, opt) {
 * - arr[0][2], the index of the corner portfolio with a return strictly greater than the return of the efficient portfolio (only in case arr is made of three elements), a natural integer
 */
 function computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfolios) {
-	// Internal functon to compute the return of a portfolio
+	// Internal functor to compute the return of a portfolio
 	function computeReturn_(mu, weights) {
 		return  Matrix_.vectorDotProduct(mu, weights);
 	}
@@ -11834,6 +12451,19 @@ function computeMaximumTargetVolatilityEfficientPortfolio_(mu, sigma, maxVolatil
 	}
 	
 	// ------	
+
+	// Initialize the options structure
+	if (opt === undefined) {
+		opt = {};
+	}
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
+
+	// Initialize the options default values
+	if (opt.maxIter === undefined) {
+		opt.maxIter = 1000;
+	}
 	
 	// Initializations
 	var eps = 1e-8; // the numerical accuracy for testing equality	
@@ -11883,10 +12513,37 @@ function computeMaximumTargetVolatilityEfficientPortfolio_(mu, sigma, maxVolatil
 												return 0;
 											}
 										});
-
+										
+			// In case minimum/maximum weights constraints are provided, extend them.
+			var newMinWeights = null;
+			if (opt.constraints.minWeights) {
+				newMinWeights = typeof Float64Array === 'function' ? new Float64Array(nbAssets + 1) : new Array(nbAssets + 1); 
+				for (var i = 0; i < nbAssets; ++i) {
+					newMinWeights[i] = opt.constraints.minWeights[i];
+				}
+				newMinWeights[nbAssets] = 0; // risk free asset, no min weight
+			}
+			var newMaxWeights = null;
+			if (opt.constraints.maxWeights) {
+				newMaxWeights = typeof Float64Array === 'function' ? new Float64Array(nbAssets + 1) : new Array(nbAssets + 1); 
+				for (var i = 0; i < nbAssets; ++i) {
+					newMaxWeights[i] = opt.constraints.maxWeights[i]
+				}
+				newMaxWeights[nbAssets] = 1; // risk free asset, no max weight
+			}
+			
+			// Create and fill a new options structure
+			newOpt = { maxIter: opt.maxIter, constraints: {}};
+			if (opt.constraints.minWeights) {
+				newOpt.constraints.minWeights = newMinWeights;
+			}
+			if (opt.constraints.maxWeights) {
+				newOpt.constraints.maxWeights = newMaxWeights;
+			}
+			
 			// Compute the new corner portfolios defining the new efficient frontier
 			// for the input assets with a risk free asset.
-			var newCornerPortfolios = computeCornerPortfolios_(newMu, newSigma, opt);
+			var newCornerPortfolios = computeCornerPortfolios_(newMu, newSigma, newOpt);
 			
 			// Compute the efficient portfolio with a target volatility strictly equal to
 			// desired maximum volatility.
@@ -11961,8 +12618,8 @@ function computeMaximumTargetVolatilityEfficientPortfolio_(mu, sigma, maxVolatil
 * efficient frontier.
 *
 * Optionally, the following constraints can be added:
-* - Minimum weight of each asset to include in the portfolios
-* - Maximum weight of each asset to include in the portfolios
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
 *
 * The algorithm used internally is the Markowitz critical line algorithm, c.f. the first reference.
 *
@@ -12980,7 +13637,7 @@ self.minimumCorrelationWeights = function (sigma, opt) {
 	var sigma = new Matrix_(sigma).toCovarianceMatrix();
 	
 	// Extract the correlation matrix and the misc. variances-related vectors
-	var variances = sigma.getVariancesVector();
+	var variances = sigma.getVariances();
 	var invStddevs = variances.elemMap(function(i,j,val) { return 1/Math.sqrt(val); });
 	var rho = sigma.getCorrelationMatrix();
 
@@ -13012,7 +13669,7 @@ self.minimumCorrelationWeights = function (sigma, opt) {
 			}
 		});
 
-	// Step 4: Compute average value for each row (= column, as matrix is symetric) of the Adjusted Correlation Matrix
+	// Step 4: Compute average value for each row (= column, as matrix is symmetric) of the Adjusted Correlation Matrix
 	// Note: only non diagonal elements are considered, c.f. the example of the reference
 	var rowsElements = adjustedRho.toRowArray(function(i, j, val) {
 		return i != j;
@@ -13072,12 +13729,20 @@ self.minimumCorrelationWeights = function (sigma, opt) {
 * The algorithm used internally to solve the associated optimization problem is a FISTA-like 
 * convex composite optimization algorithm.
 *
-* In case cardinality constraints are imposed, the associated optimization problem becomes
-* strongly NP-hard, c.f. the third reference, so that an exhaustive computation of all 
-* the portfolios minimizing the tracking error for each possible subset of assets is enforced.
+* In case cardinality constraints are provided:
+* - The associated optimization problem becomes strongly NP-hard, c.f. the third reference,
+* so that an exhaustive computation of all the portfolios minimizing the tracking error 
+* for each possible subset of assets is the only possible way to find an exact solution.
+*
 * This approach is expected to produce an exact solution within a reasonable amount of time
 * for small n (e.g. n <= 15), but due to the combinatorial nature of the problem, 
-* the computation for greater values of n will not be tractable.
+* the computation for greater values of n will not be tractable, unless the maximum 
+* number of assets is very small or very big compared to n.
+*
+* - The minimum/maximum weight of each asset is then to be understood as applying only to
+* the assets selected by the optimization algorithm to be included in the portfolio.
+* So, for example, in case a minimum weight constraint is defined for a non-selected asset,
+* this minimum weight constraint is discarded.
 *
 * @see <a href="https://doi.org/10.1016/S0378-4266%2898%2900076-4">Markus Rudolf and Hans-jurgen Wolter and Heinz Zimmermann. A linear model for tracking error minimization. Journal of Banking and Finance. 1998</a>
 * @see <a href="https://epubs.siam.org/doi/10.1137/0917020">R. Bramley and B. Winnicka. Solving Linear Inequalities in a Least Squares Sense. SIAM J. Sci. Comput., 17(1), 275–286.</a>
@@ -13268,7 +13933,7 @@ self.minimumTrackingErrorWeights = function (assetsReturns, benchmarkReturns, op
 	//
 	// In case cardinality constraints are imposed, an exhaustive enumeration of
 	// all the subsets of the set {1,...,nbAssets} of size between minNbAssets and
-	// maxNbAssets is done, searching for the portfolio minimizing the tracking error
+	// maxNbAssets is done, searching for the feasible portfolio minimizing the tracking error
 	// over all these subsets.
 	if (!cardinalityConstraints) {
 		// Extract the assets returns
@@ -14165,8 +14830,8 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * Optionally, the following constraints can be added:
 * - Minimum number of assets to include in the portfolio
 * - Maximum number of assets to include in the portfolio
-* - Minimum weight of each asset that is included in the portfolio
-* - Maximum weight of each asset that is included in the portfolio
+* - Minimum weight of each asset when selected to be included in the portfolio
+* - Maximum weight of each asset when selected to be included in the portfolio
 * - Minimum exposure of the portfolio
 * - Maximum exposure of the portfolio
 *
@@ -14175,7 +14840,7 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * Random portfolios have several applications in asset allocation, c.f. the first reference, as
 * well as in trading strategies evaluation, c.f. the second reference.
 *
-* To be noted that the algorithms used internally allow the random portfolios to be generated uniformly
+* The algorithms used internally allow the random portfolios to be generated uniformly
 * among all the feasible portfolios.
 *
 * @see <a href="https://arxiv.org/abs/1008.3718">William T. Shaw, Monte Carlo Portfolio Optimization for General Investor Risk-Return Objectives and Arbitrary Return Distributions: a Solution for Long-only Portfolios</a>
@@ -14385,7 +15050,6 @@ self.randomWeights = function (nbAssets, opt) {
 
 
 /**
- * @file Functions related to risk budgeting portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
  */
 
@@ -14400,47 +15064,576 @@ self.randomWeights = function (nbAssets, opt) {
 * @summary Compute the weights of the risk budgeting portfolio.
 *
 * @description This function returns the weights w_1,...,w_n associated to the fully invested and long-only portfolio
-* of n assets with risk budgeting contraints.
+* of n assets with risk budgeting constraints.
 *
 * This portfolio has the property that the total contribution 
 * of each asset to the risk of the portfolio is equal to a pre-determined budget weight.
 *
 * This portfolio is unique, provided the covariance matrix of the assets is definite positive.
 * 
-* To be noted that the algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
+* Optionally, the following constraints can be added:
+* - Minimum weight of each asset that is included in the portfolio
+* - Maximum weight of each asset that is included in the portfolio
+*
+* To be noted that in case weights constraints are defined, the concept of risk budget does not make any sense, 
+* c.f. the sixth reference.
+*
+* The algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is semi-definite positive.
 *
 * @see <a href="https://ssrn.com/abstract=2009778">Bruder, Benjamin and Roncalli, Thierry, Managing Risk Exposures Using the Risk Budgeting Approach (January 20, 2012).</a>
 * @see <a href="https://arxiv.org/abs/1311.4057">Théophile Griveau-Billion, Jean-Charles Richard, Thierry Roncalli; A Fast Algorithm for Computing High-dimensional Risk Parity Portfolios. eprint arXiv:1311.4057</a>
-* 
+* @see <a href="https://link.springer.com/article/10.1023/A:1017501703105">Tseng P., Convergence of a Block Coordinate Descent Method for Nondifferentiable Minimization, Journal of Optimization Theory and Applications, 109(3), pp. 475-494. (2001)</a>
+* @see <a href="https://doi.org/10.1090/mcom/3530">Stephen J. Wright, Ching-pei Lee, Analyzing random permutations for cyclic coordinate descent, Math. Comp.</a>
+* @see <a href="http://proceedings.mlr.press/v29/Glasmachers13.html">Tobias Glasmachers, Urun Dogan, Accelerated Coordinate Descent with Adaptive Coordinate Frequencies, Proceedings of the 5th Asian Conference on Machine Learning, PMLR 29:72-86, 2013.</a>
+* @see <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3331184">RONCALLI Thierry, RICHARD Jean-Charles, CONSTRAINED RISK BUDGETING PORTFOLIOS, </a>
+*
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {Array.<number>} rb the risk budgets, array of n real strictly positive numbers summing to one.
 * @param {object} opt the optional parameters for the algorithm.
-* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-8.
-* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-10.
+* @param {number} opt.epsSdp the tolerance parameter for testing the semi-definite positiveness of the covariance matrix, a strictly positive real number; defaults to 1e-12.
+* @param {number} opt.maxCycles the maximum number of cycles of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.nbCycles the exact number of cycles of the algorithm, a strictly positive natural integer, in which case the values of opt.eps and opt.maxCycles are discarded,
+* or -1; defaults to -1.
+* @param {string} opt.coordinatesSampler, the type of coordinates sampler to use, a string either equal to:
+* - 'cyclic', in order to use a cyclic coordinates sampler, called "cyclic CD" in the fourth reference
+* - 'shuffledCyclic', in order to use a uniformly randomly shuffled cyclic coordinates sampler, called "random-permutations CD" in the fourth reference
+* - 'randomized', in order to use a uniformly randomized coordinates sampler, called "fully randomized CD" in the fourth reference
+* - 'acf', in order to use the adaptive coordinate frequencies coordinates sampler, as described in the fifth reference
+*; defaults to 'cyclic'.
 * @param {boolean} opt.outputPortfolioVolatility a boolean indicating whether the portfolio volatility should be provided in output
 * (if set to true) or not (if set to false); defaults to false.
+* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+*
 * @return {Array.<number>|Array.<Array.<number>>} if opt.outputPortfolioVolatility is set to false, the weights corresponding to the risk budgeting portfolio, 
 * array of n real numbers, and if opt.outputPortfolioVolatility is set to true, an array arr of two elements:
 * - arr[0], the weights corresponding to the risk budgeting portfolio, array of n real numbers
 * - arr[1], the volatility of the computed risk budgeting portfolio, a real number
 *
 * @example
-* riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75], {eps: 1e-10, maxIter: 10000});
+* riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75], {eps: 1e-10, maxCycles: 1000});
 * // [~0.45, ~0.55]
 */
 self.riskBudgetingWeights = function (sigma, rb, opt) {
-	// The numerical zero 
-	var eps_tol = 1e-12;
+	// Internal function to compute the volatility of a portfolio
+	function computeVolatility(x, sigma_x) {
+		// Compute the variance x'*SIGMA*x
+		var sigma_x_x = Matrix_.vectorDotProduct(sigma_x, x);		
+
+		// In case the variance is numerically zero, which can occur with 
+		// a semi-positive definite covariance matrix, it is replaced with zero.
+		//
+		// Otherwise, if the variance is negative, stops the algorithm,
+		// since the covariance matrix is then not numerically semi-positive definite.
+		if (Math.abs(sigma_x_x) <= epsSdp) {
+			sigma_x_x = 0;
+		}
+		else if (sigma_x_x < 0 && sigma_x_x < -epsSdp) {
+			throw new Error('negative volatility during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
+		}
+		
+		// Compute the volatility SQRT(x'*SIGMA*x)
+		var s_x = Math.sqrt(sigma_x_x);
+	   
+		// Return the computed volatility
+		return s_x;
+	}
+
 	
-	// Decode options
+	// Internal function to compute the solution x^*(lambda) to the minimization problem
+	// described in the second and sixth references, using a coordinate descent
+	// method.
+	//
+	// It returns the computed solution x^*(lambda).
+	function coordinatesDescentSolve(lambda, lowerBounds, upperBounds) {
+		// Initial point for the algorithm is an equal weight vector
+		var x = Matrix_.fill(nbAssets, 1, function(i,j) { return 1/nbAssets; });
+		var log_x = x.elemMap(function(i,j,val) { return Math.log(val);});
+		
+		// Placeholder for the previous x
+		var x_old = Matrix_.copy(x);
+
+		// Preparational computations
+		var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
+		var s_x = computeVolatility(x, sigma_x); // sigma(x)
+		
+		var rb_d_log_x = Matrix_.vectorDotProduct(rb, log_x); // Matrix_.vectorDotProduct(rb, log_x)
+		var obj_old = 0.5 * s_x - rb_d_log_x; // the objective function to be minimized, c.f. formula 3 of the second reference
+		
+		// Initialization of the coordinates sampler
+		var cs = new coordinatesSampler(nbAssets);
+		
+		// Main loop until convergence, guaranteed as per hypotheses on sigma and b
+		// in case of essentially cyclic coordinates sampling.
+		//
+		// To be noted that what is guaranteed is the convergence of
+		// the objective function values, c.f. the third reference, 
+		// so that the convergence criteria will be based on the objective function values.
+		//
+		// To also be noted that the convergence of the x_k sequence is not guaranteed 
+		// (the only guarantee is that all the cluster points of the x_k sequence 
+		// are minimizers of the objective function).
+		var cycle = 0;
+		while (true) {
+			// Check the exact number of cycles
+			if	(nbCycles != -1 && cycle == nbCycles) {
+				break;
+			}
+
+			// Check the maximum number of cycles
+			if (nbCycles == -1 && cycle >= maxCycles) {
+				throw new Error('maximum number of cycles reached: ' + maxCycles);
+			}
+
+			// Update the number of cycles
+			++cycle;
+
+
+			// Generate the coordinates to use in the next cycle of coordinates descent
+			cs.generateCoordinates();
+
+		   
+			// Perform one full cycle of coordinates descent
+			var obj_old_i
+			var obj_new_i;
+			while (true) {
+				// Generate the index of the current coordinate to optimize in 1D,
+				// in case such an index is remaining.
+				var i = cs.sampleCoordinate();
+				if (i == -1) {
+					break;
+				}
+
+				// In case the coordinate sampler is ACF, 
+				// compute the old value of the objective function
+				if (opt.coordinatesSampler === 'acf') {
+					obj_old_i = 0.5 * s_x - rb_d_log_x;
+				}
+				
+				
+				// Save the old asset weight before any update
+				var xi_old = x.data[i-1];
+				var log_xi_old = log_x.data[i-1];
+
+
+				// Define the coefficients of the second order polynomial (a*x_i)^2 + b*x_i + c_i, c.f. the second reference
+				var a = sigma.data[(i-1)*sigma.nbColumns + (i-1)]; // sigma_i^2, always > 0
+				var b = sigma_x.data[i-1] - x.data[i-1] * a; // (SIGMA*x)_i - x_i*sigma_i^2, might be any sign
+				var c = -lambda * rb.data[i-1] * s_x; // -lambda * b_i * sigma(x), always <= 0 (== 0 iff the covariance matrix is semi-definite positive and sigma(x) == 0)
+
+
+				// Extract the strictly positive root x_i^* of the equation (a*x_i)^2 + b*x_i + c = 0, using a stable numerical formula
+				var b_p = b/2; // reduced discriminant
+				var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
+				var disc = b_p*b_p - a*c;
+				if (disc < 0) {
+				   throw new Error('internal error: negative discriminant detected, the covariance matrix might not be semi-definite positive');
+				}
+				var q = -(b_p + sign_b_p * Math.sqrt(disc));
+				var r1 = q/a;
+				var r2 = c/q;
+				
+				var xi_star;
+				if (r1 > 0) {
+					xi_star = r1;
+				}
+				else if (r2 > 0) {
+					xi_star = r2;
+				}
+				else {
+					throw new Error('internal error: no strictly positive root detected, the covariance matrix might not be semi-definite positive');
+				}
+			   
+
+				// Possibly truncate the strictly positive root above in case min/max weights are provided
+				if (lowerBounds && xi_star < lowerBounds[i-1]) {
+					xi_star = lowerBounds[i-1];
+				}
+				if (upperBounds && xi_star > upperBounds[i-1]) {
+					xi_star = upperBounds[i-1];
+				}
+				
+				
+				// Update the asset weight
+				x.data[i-1] = xi_star;
+				
+				// Update the asset weight log value, and <rb / log(x)>
+				log_x.data[i-1] = Math.log(xi_star);
+				
+				rb_d_log_x -= log_xi_old * rb.data[i-1];
+				rb_d_log_x += log_x.data[i-1] * rb.data[i-1];
+
+
+				// Compute the updated SIGMA*x and SQRT(x'*SIGMA*x) elements for next loop evaluation.
+				//
+				// The update of the vector SIGMA*x uses the efficient update procedure described
+				// in the second reference, based on the fact that only one coordinate of the vector x
+				// changes per iteration.
+				//
+				// The update of the value x'*SIGMA*x does not use an "efficient" procedure,
+				// because it requires a dot product, which is then equivalent to the full recomputation
+				// of the volatility from SIGMA*x.
+
+				// Compute the updated SIGMA*x
+				for (var j = 1; j <= nbAssets; ++j) {
+					sigma_x.data[j-1] += sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_star;
+					sigma_x.data[j-1] -= sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_old;
+				}
+
+				// Compute the updated volatility SQRT(x'*SIGMA*x)
+				s_x = computeVolatility(x, sigma_x);
+				
+				
+				// In case the coordinate sampler is ACF:
+				// - Compute the new value of the objective function
+				// - Compute the gain for the current coordinate
+				// - Update the scheduling preference for the current coordinate index i,
+				//   or update the average gain
+				if (opt.coordinatesSampler === 'acf') {
+					// Compute the new value of the objective function
+					obj_new_i = 0.5 * s_x - rb_d_log_x;
+					
+					// Compute the gain for the current coordinate, with 
+					// gain = f(old) - f(new), from the code implementation of the fifth
+					// reference by their authors.
+					var gain = obj_old_i - obj_new_i;
+					
+					// If the cycle is the first one, update the average gain, and otherwise,
+					// update the scheduling preference for the current coordinate index i.
+					if (cycle == 1) {
+						cs.updateAverageGain(gain);
+					}
+					else {
+						cs.updateSchedulingPreference(i, gain);
+					}
+				}	
+			}
+
+		   
+			// Compute the updated value of the objective function
+			var obj_new = 0.5 * s_x - rb_d_log_x;
+
+
+			// Check the necessary and sufficient convergence condition: |obj* - obj| <= eps,
+			// unless an exact number of cycles is required.
+			if (nbCycles == -1 && Math.abs(obj_new - obj_old) <= eps) {
+				break;
+			}
+			
+			
+			// Prepare the next cycle:
+			// - Update the previous objective function value
+			obj_old = obj_new;
+		}
+		
+		// Return the computed solution
+		return x;
+	}
+	
+	
+	// Internal function to sample coordinates in a cyclic way.
+	//
+	// This is an essentially cyclic coordinates sampler, as
+	// defined in the third reference.
+	function cyclicCoordinatesSampler(n) {
+		// Initializations
+		this.n = n;
+		this.k = n;
+	   
+	   
+		// The sampling function, returning 1,2,...,n in this order,
+		// and -1 to indicate that the sampling is finished.
+		this.sampleCoordinate = function() {
+			if (this.k == this.n) {
+				return -1;
+			}
+			else {
+				return ++this.k;
+			}        
+		}
+		
+		
+		// The function generating the coordinates for one cycle
+		this.generateCoordinates = function() {
+			// Re-set the index
+			this.k = 0;
+		}
+	}
+
+	
+	// Internal function to sample coordinates in a randomly shuffled 
+	// cyclic way.
+	//
+	// This is an essentially cyclic coordinates sampler, as
+	// defined in the third reference.
+	function shuffledCyclicCoordinatesSampler(n) {
+		// Initializations
+		this.n = n;
+		this.k = n;
+		
+		// The coordinates set
+		this.r = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			this.r[i] = i+1;
+		}
+	   
+	   
+		// The sampling function, returning the elements this.r[0],...,this.r[n-1] in this order,
+		// and -1 to indicate that the sampling is finished.
+		this.sampleCoordinate = function() {
+			if (this.k == this.n) {
+				return -1;
+			}
+			else {
+				return this.r[this.k++];
+			}        
+		}
+		
+		
+		// The function generating the coordinates for one cycle
+		this.generateCoordinates = function() {
+			// Re-shuffle the coordinates
+			this.r = new randomPermutationsIterator_(undefined, this.r, true).next();
+			
+			// Re-set the index
+			this.k = 0;
+		}
+	}
+	
+
+	// Internal function to sample coordinates in a uniform random 
+	// way.
+	function randomizedCoordinatesSampler(n) {
+		// Initializations
+		this.n = n;
+		this.k = n;
+		
+		var p = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			p[i] = 1/n;
+		}
+		this.s = new aliasMethodSampler_(p);
+	   
+	   
+		// The sampling function, returning a coordinate chosen uniformly at random
+		// among the set {1,...,n}, and -1 to indicate that the sampling is finished
+		// after n samplings.
+		this.sampleCoordinate = function() {
+			if (this.k == this.n) {
+				return -1;
+			}
+			else {
+				++this.k;
+				return this.s.sample() + 1;
+			}        
+		}
+		
+		
+		// The function generating the coordinates for one cycle
+		this.generateCoordinates = function() {
+			// Re-set the index
+			this.k = 0;
+		}
+	}
+
+	
+	// Internal function to sample coordinates following the
+	// adaptive coordinate frequencies of the fifth reference.
+	//
+	// This is an essentially cyclic coordinates sampler, as
+	// defined in the third reference.
+	function adaptiveCoordinateFrequenciesSampler(n) {
+		// Initializations
+		this.n = n;
+		this.k = 0;
+		
+		// Initializations of the ACF strategy constants
+		this.change_rate = 1/5; // c in the fifth reference
+		this.p_min = 1/20;
+		this.p_max = 20;	
+		
+		// Placeholder for the coordinates set I, allocated with the
+		// maximum possible size of I which is 2n, c.f. the fifth reference.
+		this.idx_set_tmp = typeof Uint32Array === 'function' ? new Uint32Array(2*n) : new Array(2*n);
+
+		// The coordinates set I, null at initialization, which will contain 
+		// between n and 2n coordinates for a given cycle, c.f. fifth reference.
+		this.idx_set = null;
+		this.idx_set_len = 0;
+		
+		// The preferences for scheduling p_i, i=1..n
+		this.pref = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			this.pref[i] = 1;
+		}
+		this.prefsum = n; // sum p_i, i=1..n
+		
+		// The accumulators a_i, i=1..n
+		//
+		// Note: contrary to the fifth reference, the accumulators are not initialized to 0,
+		// but to 0.5, which is the value the authors of the fifth reference used in their 
+		// implementations.
+		this.acc = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			this.acc[i] = 0.5;
+		}
+			
+		// Variables for the self-adaptation of the performances monitoring
+		this.gain_learning_rate = 1/n;
+		this.average_gain = 0;
+
+		
+		// The sampling function, returning the elements this.r[0],...,this.r[n-1] in this order,
+		// and -1 to indicate that the sampling is finished.
+		this.sampleCoordinate = function() {
+			if (this.k == this.idx_set_len) {
+				return -1;
+			}
+			else {
+				return this.idx_set[this.k++];
+			}        
+		}
+		
+		
+		// The function generating the coordinates for one cycle
+		this.generateCoordinates = function() {
+			// Re-set the index
+			this.k = 0;
+			
+			// Re-compute the index set
+			this.idx_set_len = 0;
+			var q = this.n / this.prefsum;
+			for (var i = 0; i < this.n; ++i) {
+				var a_i = this.acc[i] + q * this.pref[i];
+				var a_i_f = Math.floor(a_i);
+				
+				for (var j = 0; j < a_i_f; ++j) {
+					this.idx_set_tmp[this.idx_set_len] = i + 1;
+					this.idx_set_len++;
+				}
+				
+				this.acc[i] = a_i - a_i_f;
+			}
+		
+			// Shuffle the index set
+			this.idx_set = new randomPermutationsIterator_(undefined, this.idx_set_tmp.slice(0, this.idx_set_len), true).next();
+		}
+		
+		
+		//
+		this.updateSchedulingPreference = function(i, gain) {
+			// Compute the new scheduling preference for index i
+			var p_new = this.pref[i-1] * Math.exp(this.change_rate * (gain / this.average_gain - 1));
+			
+			// Truncate the new scheduling preference for index i, if required
+			if (p_new < this.p_min) {
+				p_new = this.p_min;
+			}
+			else if (p_new > this.p_max) {
+				p_new = this.p_max;
+			}
+			
+			// Update the scheduling preference for index i
+			this.prefsum = this.prefsum + p_new - this.pref[i-1];
+			this.pref[i-1] = p_new;
+			
+			// Update the average gain
+			this.average_gain = (1 - this.gain_learning_rate) * this.average_gain + this.gain_learning_rate * gain;
+		}
+		
+		
+		//
+		this.updateAverageGain = function(gain) {
+			this.average_gain += gain / this.n;
+		}
+	}
+	
+	// ------
+
+	// Initialize the options structure
 	if (opt === undefined) {
 		opt = {};
 	}
-	var eps = opt.eps || 1e-8;
-	var maxIterations = opt.maxIter || 10000;
-	var outputPortfolioVolatility = false || opt.outputPortfolioVolatility; 
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
 	
+	// Initialize the options default values
+	if (opt.eps === undefined) {
+		opt.eps = 1e-10;
+	}
+	if (opt.epsSdp === undefined) {
+		opt.epsSdp = 1e-12;
+	}
+	if (opt.maxCycles === undefined) {
+		opt.maxCycles = 10000;
+	}
+	if (opt.nbCycles === undefined) {
+		opt.nbCycles = -1;
+	}
+	if (opt.outputPortfolioVolatility === undefined) {
+		opt.outputPortfolioVolatility = false;
+	}
+	if (opt.coordinatesSampler === undefined) {
+		opt.coordinatesSampler = 'cyclic';
+	}
+	
+	// Decode the options
+	var eps = opt.eps;
+	var epsSdp = opt.epsSdp;
+	var maxCycles = opt.maxCycles;
+	var nbCycles = opt.nbCycles;
+	
+	var outputPortfolioVolatility = opt.outputPortfolioVolatility; 
+	
+	var coordinatesSampler;
+	if (opt.coordinatesSampler === 'cyclic') {
+		coordinatesSampler = cyclicCoordinatesSampler;
+	}
+	else if (opt.coordinatesSampler === 'shuffledCyclic') {
+		coordinatesSampler = shuffledCyclicCoordinatesSampler;
+	}	
+	else if (opt.coordinatesSampler === 'randomized') {
+		coordinatesSampler = randomizedCoordinatesSampler;
+	}
+	else if (opt.coordinatesSampler === 'acf') {
+		coordinatesSampler = adaptiveCoordinateFrequenciesSampler;
+	}
+	else {
+		throw new Error('unsupported coordinates sampler');
+	}
+	
+	// Decode the lower/upper bounds constraints, if provided
+	var lowerBounds = null;
+	var upperBounds = null;
+	if (opt.constraints.minWeights) {
+		lowerBounds = opt.constraints.minWeights; // no input checks
+		
+		if (!opt.constraints.maxWeights) {
+			upperBounds = typeof Float64Array === 'function' ? new Float64Array(opt.constraints.minWeights.length) : new Array(opt.constraints.minWeights.length);
+			
+			// Initialization to an array of ones
+			for (var i = 0; i < upperBounds.length; ++i) {
+				upperBounds[i] = 1;
+			}
+		}
+	}
+	if (opt.constraints.maxWeights) {
+		upperBounds = opt.constraints.maxWeights; // no input checks
+		
+		if (!opt.constraints.minWeights) {
+			lowerBounds = typeof Float64Array === 'function' ? new Float64Array(opt.constraints.maxWeights.length) : new Array(opt.constraints.maxWeights.length);
+
+			// Initialization to an array of zeros
+			for (var i = 0; i < lowerBounds.length; ++i) {
+				lowerBounds[i] = 0;
+			}
+		}
+	}
+
+
 	// Convert sigma to matrix format
 	var sigma = new Matrix_(sigma);
 	
@@ -14456,135 +15649,71 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 
 	// ------
 
+	// Initializations
 	var nbAssets = sigma.nbRows;
 	
 	
 	// ------
 	
-	// Initial point for the algorithm is an equal weight vector
-	var x = Matrix_.fill(nbAssets, 1, function(i,j) { return 1/nbAssets; });
 	
-	// Preparational computations
-	var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
-	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
-	var obj = 0.5 * s_x - Matrix_.vectorDotProduct(rb, x.elemMap(function(i,j,val) { return Math.log(val);})); // the objective function to be minimized, c.f. formula 3 of the second reference
+	// Compute the weights of the unconstrained risk budgeting portfolio, which
+	// are needed even in case weights constraints are provided.
+	//
+	// This is done using any value of the lambda penalty parameter (below, 1)
+	// and then normalizing the computed weights, c.f. the second reference.
+	var lambda = 1;
+	var weightsURb = coordinatesDescentSolve(lambda);
+	weightsURb = weightsURb.normalize();
 	
-	// Main loop until convergence, guaranteed as per hypotheses on sigma and b
-	var iter = 0;
-	var converged = false;
-	while (!converged) {
-        // Convergence condition is false if any of the coordinate-wise convergence condition is false
-    	converged = true;
-    	
-    	for (var i = 1; i <= nbAssets; ++i) {
-			// Save the old asset weight i before any update
-			var xi_old = x.data[i-1];
+	
+	// In case weights constraints are provided, the associated restricted simplex is first  
+	// checked for emptiness, and the bisection algorithm described in the sixth reference is 
+	// then used to compute the weights of the constrained risk budgeting portfolio.
+	//
+	// Otherwise, there is nothing else to do.
+	var x;
+	if (lowerBounds || upperBounds) {
+		// In case the restricted simplex is empty, an exception is thrown, so that
+		// the process is (violently) stopped here.
+		var sumBounds = simplexEmptinessCheck_(nbAssets, lowerBounds, upperBounds);
+		
 
-			
-			// Define the coefficients of the second order polynomial ax_i^2 + b_ix + c_i, c.f. the second reference
-    	    var a = sigma.data[(i-1)*sigma.nbColumns + (i-1)]; // sigma_i^2, always > 0
-    	    var b = sigma_x.data[i-1] - x.data[i-1] * a; // (SIGMA*x)_i - x_i*sigma_i^2, might be any sign
-    	    var c = -rb.data[i-1] * s_x; // -b_i * sigma(x), always <= 0 (== 0 iff the covariance matrix is semi-definite positive and sigma(x) == 0)
-
-			
-    	    // Extract the strictly positive root x_i^* of the equation ax_i^2 + bx_i + c = 0, using a stable numerical formula
-    	    var b_p = b/2; // reduced discriminant
-			var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
-			var disc = b_p*b_p - a*c;
-			if (disc < 0) {
-			    throw new Error('Negative discriminant during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
-			}
-    	    var q = -(b_p + sign_b_p * Math.sqrt(disc));
-    	    var r1 = q/a;
-    	    var r2 = c/q;
-    	    var xi_star = r1 > 0 ? r1 : r2;
-    	    
-			
-			// Update the asset weight i
-			x.data[i-1] = xi_star;
-    	    
-			
-    	    // Compute the updated SIGMA*x and x'*SIGMA*x elements for convergence condition evaluation,
-			// and next loop evaluation.
-			//
-			// The update of the vector SIGMA*x uses the efficient update procedure described 
-			// in the second reference, based on the fact that only one coordinate of the vector x
-			// changes per iteration.
-			//
-			// To be noted that the update of the value x'*SIGMA*x does not use this procedure, 
-			// because it requires a dot product, which is then equivalent to the full recomputation
-			// of the volatility from SIGMA*x.
-			
-			// Compute the updated SIGMA*x
-			for (var j = 1; j <= nbAssets; ++j) {
-				sigma_x.data[j-1] += sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_star;
-				sigma_x.data[j-1] -= sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_old;
-			}
-			
-			// Compute the updated x'*SIGMA*x
-			var sigma_x_x = Matrix_.vectorDotProduct(sigma_x, x);		
-			
-			// In case the variance is numerically negative zero, which can occur with 
-			// a semi-positive definite covariance matrice, it is replaced with zero
-			if (sigma_x_x < 0) {
-				if (-sigma_x_x < eps_tol) {
-					sigma_x_x = 0;
-				}
-				else {
-					throw new Error('Negative volatility during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
-				}
-			}
-			
-			// Compute the updated volatility SQRT(x'*SIGMA*x)
-			s_x = Math.sqrt(sigma_x_x);
-
-			
-    	    // Update the convergence condition: |RC_i* - b_i| <= eps, i = 1..nbAssets,
-			// used in case the risk contributions are properly defined (i.e., a strictly
-			// positive portfolio volatility).
-			if (s_x != 0) {
-				var rci_star = x.data[i-1] * sigma_x.data[i-1] / s_x;
-
-				if (Math.abs(rci_star - rb.data[i-1]) > eps) {
-					converged = false;
-				}
-			}
-		}
-
-		// Update the generic convergence condition: |obj - obj*| <= eps,
-		// used in all cases
-		var obj_star = 0.5 * s_x - Matrix_.vectorDotProduct(rb, x.elemMap(function(i,j,val) { return Math.log(val);}));		
-		if (Math.abs(obj_star - obj) > eps) {
-			converged = false;
-			obj = obj_star;
-		}
-
-
-		// Update the number of iterations
-		++iter;
-
-
-		// Check the number of iterations
-		if (iter > maxIterations) {
-			throw new Error('maximum number of iterations reached: ' + maxIterations);
-		}
+		// Compute the initial interval for the bisection algorithm,
+		// c.f. remark 7 of the sixth reference.
+		var volURb = computeVolatility(weightsURb, Matrix_.xy(sigma, weightsURb));
+		var a = 0.5 * volURb;
+		var b = 2 * volURb;
+		
+		
+		// Compute the value of the penalty parameter lambda^* such that
+		// sum x(lambda^*)_i = 1, i=1..nbAssets, using the bisection algorithm.
+		var lambda_star = bisection_(function (lambda) { 
+						 		         var weights = coordinatesDescentSolve(lambda, lowerBounds, upperBounds); 
+								         return weights.sum() - 1; 
+							         }, 
+							         a, b);
+		
+		
+		// Compute the associated portfolio weights
+		x = coordinatesDescentSolve(lambda_star, lowerBounds, upperBounds);
+		
+	}
+	else {
+		// The solution to the unconstrained risk budgeting optimization problem
+		// has already been computed.
+		x = weightsURb;
 	}
 
-	// Normalize the computed weights, and compute the normalization constant
-	var sum_x = x.sum();
-	x = x.normalize(x);
 
-	// Depending on what is requested in output, return the computed normalized weights
+	// Depending on what is requested in output, return the computed portfolio weights
 	// and possibly the associated portfolio volatility.
 	if (outputPortfolioVolatility === true) {
-		return [x.toArray(), s_x/sum_x];
+		return [x.toArray(), computeVolatility(x, Matrix_.xy(sigma, x))];
 	}
 	else {
 		return x.toArray();
 	}
 }
-
-
 /**
 * @file Functions related to (rational) rounding of floating-point portfolio weights.
 * @author Roman Rubsamen <roman.rubsamen@gmail.com>

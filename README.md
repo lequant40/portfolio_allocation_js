@@ -4,9 +4,9 @@
 
 PortfolioAllocation is a JavaScript library designed to help constructing financial portfolios made of several assets: bonds, commodities, cryptocurrencies, currencies, exchange traded funds (ETFs), mutual funds, stocks...
 
-When constructing such portfolios, one of the main problem faced by the portfolio manager is to determine the proportion of the different assets to hold.
+When constructing such portfolios, one of the main problem faced is to determine the proportion of the different assets to hold.
 
-PortfolioAllocation allows to solve this problem using mathematical optimization algorithms.
+PortfolioAllocation solves this problem using mathematical optimization algorithms.
 
 Do not hesitate to report any bug / request additional features !
 
@@ -27,8 +27,8 @@ Do not hesitate to report any bug / request additional features !
 
 ***Note: Examples of how to integrate PortfolioAllocation in Google Sheets are provided in [this spreadsheet](https://docs.google.com/spreadsheets/d/1ScrwSjr9EgwXfRyPN4IaqVxZvDnqw-hWvVQcJ9Ak590).***
 
-First, you need to make the PortfolioAllocation functions available in your spreadsheet script:
-- *(Recommended)* [Import the external Google Apps Script library](https://developers.google.com/apps-script/guide_libraries) with Script ID **1cTTAt3VZRZKptyhXtjF3EK-jKagdTUl6t29Pc7YidrC5m5ABR6LUy8sC**
+First, make the PortfolioAllocation functions available in your spreadsheet script:
+- *(Recommended)* Import PortfolioAllocation as any other [external Google Apps Script library](https://developers.google.com/apps-script/guide_libraries), using the Script ID ***1cTTAt3VZRZKptyhXtjF3EK-jKagdTUl6t29Pc7YidrC5m5ABR6LUy8sC***
 - *(Alternative)* Copy/paste the JavaScript files from the [dist/gs directory](https://github.com/lequant40/portfolio_allocation_js/tree/master/dist/gs)
 
 Then, you can call these functions your preferred way in your spreadsheet script.
@@ -48,11 +48,11 @@ function computeERCPortfolioWeights(covarianceMatrix) {
 
 ### Usage in a browser
 
-First, you need to download PortfolioAllocation [source file](http://raw.github.com/lequant40/portfolio_allocation_js/master/dist/portfolio_allocation.dist.js) or [minified source file](http://raw.github.com/lequant40/portfolio_allocation_js/master/dist/portfolio_allocation.dist.min.js).
+***Note: PortfolioAllocation is delivered through the CDN [jsDelivr](https://www.jsdelivr.com/), at [this URL](https://cdn.jsdelivr.net/npm/portfolio-allocation/dist/portfolio_allocation.dist.min.js).***
 
-Then, you need to reference this file in an HTML page so that you can use it:
+Reference PortfolioAllocation minified source file in an HTML page, and you are done:
 ```html
-<script src="portfolio_allocation.dist.min.js" type="text/javascript"></script>
+<script src="https://cdn.jsdelivr.net/npm/portfolio-allocation/dist/portfolio_allocation.dist.min.js" type="text/javascript"></script>
 <script type="text/javascript">
   var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75]);
 </script>
@@ -62,7 +62,7 @@ Then, you need to reference this file in an HTML page so that you can use it:
 
 ***Note: PortfolioAllocation is delivered as the [npm](https://www.npmjs.com/) package [portfolio-allocation](https://www.npmjs.com/package/portfolio-allocation).***
 
-First, [declare PortfolioAllocation as a dependency in your project's `package.json` file](https://docs.npmjs.com/specifying-dependencies-and-devdependencies-in-a-package-json-file) using the package name **portfolio-allocation**.
+First, [declare PortfolioAllocation as a dependency in your project's `package.json` file](https://docs.npmjs.com/specifying-dependencies-and-devdependencies-in-a-package-json-file), using the package name ***portfolio-allocation***.
 
 Then, this is standard Node.js:
 
@@ -83,7 +83,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
   Described by Raul Leote de Carvalho and al. in the research paper [Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description](https://doi.org/10.3905/jpm.2012.38.3.056).
 
 - Equal risk contributions (ERC) and risk budgeting (RB)  
-  Extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers ([The properties of equally weighted risk contribution portfolios](https://doi.org/10.3905/jpm.2010.36.4.060), [Managing Risk Exposures Using the Risk Budgeting Approach](https://ssrn.com/abstract=2009778)...).
+  Extensively studied by [Thierry Roncalli](http://www.thierry-roncalli.com/) and al in misc. research papers ([The properties of equally weighted risk contribution portfolios](https://doi.org/10.3905/jpm.2010.36.4.060), [Managing Risk Exposures Using the Risk Budgeting Approach](https://ssrn.com/abstract=2009778), [Constrained Risk Budgeting Portfolios](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=3331184)...).
 
 - Equal risk bounding (ERB)  
   Described in the research paper [Equal Risk Bounding is better than Risk Parity for portfolio selection](https://doi.org/10.1007/s10898-016-0477-6) by Francesco Cesarone and Fabio Tardella, the ERB portfolio is an ERC portfolio possibly not containing all the assets in the considered universe.
@@ -126,17 +126,20 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 
   
 ### Misc. other algorithms
-- Portfolio weights rounding  
+- Portfolio weights rounding   
   The theoretical weights obtained through a portfolio optimization algorithm usually need to be rounded off, which can be done thanks to the algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al..
 
 - Mean-variance efficient frontier and corner portfolios computation  
   The set of all mean-variance efficient portfolios (the mean-variance efficient frontier), as well as its generating discrete set (the set of corner portfolios) can be efficiently computed thanks to a specialized algorithm developed by Harry M. Markowitz: [the critical line method](https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm).
 
-- Generic random subspace optimization method  
-  A direct extension of the RSO-MVO method, which allows to use the random subspace optimization method with any portfolio optimization method.
+- Generic random subspace optimization   
+  A direct extension of the RSO-MVO method, allowing to use the random subspace optimization method with any portfolio optimization method.
 
-- Generic numerical optimization algorithms  
-  When no specialized numerical algorithm exist to solve a particular portfolio optimization problem, a slow-but-always-working solution is to use generic numerical optimization algorithms instead (e.g., grid search on the simplex).
+- Generic numerical optimization  
+  When no specialized numerical algorithm exist to solve a particular portfolio optimization problem, a workaround is to use generic numerical optimization algorithms instead (e.g., grid search on the simplex).
+
+- [ON-GOING WITH v0.0.9] Random correlation and covariance matrices generation  
+  Assets correlation and covariance matrices are used as inputs in several portfolio allocation algorithms, so that the capability to randomly generate them is a plus.
 
 
 ## Documentation

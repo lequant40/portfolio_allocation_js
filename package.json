@@ -26,7 +26,8 @@
     "grunt-contrib-qunit": "^3.1.0",
     "grunt-contrib-uglify": "^4.0.1",
     "grunt-replace": "^1.0.1",
-    "grunt-strip-code": "^1.0.6"
+    "grunt-strip-code": "^1.0.6",
+    "grunt-stripcomments": "^0.7.2"
   },
   "bugs": {
     "url": "https://github.com/lequant40/portfolio_allocation_js/issues"
@@ -35,7 +36,5 @@
   "scripts": {
     "test": "grunt test"
   },
-  "dependencies": {
-    
-  }
+  "dependencies": {}
 }

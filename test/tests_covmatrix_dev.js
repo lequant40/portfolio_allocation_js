@@ -13,18 +13,28 @@ QUnit.test('Covariance matrix native creation', function(assert) {
 	  var matCov = mat.toCovarianceMatrix();
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(mat,matCov), true, 'Covariances matrices must be equal');
 	  assert.equal(typeof matCov.getCorrelationMatrix == 'function' &&
-				   typeof matCov.getVariancesVector == 'function' &&
+				   typeof matCov.getVariances == 'function' &&
 				   typeof matCov.standardizedGeneralizedVariance == 'function', true, 'Covariances matrices methods added');
   }
   
 });
 
 
-QUnit.test('Covariance matrix sgv', function(assert) {    
-  // Move to DIST
-  // Test using static data  
-  var mat = new PortfolioAllocation.Matrix([[0.01, 0.016, 0, 0], [0.016, 0.04, 0, 0], [0, 0, 0.09, -0.06], [0, 0, -0.06, 0.16]]).toCovarianceMatrix();
-  assert.equal(mat.standardizedGeneralizedVariance(), Math.pow(mat.determinant(), 1/4), true, 'Sgv computation');
-  
-    // TODO: Test using formula and random data
+QUnit.test('Covariance matrix functions', function(assert) {    
+  // Test using static data
+  {
+	  var mat = new PortfolioAllocation.Matrix([[1, 1, 8.1], [1, 16, 18], [8.1, 18, 81]]).toCovarianceMatrix();
+
+	  // Test correlation matrix extraction
+	  var expectedCorrMat = new PortfolioAllocation.Matrix([[1, 0.25, 0.9], [0.25, 1, 0.5], [0.9, 0.5, 1]]);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getCorrelationMatrix(), expectedCorrMat, 1e-14), true, 'Covariance matrix functions - Correlation matrix extraction');
+	  
+	  // Test variances vector extraction
+	  var expectedVarianceMat = new PortfolioAllocation.Matrix([1, 16, 81]);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getVariances(), expectedVarianceMat, 1e-14), true, 'Covariance matrix functions - Variances vector extraction');
+	  
+	  // Test standard deviations vector extraction
+	  var expectedStdDevMat = new PortfolioAllocation.Matrix([1, 4, 9]);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getStandardDeviations(), expectedStdDevMat, 1e-14), true, 'Covariance matrix functions - Standard deviations vector extraction');
+  }
 });
