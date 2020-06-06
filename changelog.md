@@ -12,7 +12,7 @@
 - Added a method to generate random normal numbers, with positive support (i.e., truncated to R^+)
 - Added a method to generate random covariance matrices
 - Added a method to test if a matrix is symmetric
-- 
+- Fixed bug https://github.com/lequant40/portfolio_allocation_js/issues/6 related to MVO optimization (corner portfolios computation)
 
 ### 0.0.8 - 16/04/2020
 - Introduced a function simplexEmptinessCheck_ to avoid copy/pasting feasibility checks on the restricted simplex everywhere
