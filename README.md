@@ -1,4 +1,4 @@
-# PortfolioAllocation v0.0.8 ([Changelog](changelog.md))
+# PortfolioAllocation v0.0.9 ([Changelog](changelog.md))
 
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 
@@ -125,16 +125,16 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 
   
 ### Misc. other algorithms
-- [ON-GOING WITH v0.0.9] Post-processing of numerical portfolio weights   
+- Post-processing of numerical portfolio weights   
   The weights obtained through a portfolio optimization algorithm (e.g. w = 0.123456789) need in practice to be either rounded off (e.g. w = 0.12) or converted into an integer number of shares (e.g. q = 10 shares, or q = 2 lots of 100 shares).
 
 - Computation of the mean-variance efficient frontier   
   The continuous set of all mean-variance efficient portfolios (the mean-variance efficient frontier) as well as its generating discrete set (the set of corner portfolios) can both be efficiently computed thanks to a specialized algorithm developed by Harry M. Markowitz: [the critical line method](https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm).
 
-- [ON-GOING WITH v0.0.9] Computation of the nearest portfolio on the mean-variance efficient frontier    
+- Computation of the nearest portfolio on the mean-variance efficient frontier    
   Thanks to the Markowitz's critical line method, it is possible to compute the nearest mean-variance efficient portfolio of any given portfolio.
 
-- [ON-GOING WITH v0.0.9] Generation of perturbed mean vectors   
+- Generation of perturbed mean vectors   
   As demonstrated in [The effect of errors in means, variances, and covariances on optimal portfolio choice](https://jpm.pm-research.com/content/19/2/6), the impact of estimation errors in expected returns on the output of a portfolio optimization algorithm can be significant, so that it is useful to have an algorithm to perturb mean vectors for portfolio weights sensitivity analysis.
 
 - Generic random subspace optimization   
@@ -143,10 +143,10 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 - Generic numerical optimization   
   When no specialized algorithm exist to solve a particular portfolio optimization problem, it is always possible to use a generic numerical optimization algorithm (e.g., grid search on the simplex).
 
-- [ON-GOING WITH v0.0.9] Random generation of mean vectors, variances and correlation matrices   
+- Random generation of mean vectors, variances and correlation matrices   
   When implementing portfolio optimization algorithms, the capability to generate random mean vectors, random variances and random correlation matrices can be of great help.
 
-- [ON-GOING WITH v0.0.9] Computation of shrinkage estimators for mean vectors and covariance matrices   
+- Computation of shrinkage estimators for mean vectors and covariance matrices   
   Shrinkage estimators for mean vectors can help to reduce the estimation errors in expected returns as observed in DeMiguel et al. [Size Matters: Optimal Calibration of Shrinkage Estimators for Portfolio Selection](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1891847), and shrinkage estimators for covariance matrices like Ledoit-Wolf's [A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices](http://www.ledoit.net/ole1_abstract.htm) provide an elegant solution to the problem of the ill-conditioning and non-invertibility of sample covariance matrices.
 
 

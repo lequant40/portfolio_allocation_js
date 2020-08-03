@@ -1,4 +1,4 @@
-### 0.0.9 - XX/08/2020
+### 0.0.9 - 03/08/2020
 - Removed comments from the generated Google Sheet script using a new grunt plugin
 - Added a method to extract the columns of a matrix
 - Added a method to generate random normal numbers, using the inverse method
