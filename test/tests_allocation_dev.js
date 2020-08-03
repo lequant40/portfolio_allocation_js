@@ -5,6 +5,7 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 	// Used for compatibility purposes with old JavaScript engines
 	function cornerPortfoliosToArray(cornerPortfolio) {
 		for (var i = 0; i < cornerPortfolio.length; ++i) {
+			// WeightscornerPortfolio
 			cornerPortfolio[i][0] = cornerPortfolio[i][0].toArray();
 		}
 		
@@ -47,13 +48,36 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 	}
 	
 	// Test using static data
+	// Test limit cases for determining the critical line algorithm starting portfolio:
+	{
+		// Lower bounds binding (sum lb_i == 1)
+		var cornerPortfolios = PortfolioAllocation.computeCornerPortfolios_(new PortfolioAllocation.Matrix([0.1, 0.2]), 
+		                                                                    new PortfolioAllocation.Matrix([[1,0],[0,1]]), 
+																			{ constraints: {minWeights: [0.4, 0.6]} });
+		assert.deepEqual(cornerPortfoliosToArray(cornerPortfolios), [[[0.4, 0.6],  0]], 'Mean variance portfolio - Corner portfolios, lower bounds binding');
+		
+		// Upper bounds binding (sum ub_i == 1)
+		var cornerPortfolios = PortfolioAllocation.computeCornerPortfolios_(new PortfolioAllocation.Matrix([0.1, 0.2]), 
+		                                                                    new PortfolioAllocation.Matrix([[1,0],[0,1]]), 
+																			{ constraints: {maxWeights: [0.6, 0.4]} });
+		assert.deepEqual(cornerPortfoliosToArray(cornerPortfolios), [[[0.6, 0.4],  0]], 'Mean variance portfolio - Corner portfolios, upper bounds binding');
+	}
+	
+	// Test using static data
 	// Reference: https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm
-	// Note: this test also allows checking that numerically equal corner portfolios are filtered out by the algorithm
+	//
+	// Note: this test also allows checking that numerically equal corner portfolios are NOT filtered out by the algorithm,
+	// c.f. note: "over the range of risk tolerances from 22.30 to 22.94 the optimal composition remains the same. This is
+    // not a rounding error. Since the efficient frontier is piecewise quadratic, there is always the possibility that there 
+	// is a kink at the point corresponding to a specific level of risk and return. In such a case indifference curves with different 
+	// slopes (risk tolerances) can be tangent to the efficient frontier at the same point, giving the same optimal portfolio."
 	{
 		var expectedCornerPortfolios = [[[0.2, 0.30000000000000004, 0.5], 20.898844444444443], 
+		                                [[0.2,0.5,0.3000000000000001],11.470044444444447],
 										[[0.2, 0.5, 0.30000000000000004], 11.1475], 
 										[[0.22180737780348653, 0.5, 0.27819262219651353], 10.51088812347172],
 										[[0.451915610952186, 0.348084389047814, 0.2], 7.55192170004087],
+										[[0.5, 0.30000000000000004, 0.2], 6.8672],
 										[[0.5, 0.2999999999999999, 0.2], 0]];
 		
 		var covMat = new PortfolioAllocation.Matrix([[1, 2.96, 2.31],
@@ -66,7 +90,7 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 	}
 		
 	// Test using static data
-	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII "The computing procedure"
+	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII, section "The computing procedure"
 	{
 		var expectedCornerPortfolios = [[[0, 1, 0], 4.16666666666667], 
 										[[0, 0.22496808316614988, 0.7750319168338501], 0.1408064320019454], 
@@ -145,6 +169,45 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 		var cornerPortfolios = PortfolioAllocation.computeCornerPortfolios_(returns, covMat);
 		assert.deepEqual(cornerPortfoliosToArray(cornerPortfolios), expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #5');
 	}
+	
+	// Test using static data in order to fix bug https://github.com/lequant40/portfolio_allocation_js/issues/6
+	// The covariance matrix here has a determinant ~1e-22, and condition number ~5e6
+	{
+		// Problem data
+		var covMat = [[0.04902254557, 0.04255604021, 0.04501327517, 0.04330779376, 0.03019691712, 0.02548665503, -0.01073017105, -0.0004006905689],
+					[0.04682328959, 0.04455486658, 0.03786639547, 0.03747189194, 0.02769367774, 0.02256710184, -0.007460602423, -0.000360821725],
+					[0.04501327517, 0.03441543433, 0.05846027012, 0.04801847343, 0.02887413717, 0.02797183226, -0.01440997349, -0.0003895354954],
+					[0.04330779376, 0.03405688396, 0.04801847343, 0.04558680387, 0.03111517718, 0.02477230838, -0.01272882784, -0.0003624611328],
+					[0.03019691712, 0.02516980916, 0.02887413717, 0.03111517718, 0.02614411029, 0.01475643353, -0.008794983792, -0.0002160623154],
+					[0.02548665503, 0.02051044473, 0.02797183226, 0.02477230838, 0.01475643353, 0.01618991115, -0.006014483461, -0.0002507995642],
+					[-0.01073017105, -0.006780679005, -0.01440997349, -0.01272882784, -0.008794983792, -0.006014483461, 0.005138124692, 0.00007878547574],
+					[-0.0004006905689, -0.0003279381686, -0.0003895354954, -0.0003624611328, -0.0002160623154, -0.0002507995642, 0.00007878547574, 0.000007405024165]];
+		var returns = [0.01807438883, 0.03238795043, 0.007555801824, 0.007427269126, 0.009034317809, 0.006707731718, 0.007769863126, 0.0007622417915];
+		
+		var minWeights = [0, 0, 0, 0, 0, 0, 0, 0];
+		var maxWeights = [0.25, 0.25, 0.25, 0.25, 0.25, 0.25, 1, 1];
+		
+		var expectedCornerPortfolios = [[[0.0008860751090370526, 0, 0, 0.003345695950238685, 0.00007663523943489258, 0.012841518880073127, 0.01192011965466721, 0.97092995516609], 0],
+										[[0.0010092608916674394, 0, 0, 0.004008702066904519, 0.00033764763422769743, 0.012496184295674449, 0.01453557759610034, 0.9676126275149418],  0.00046956768316411246], 
+										[[0.0017655557593660093, 0, 0.008931031081884725, 0, 0.008263675566746306, 0.0063916733651148624, 0.04309168778365437, 0.9315563764426312], 0.0041508392817256245], 
+										[[0.0012756123767303507, 0, 0.0032588378760465275, 0, 0.004072943929600115, 0.012021095630643686, 0.02160446204652544, 0.957767048138976], 0.0014586035429539558], 
+										[[0, 0.004345917988265768, 0.006849418265594814, 0, 0.004007054238260629, 0.005038387387097269, 0.0284123197082556, 0.9513469024125258], 0.002851415009160898],
+										[[0, 0.007621949314523461, 0.01148109322047808, 0, 0.00653096875456001, 0, 0.04935684701395931, 0.9250091416964791], 0.006507814480398172],
+										[[0, 0.061938538867079784, 0.10166770263898256, 0, 0.11119983640121779, 0, 0.7251939220927198, 0],  0.12699435118749036],
+										[[0, 0.25, 0.0405985104054761, 0, 0.009674272143084611, 0, 0.6997272174514392, 0], 0.2637718357009199],
+										[[0, 0.25, 0.03158049051256315, 0, 0.023733980661979903, 0, 0.6946855288254571, 0], 0.39912101396530497],
+										[[0.046211968331688, 0.25, 0.008523783192019019, 0, -2.7755575615628914e-17, 0, 0.6952642484762929, 0], 0.44342871837702696],
+										[[0.05663429563220421, 0.25, 0, 0, -2.7755575615628914e-17, 0, 0.6933657043677959, 0], 0.4576339467556026],
+										[[0.25, 0.25, 0, 0, -2.7755575615628914e-17, 0, 0.5, 0], 1.8766716337311202],
+										[[0.25,0.25,0,0,-2.7755575615628914e-17,0,0.5,0], 8.899361909160644],
+										[[0.25, 0.25, 0, 0, 0.25, 0, 0.25, 0], 18.562065370001065]].reverse();
+						
+		// Test that the algorithm is behaving properly
+		var cornerPortfolios = PortfolioAllocation.computeCornerPortfolios_(new PortfolioAllocation.Matrix(returns), 
+		                                                                    new PortfolioAllocation.Matrix(covMat), 
+																			{ constraints: { minWeights: minWeights, maxWeights: maxWeights }});
+		assert.deepEqual(cornerPortfoliosToArray(cornerPortfolios), expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #6');
+	}
 });
 
 
@@ -167,12 +230,13 @@ QUnit.test('Mean variance portfolio - internal target return weights portfolio',
 		var targetReturn = generateRandomValue(minReturn, maxReturn);
 		
 		// Compute the associated portfolio weights
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {  optimizationMethod: 'targetReturn', constraints: {return: targetReturn}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {  constraints: {return: targetReturn}});
 		
 		// Compare the computed portfolio return with the target return
 		var portfolioReturn = PortfolioAllocation.Matrix.vectorDotProduct(new PortfolioAllocation.Matrix(returns), new PortfolioAllocation.Matrix(weights));
 		assert.equal(Math.abs(portfolioReturn - targetReturn) <= 1e-8, true, 'Mean variance portfolio - internal target return weights portfolio #1');
 	}
+	
 });	
 
 
@@ -195,7 +259,7 @@ QUnit.test('Mean variance portfolio - internal target volatility weights portfol
 		var targetVolatility = generateRandomValue(minVolatility, maxVolatility);
 		
 		// Compute the associated portfolio weights
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {  optimizationMethod: 'targetVolatility', constraints: {volatility: targetVolatility}});
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {  constraints: {volatility: targetVolatility}});
 		
 		// Compare the computed portfolio volatility with the target volatility
 		var portfolioVolatility = Math.sqrt(PortfolioAllocation.Matrix.vectorDotProduct(PortfolioAllocation.Matrix.xy(new PortfolioAllocation.Matrix(covMat), new PortfolioAllocation.Matrix(weights)), 
@@ -224,10 +288,10 @@ QUnit.test('Random subspace mean variance portfolio - internal target max volati
 		var targetMaxVolatility = generateRandomValue(minVolatility, maxVolatility);
 		
 		// Compute the associated portfolio weights
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetPortfolioOptimizationMethodParams: { 
-		                                                                                                      optimizationMethod: 'maximumTargetVolatility', 
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsMeanVarianceOptimizationOpt: { 
 																											  constraints: {
-																												  maxVolatility: targetMaxVolatility 
+																												  fullInvestment: false,
+																												  maxVolatility: targetMaxVolatility
 																											  }
 		                                                                                                    }} );
 		
@@ -324,4 +388,5 @@ QUnit.test('Random weights portfolio - internal tests requiring access to intern
 	  }
 	}
 });
+
 

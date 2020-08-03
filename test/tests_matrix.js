@@ -526,6 +526,17 @@ QUnit.test('Determinant computation', function(assert) {
 });
 
 
+QUnit.test('Trace computation', function(assert) {    
+  // Test using static data  
+  var mat = new PortfolioAllocation.Matrix([[-2,2,-3], [-1,1,3], [2,0,-1]]);
+  var expectedValue = -2;
+
+  assert.equal(Math.abs(mat.trace() - expectedValue) <= 1e-16, true, 'Trace computation');
+  
+  // TODO: Test random data
+});
+
+
 QUnit.test('Matrix copy', function(assert) {    
   // Test using static data
   {

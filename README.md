@@ -18,7 +18,6 @@ Do not hesitate to report any bug / request additional features !
 - Compatible with [Node.js](https://nodejs.org/) for back-end development
 - Code continuously tested and integrated by [Travis CI](https://travis-ci.org/)
 - Code documented for developers using [JSDoc](http://usejsdoc.org/)
-- Code documented for users using [GitHub Pages](https://lequant40.github.io/portfolio_allocation_js/)
 
 
 ## Usage
@@ -50,7 +49,7 @@ function computeERCPortfolioWeights(covarianceMatrix) {
 
 ***Note: PortfolioAllocation is delivered through the CDN [jsDelivr](https://www.jsdelivr.com/), at [this URL](https://cdn.jsdelivr.net/npm/portfolio-allocation/dist/portfolio_allocation.dist.min.js).***
 
-Reference PortfolioAllocation minified source file in an HTML page, and you are done:
+Include PortfolioAllocation minified source file in an HTML page, and you are done:
 ```html
 <script src="https://cdn.jsdelivr.net/npm/portfolio-allocation/dist/portfolio_allocation.dist.min.js" type="text/javascript"></script>
 <script type="text/javascript">
@@ -79,7 +78,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 - Equal weights (EW)  
   Analyzed by Victor DeMiguel and al. in their research paper [Optimal Versus Naive Diversification: How Inefficient is the 1/N Portfolio Strategy?](https://doi.org/10.1093/rfs/hhm075).
 
-- Equal risk budgets, a.k.a. inverse volatility (IV)  
+- Inverse volatility (IV)  
   Described by Raul Leote de Carvalho and al. in the research paper [Demystifying Equity Risk-Based Strategies: A Simple Alpha Plus Beta Description](https://doi.org/10.3905/jpm.2012.38.3.056).
 
 - Equal risk contributions (ERC) and risk budgeting (RB)  
@@ -98,7 +97,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/), the MCA portfolio is meant to be an approximation of the MDP portfolio.
 
 - Mean-variance optimization (MVO)  
-  Based on the modern portfolio theory introduced by Harry M. Markowitz in numerous articles and books ([Portfolio Selection: Efficient Diversification of Investments](https://www.jstor.org/stable/j.ctt1bh4c8h)...), the portfolio obtained through mean-variance optimization is mean-variance efficient, that is, for a given level of return, it possesses the lowest attainable volatility and for a given level of volatility, it possesses the highest attainable return.
+  Based on the modern portfolio theory described by Harry M. Markowitz in numerous articles and books ([Portfolio Selection: Efficient Diversification of Investments](https://www.jstor.org/stable/j.ctt1bh4c8h)...), the portfolio obtained through mean-variance optimization is mean-variance efficient, that is, for a given level of return, it possesses the lowest attainable volatility and for a given level of volatility, it possesses the highest attainable return.
 
 - Global minimum variance (GMV)  
   The leftmost portfolio on the mean-variance efficient frontier, the GMV portfolio possesses the smallest attainable volatility among all the mean-variance efficient portfolios.
@@ -116,35 +115,46 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
   Introduced by John Lintner in the research paper [The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets](https://www.jstor.org/stable/1924119), the MSR portfolio possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
 
 - Random subspace mean-variance optimization (RSO-MVO)  
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and first formally studied by Benjamin J. Gillen in the research paper [Subset Optimization for Asset Allocation](https://authors.library.caltech.edu/79336/), the RSO-MVO portfolio combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and formally studied by Benjamin J. Gillen in the research paper [Subset Optimization for Asset Allocation](https://authors.library.caltech.edu/79336/), the RSO-MVO portfolio combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
 
 - Minimum tracking error portfolio, a.k.a. index tracking portfolio  
-  The index tracking portfolio aims at replicating the performances of a given stock market index with a limited number of its constituents.
+  The index tracking portfolio aims at replicating the performances of a given stock market index, or more generally of a given benchmark, with a limited number of its constituents.
   
 - Best constantly rebalanced portfolio (BCRP)  
   The BCRP portfolio is a portfolio determined in hindsight to benchmark the performances of online portfolio selection algorithms.
 
   
 ### Misc. other algorithms
-- Portfolio weights rounding   
-  The theoretical weights obtained through a portfolio optimization algorithm usually need to be rounded off, which can be done thanks to the algorithm described in the research paper [Rounding on the standard simplex: Regular grids for global optimization](https://doi.org/10.1007/s10898-013-0126-2) from Immanuel M. Bomze and al..
+- [ON-GOING WITH v0.0.9] Post-processing of numerical portfolio weights   
+  The weights obtained through a portfolio optimization algorithm (e.g. w = 0.123456789) need in practice to be either rounded off (e.g. w = 0.12) or converted into an integer number of shares (e.g. q = 10 shares, or q = 2 lots of 100 shares).
 
-- Mean-variance efficient frontier and corner portfolios computation  
-  The set of all mean-variance efficient portfolios (the mean-variance efficient frontier), as well as its generating discrete set (the set of corner portfolios) can be efficiently computed thanks to a specialized algorithm developed by Harry M. Markowitz: [the critical line method](https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm).
+- Computation of the mean-variance efficient frontier   
+  The continuous set of all mean-variance efficient portfolios (the mean-variance efficient frontier) as well as its generating discrete set (the set of corner portfolios) can both be efficiently computed thanks to a specialized algorithm developed by Harry M. Markowitz: [the critical line method](https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm).
+
+- [ON-GOING WITH v0.0.9] Computation of the nearest portfolio on the mean-variance efficient frontier    
+  Thanks to the Markowitz's critical line method, it is possible to compute the nearest mean-variance efficient portfolio of any given portfolio.
+
+- [ON-GOING WITH v0.0.9] Generation of perturbed mean vectors   
+  As demonstrated in [The effect of errors in means, variances, and covariances on optimal portfolio choice](https://jpm.pm-research.com/content/19/2/6), the impact of estimation errors in expected returns on the output of a portfolio optimization algorithm can be significant, so that it is useful to have an algorithm to perturb mean vectors for portfolio weights sensitivity analysis.
 
 - Generic random subspace optimization   
   A direct extension of the RSO-MVO method, allowing to use the random subspace optimization method with any portfolio optimization method.
 
-- Generic numerical optimization  
-  When no specialized numerical algorithm exist to solve a particular portfolio optimization problem, a workaround is to use generic numerical optimization algorithms instead (e.g., grid search on the simplex).
+- Generic numerical optimization   
+  When no specialized algorithm exist to solve a particular portfolio optimization problem, it is always possible to use a generic numerical optimization algorithm (e.g., grid search on the simplex).
 
-- [ON-GOING WITH v0.0.9] Random correlation and covariance matrices generation  
-  Assets correlation and covariance matrices are used as inputs in several portfolio allocation algorithms, so that the capability to randomly generate them is a plus.
+- [ON-GOING WITH v0.0.9] Random generation of mean vectors, variances and correlation matrices   
+  When implementing portfolio optimization algorithms, the capability to generate random mean vectors, random variances and random correlation matrices can be of great help.
+
+- [ON-GOING WITH v0.0.9] Computation of shrinkage estimators for mean vectors and covariance matrices   
+  Shrinkage estimators for mean vectors can help to reduce the estimation errors in expected returns as observed in DeMiguel et al. [Size Matters: Optimal Calibration of Shrinkage Estimators for Portfolio Selection](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1891847), and shrinkage estimators for covariance matrices like Ledoit-Wolf's [A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices](http://www.ledoit.net/ole1_abstract.htm) provide an elegant solution to the problem of the ill-conditioning and non-invertibility of sample covariance matrices.
 
 
 ## Documentation
 
-A complete documentation, including code examples, can be found [on the GitHub Pages associated to this repository](https://lequant40.github.io/portfolio_allocation_js/).
+The code is heavily documented, using [JSDoc](http://usejsdoc.org/).
+
+That being said, the documentation is rather for developer's usage, so that in case of trouble to use any algorithm, do not hesitate to ask for support !
 
 
 ## Contributing
@@ -160,12 +170,13 @@ npm install -g grunt-cli
 
 ### Develop...
 
-### Compile
+### Compile and test
 
-- The following command generates the files to be used inside a browser or with Node.js in the `dist` directory:
+- The following commands generates the files to be used inside a browser or with Node.js in the `dist` directory:
 
 ```
-grunt deliver
+grunt deliver-dev
+grunt deliver-dist
 ```
 
 - The following command generates the files to be used in Google Sheets in the `dist\gs` directory:
@@ -174,17 +185,6 @@ grunt deliver
 grunt deliver-gs
 ```
 
-### Test
-
-Any of the following two commands run the [QUnit](https://qunitjs.com/) unit tests contained in the `test` directory on the generated file `dist\portfolio_allocation.dev.min.js`:
-
-```
-npm test
-```
-
-```
-grunt test
-```
 
 ### Submit a pull-request...
 

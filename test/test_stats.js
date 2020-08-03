@@ -7,6 +7,195 @@ QUnit.module('Statistics internal module', {
 
 
 
+QUnit.test('Returns computation', function(assert) {    
+	// Test with static data
+	{
+		// Test the arithmetic returns computation
+		var ret = PortfolioAllocation.returns([0.05, 0.01, 0.01], {method: "arithmetic"});
+		var retDefault = PortfolioAllocation.returns([0.05, 0.01, 0.01]);
+		var expectedRet = [-0.7999999999999999, 0];
+
+		assert.equal(ret.length, expectedRet.length, 'Returns computation, default parameters #1');
+		assert.equal(retDefault.length, expectedRet.length, 'Returns computation, default parameters #2');
+		var resultOK = true;
+		for (var i = 0; i < expectedRet.length; ++i) {
+		  if (expectedRet[i] != ret[i] || expectedRet[i] != retDefault[i]) {
+			  resultOK = false;
+			  break;
+		  }
+		}
+		assert.equal(resultOK, true, 'Returns computation, default parameters #3');
+		
+		// Test the logarithmic returns computation
+		var ret = PortfolioAllocation.returns([0.05, 0.01, 0.01], {method: "logarithmic"});
+		var expectedRet = [-1.6094379124341005, 0];
+		
+		assert.equal(ret.length, expectedRet.length, 'Returns computation, logarithmic returns #1');
+		var resultOK = true;
+		for (var i = 0; i < expectedRet.length; ++i) {
+		  if (expectedRet[i] != ret[i]) {
+			  resultOK = false;
+			  break;
+		  }
+		}
+		assert.equal(resultOK, true, 'Returns computation, logarithmic returns #2');
+		
+	}
+});
+
+
+QUnit.test('Projection on a line segment computation', function(assert) {    
+  // Test error case
+  {
+	var a = [1, 0];
+    var b = [0, 1];
+	var p = [1, 1, 1];
+	
+	assert.throws(function() { 
+		PortfolioAllocation.lineSegmentEuclidianProjection_(p, a, b) },
+		new Error('incompatible dimensions: 3, 2, 2'),
+		"Projection on a line segment, incompatible dimensions");
+  }
+  
+  // Test with static data
+  {
+	var a = [2.0000, -81.5590];
+    var b = [58.0000, 161.9340];
+    
+	var p = [42.0000, 41.8890];
+	var expectedProjection = [30.974499670159346, 44.424711574751953];
+	var proj = PortfolioAllocation.lineSegmentEuclidianProjection_(p, a, b);
+		
+	var projOK = true;
+	for (var i = 0; i < proj.length; ++i) {
+	   if (Math.abs(expectedProjection[i] - proj[i]) > 1e-12) {
+		 projOK = false;
+		 break;
+	   }
+	}	  
+	assert.equal(projOK, true, 'Projection on a line segment - Test 1');
+  }
+
+	// Test with static data in 2D
+	{
+		var a = [0, 1];
+		var b = [1, 0];
+		
+		var ps = [[0, 10], [10, 0], [-1, 2], [2, -1]];
+		var expectedProjections = [[0, 1], [1, 0], [0, 1], [1, 0]];
+
+		for (var i = 0; i < ps.length; ++i) {
+			//
+			var p = ps[i];
+			var expectedProjection = expectedProjections[i];
+			
+			var proj = PortfolioAllocation.lineSegmentEuclidianProjection_(p, a, b);
+			
+			var projOK = true;
+			for (var j = 0; j < proj.length; ++j) {
+			   if (Math.abs(expectedProjection[j] - proj[j]) > 1e-12) {
+				 projOK = false;
+				 break;
+			   }
+			}	  
+			assert.equal(projOK, true, 'Projection on a line segment - Test ' + (i + 2).toString());
+		}
+	}
+});
+
+
+
+QUnit.test('Box random point computation', function(assert) {    
+
+  // Test with random data the generation on a box
+  {
+	  // Setup static parameters of the random test
+	  var nbTests = 10;
+	  var nbSubTests = 20;
+	  var minDimension = 1;
+	  var maxDimension = 50;
+	  var min_lb = -10;
+	  var max_ub = 10;
+	
+	  // Aim of these tests is to check that for a sample of size n:
+	  // - An array of coordinates of size n is returned
+	  // - The coordinates belong to the interval [lower bound, upper bound]
+	  for (var i = 0; i < nbTests; ++i) {
+		 // Generate a random dimension size and the associated sampler
+		 var dimension = Math.floor(Math.random()*(maxDimension - minDimension + 1) + minDimension);
+		
+		  // Generate bounds, with the type of bounds (none, lower, upper, lower and upper)
+		  // determined randomly.
+		  var sampler = null;
+		  
+		  var lowerBounds = new Array(dimension);;
+		  var upperBounds = new Array(dimension);;
+
+		  var u = Math.random();
+		  if (u <= 0.25) {
+			  // No bounds constraints => must be [0, 1]
+			  for (var j = 0; j < dimension; ++j) {
+			  	  lowerBounds[j] = 0;
+				  upperBounds[j] = 1;
+			  }
+			  
+			  sampler = new PortfolioAllocation.boxRandomSampler_(dimension); // no bounds constraints 
+		  }
+		  else if (u <= 0.50) {		  
+			  // Generate random lower bounds between min_lb and max_ub, and lower bounds <= 1
+			  for (var j = 0; j < dimension; ++j) {
+			  	  lowerBounds[j] = Math.min(1, Math.random()*(max_ub - min_lb) + min_lb);
+				  upperBounds[j] = 1;
+			  }
+				
+			  sampler = new PortfolioAllocation.boxRandomSampler_(dimension, lowerBounds); // lower bounds constraints
+		  }
+		  else if (u <= 0.75) {		  
+			  // Generate random upper bounds between min_lb and max_ub
+			  for (var j = 0; j < dimension; ++j) {
+			  	  lowerBounds[j] = 0;
+				  upperBounds[j] = Math.max(lowerBounds[j], Math.random()*(max_ub - min_lb) + min_lb);
+			  }
+				
+			  sampler = new PortfolioAllocation.boxRandomSampler_(dimension, null, upperBounds); // upper bounds constraints
+		  }
+		  else {
+			  // Generate random lower and upper bounds between min_lb and max_ub
+			  for (var j = 0; j < dimension; ++j) {
+			  	  lowerBounds[j] = Math.random()*(max_ub - min_lb) + min_lb;
+				  upperBounds[j] = Math.max(lowerBounds[j], Math.random()*(max_ub - min_lb) + min_lb);
+			  }
+			  
+			  sampler = new PortfolioAllocation.boxRandomSampler_(dimension, lowerBounds, upperBounds); // lower and upper bounds constraints
+		  }
+		  
+		  
+		 for (var j = 0; j < nbSubTests; ++j) {
+			// Generate a random sample point
+			var sampledPoint = sampler.sample();
+		 
+			// Check that the number of coordinates of the sampled point corresponds to the requested dimension
+			var sampledPointDimension = sampledPoint.length;
+			assert.equal(sampledPointDimension, dimension, "Box random sampler point computation, coordinates length - Test " + i + "," + j);
+		 
+			 // Check that the coordinates of the sampled point belong to the proper interval
+			 var sampledPointBelongToProperInterval = true;
+			 for (var k = 0; k < sampledPoint.length; ++k) {
+				if (sampledPoint[k] > upperBounds[k] || sampledPoint[k] < lowerBounds[k]) {
+					sampledPointBelongToProperInterval = false;
+					break;
+				}				
+			 }
+			 assert.equal(sampledPointBelongToProperInterval, true, "Box random sampler point computation, coordinates in proper interval - Test " + i + "," + j);
+		}
+	  }
+  }
+  
+ 
+});
+
+
+
 QUnit.test('Box grid sampler point computation', function(assert) {    
   // Test with static data, in dimension 1
   {
@@ -52,7 +241,6 @@ QUnit.test('Box grid sampler point computation', function(assert) {
 });
 
 
-
 QUnit.test('Permutation entropy computation', function(assert) {    
   // Tests with static data
   {
@@ -64,6 +252,103 @@ QUnit.test('Permutation entropy computation', function(assert) {
 	  var pE = PortfolioAllocation.permutationEntropy_([4, 7, 9, 10, 6, 11, 3 ], 2);
 	  assert.equal(Math.abs(pE - 0.918) <= 1e-3, true, 'Permutation entropy computation #2');
   }
+});
+
+
+
+
+QUnit.test('Quantile computation', function(assert) {
+	// Note: most tests below were taken frmo d3.js tests
+	
+	// Tests with static data
+	{
+		var arr = [10, 20, 30, 40, 50]; 
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 0, true), 10, 'Quantile computation #1/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.25, true), 20, 'Quantile computation #1/2');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.5, true), 30, 'Quantile computation #1/3');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.75, true), 40, 'Quantile computation #1/4');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1, true), 50, 'Quantile computation #1/5');
+	}
+	
+	// Tests with static data
+	{
+		var arr = [10, 30, 20]; 
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 0), 10, 'Quantile computation #2/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.25), 15, 'Quantile computation #2/2');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.5), 20, 'Quantile computation #2/3');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.75), 25, 'Quantile computation #2/4');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1), 30, 'Quantile computation #2/5');
+	}
+	
+	// Tests with static data
+	{
+		var arr = [0, 10, 30]; 
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 0), 0, 'Quantile computation #3/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.25), 5, 'Quantile computation #3/2');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.5), 10, 'Quantile computation #3/3');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.75), 20, 'Quantile computation #3/4');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1), 30, 'Quantile computation #3/5');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.1), 2, 'Quantile computation #3/6');
+	}
+	
+	// Tests with static data
+	{
+		var arr = [3, 6, 7, 8, 8, 10, 13, 15, 16, 20];
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 0), 3, 'Quantile computation #4/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.25), 7.25, 'Quantile computation #4/2');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.5), 9, 'Quantile computation #4/3');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.75), 14.5, 'Quantile computation #4/4');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1), 20, 'Quantile computation #4/5');
+	}
+
+	// Tests with static data
+	{
+		var arr = [3, 6, 7, 8, 8, 9, 10, 13, 15, 16, 20];
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 0), 3, 'Quantile computation #5/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.25), 7.5, 'Quantile computation #5/2');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.5), 9, 'Quantile computation #5/3');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.75), 14, 'Quantile computation #5/4');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1), 20, 'Quantile computation #5/5');
+	}
+	
+	// Tests with static data
+	// Test that quantile returns exact value for integer p-values
+	{
+		var arr = [1, 2, 3, 4];
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 1/3, true), 2, 'Quantile computation #6/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 2/3, true), 3, 'Quantile computation #6/2');
+	}
+	
+	// Tests with static data
+	// Test that quantile returns the expected value for integer or fractional p
+	{
+		var arr = [3, 1, 2, 4, 0];
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 0/4), 0, 'Quantile computation #7/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 0.1/4), 0.1, 'Quantile computation #7/2');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1/4), 1, 'Quantile computation #7/3');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1.5/4), 1.5, 'Quantile computation #7/4');
+		assert.equal(PortfolioAllocation.quantile_(arr, 2/4), 2, 'Quantile computation #7/5');
+		assert.equal(PortfolioAllocation.quantile_(arr, 2.5/4), 2.5, 'Quantile computation #7/6');
+		assert.equal(PortfolioAllocation.quantile_(arr, 3/4), 3, 'Quantile computation #7/7');
+		assert.equal(PortfolioAllocation.quantile_(arr, 3.2/4), 3.2, 'Quantile computation #7/8');
+		assert.equal(PortfolioAllocation.quantile_(arr, 4/4), 4, 'Quantile computation #7/9');
+	}
+	
+	// Tests with static data
+	// Test that quantile returns returns the first value for p = 0 and returns the last value for p = 1
+	{
+		var arr = [1, 2, 3, 4];
+		 
+		assert.equal(PortfolioAllocation.quantile_(arr, 0, true), 1, 'Quantile computation #8/1');
+		assert.equal(PortfolioAllocation.quantile_(arr, 1, true), 4, 'Quantile computation #8/2');
+	}
 });
 
 
@@ -110,6 +395,17 @@ QUnit.test('Smallest k element computation', function(assert) {
 		
 		return arr;
 	}
+
+	// Test with static data
+	{
+		var arr = [65, 28, 59, 33, 21, 56, 22, 95, 50, 12, 90, 53, 28, 77, 39];
+		var expectedArr = [28, 28, 12, 33, 21, 22, 39, 50, 53, 59, 56, 65, 90, 77, 95];
+		
+		var k = PortfolioAllocation.select_(arr, 8);
+		
+		assert.deepEqual(arr, expectedArr, 'Smallest k element computation #1');
+		
+	}
 	
   // Test with static data, to make sure duplicate values are properly handled
   {
@@ -126,7 +422,7 @@ QUnit.test('Smallest k element computation', function(assert) {
 
 	  // In case of incorrect duplicate values management, the SELECT algorithm
 	  // will output [0, 6, 6, 5, 2, 1, 3]
-	  assert.deepEqual(val_idx, expected_val_idx, 'Smallest k element computation #0');
+	  assert.deepEqual(val_idx, expected_val_idx, 'Smallest k element computation #2');
   }
   
   // Test with random data, no indices requested in output
@@ -149,12 +445,12 @@ QUnit.test('Smallest k element computation', function(assert) {
 	  
 	  // Test that the k-th smallest element of the array arr, computed
 	  // from the function SELECT, is the same as arr[k-1].
-	  assert.equal(k_smallest_elem, arr[k-1], 'Smallest k element computation #1 ' + (j+1));
+	  assert.equal(k_smallest_elem, arr[k-1], 'Smallest k element computation #3 ' + (j+1));
 
 	  // Test that the k-th smallest element of the array arr, computed
 	  // from the function SELECT, is the same as the k-th element of 
 	  // the sorted array copy_arr.
-	  assert.equal(k_smallest_elem, copy_arr[k-1], 'Smallest k element computation #2 ' + (j+1));
+	  assert.equal(k_smallest_elem, copy_arr[k-1], 'Smallest k element computation #4 ' + (j+1));
 	  
 	  // Test that smallest k elements of arr are x[i], i=0..k-1
 	  var correct_order_left_k = true;
@@ -164,7 +460,7 @@ QUnit.test('Smallest k element computation', function(assert) {
 			break;
 		}
 	  }
-	  assert.equal(correct_order_left_k, true, 'Smallest k element computation #3 ' + (j+1));
+	  assert.equal(correct_order_left_k, true, 'Smallest k element computation #5 ' + (j+1));
 	  
 	  // Test that largest n-k elements of arr are x[i], i=k+1..n-1
 	  var correct_order_right_k = true;
@@ -174,7 +470,7 @@ QUnit.test('Smallest k element computation', function(assert) {
 			break;
 		}
 	  }
-	  assert.equal(correct_order_right_k, true, 'Smallest k element computation #4 ' + (j+1));
+	  assert.equal(correct_order_right_k, true, 'Smallest k element computation #6 ' + (j+1));
     }
   }
   
@@ -208,7 +504,7 @@ QUnit.test('Smallest k element computation', function(assert) {
 	  var k_smallest_elem = PortfolioAllocation.select_(arr, k);
 	  
 	  // Test that the k-th smallest element index provided in output is correct
-	  assert.equal(k_smallest_elem == arr_copy[k_smallest_elem_index], true, 'Smallest k element computation #5 ' + (j+1));
+	  assert.equal(k_smallest_elem == arr_copy[k_smallest_elem_index], true, 'Smallest k element computation #7 ' + (j+1));
 	  
 	  // Test that the indexes provided in output of SELECT 
 	  // corresponds to the original array elements
@@ -219,7 +515,7 @@ QUnit.test('Smallest k element computation', function(assert) {
 			break;
 		}
 	  }
-	  assert.equal(correct_indexes, true, 'Smallest k element computation #6 ' + (j+1));
+	  assert.equal(correct_indexes, true, 'Smallest k element computation #8 ' + (j+1));
     }
   }
 });

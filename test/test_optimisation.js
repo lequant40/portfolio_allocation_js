@@ -198,7 +198,314 @@ QUnit.test('Unidimensional root finding - Bisection method', function(assert) {
 });
 
 
-QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) {    	
+
+QUnit.test('Optimization problems solver - Threshold Accepting', function(assert) {    	
+	// C.f. testFuntions method of NMOF R package
+	
+	// Test function Ackley 
+	{
+		// Define n
+		var n = 25;
+		
+		// Define the function
+		var f = function(x) {
+			// Dimension of the problem
+			var n = x.length;
+			
+			var sum_x_sq = 0;
+			for (var i = 0; i < n; ++i) {
+				sum_x_sq += x[i] * x[i];
+			}
+			
+			var sum_cos = 0;
+			for (var i = 0; i < n; ++i) {
+				sum_cos += Math.cos(2 * Math.PI *x[i]);
+			}
+			
+			var res = Math.exp(1) + 20 - 20*Math.exp(-0.2 * Math.sqrt(1/n * sum_x_sq)) - Math.exp(1/n * sum_cos);
+			
+			return res;
+		}
+		
+		// The minimum of the function f is attained at (0,...,0) and is equal to 0
+		var expectedSol = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			expectedSol[i] = 0;
+		}
+		var expectedSolValue = 0;
+		
+		// Define the initial point: (-0.5,...,-0.5)
+		var x0 = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			x0[i] = -0.5;
+		}
+		
+		// Define the lower and upper bounds: [-32, 32]^n
+		var lowerBounds = new Array(n);
+		var upperBounds = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			lowerBounds[i] = -32;
+			upperBounds[i] = 32;
+		}
+		
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
+		                                                                                               upperBounds: upperBounds }});
+		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Ackley, optimal point');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Ackley, optimal function value');
+	}
+	
+	// Test function Eggholder
+	{
+		// Define the function
+		var f = function(x) {
+			return -(x[1] + 47) * Math.sin(Math.sqrt(Math.abs(x[1] + x[0]/2 + 47))) - x[0] * Math.sin(Math.sqrt(Math.abs(x[0] - (x[1] + 47))));
+		}
+		
+		// The minimum of the function f is attained at (512, 404.2319) and is equal to -959.6407
+		var expectedSol = [512, 404.2319];
+		var expectedSolValue = -959.6407;
+		
+		// Define the initial point: (500, 400)
+		var x0 = [500, 400];
+
+		// Define the lower and upper bounds: [-512, 512]^2
+		var lowerBounds = [-512, -512];
+		var upperBounds = [512, 512];
+		
+		// Compute the minimum of the function f
+		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {nSteps: 10000, neighbourGeneratorParameters: { alpha: 0.1, 
+		                                                                                                              lowerBounds: lowerBounds, 
+		                                                                                                              upperBounds: upperBounds }});
+		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Eggholder, optimal point');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Eggholder, optimal function value');
+	}
+	
+	// Test function Griewank
+	{
+		// Define n
+		var n = 25;
+		
+		// Define the function
+		var f = function(x) {
+			// Dimension of the problem
+			var n = x.length;
+			
+			var sum_x_sq = 0;
+			for (var i = 0; i < n; ++i) {
+				sum_x_sq += x[i] * x[i];
+			}
+			
+			var prod_cos = 1;
+			for (var i = 0; i < n; ++i) {
+				prod_cos *= Math.cos(x[i]/Math.sqrt(i+1));
+			}
+			
+			var res = 1 + 1/4000 * sum_x_sq - prod_cos;
+			
+			return res;
+		}
+		
+		// The minimum of the function f is attained at (0,...,0) and is equal to 0
+		var expectedSol = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			expectedSol[i] = 0;
+		}
+		var expectedSolValue = 0;
+		
+		// Define the initial point: (-0.5,...,-0.5)
+		var x0 = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			x0[i] = -0.5;
+		}
+		
+		// Define the lower and upper bounds: [-1, 1]^n
+		var lowerBounds = new Array(n);
+		var upperBounds = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			lowerBounds[i] = -1;
+			upperBounds[i] = 1;
+		}
+		
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
+		                                                                                               upperBounds: upperBounds }});
+		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Griewank, optimal point');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Griewank, optimal function value');
+	}
+	
+	// Test function Rastrigin
+	{
+		// Define n
+		var n = 25;
+		
+		// Define the function
+		var f = function(x) {
+			// Dimension of the problem
+			var n = x.length;
+			
+			var sum = 0;
+			for (var i = 0; i < n; ++i) {
+				sum += x[i] * x[i] - 10 * Math.cos(2*Math.PI*x[i]);
+			}
+
+			var res = 10 * n + sum;
+			
+			return res;
+		}
+		
+		// The minimum of the function f is attained at (0,...,0) and is equal to 0
+		var expectedSol = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			expectedSol[i] = 0;
+		}
+		var expectedSolValue = 0;
+		
+		// Define the initial point: (0.1,...,0.1)
+		var x0 = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			x0[i] = 0.1;
+		}
+		
+		// Define the lower and upper bounds: [-5.12, 5.12]^n
+		var lowerBounds = new Array(n);
+		var upperBounds = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			lowerBounds[i] = -5.12;
+			upperBounds[i] = 5.12;
+		}
+		
+		// Compute the minimum of the function f
+		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
+		                                                                                               upperBounds: upperBounds }});
+		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-1, true, 'Test function Rastrigin, optimal point');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-1, true, 'Test function Rastrigin, optimal function value');
+	}
+	
+	// Test function Rosenbrock
+	{
+		// Define n
+		var n = 25;
+		
+		// Define the function
+		var f = function(x) {
+			// Dimension of the problem
+			var n = x.length;
+			
+			var sum = 0;
+			for (var i = 0; i < n-1; ++i) {
+				sum += 100*(x[i+1] - x[i]*x[i])*(x[i+1] - x[i]*x[i]) + (1-x[i])*(1-x[i])
+			}
+
+			var res = sum;
+			
+			return res;
+		}
+		
+		// The minimum of the function f is attained at (1,...,1) and is equal to 0
+		var expectedSol = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			expectedSol[i] = 1;
+		}
+		var expectedSolValue = 0;
+		
+		// Define the initial point: (0.9,...,0.9)
+		var x0 = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			x0[i] = 0.9;
+		}
+		
+		// Define the lower and upper bounds: [-5, 5]^n
+		var lowerBounds = new Array(n);
+		var upperBounds = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			lowerBounds[i] = -5;
+			upperBounds[i] = 5;
+		}
+		
+		// Compute the minimum of the function f
+		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
+		                                                                                               upperBounds: upperBounds }});
+		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-1, true, 'Test function Rosenbrock, optimal point');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-1, true, 'Test function Rosenbrock, optimal function value');
+	}
+	
+	// Test function Schwefel
+	{
+		// Define n
+		var n = 25;
+		
+		// Define the function
+		var f = function(x) {
+			// Dimension of the problem
+			var n = x.length;
+			
+			var sum = 0;
+			for (var i = 0; i < n; ++i) {
+				sum -= x[i] * Math.sin(Math.sqrt(Math.abs(x[i])));
+			}
+			
+			return sum;
+		}
+		
+		// The minimum of the function f is attained at (420.9687,...,420.9687) and is equal to -418.9829 * n
+		var expectedSol = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			expectedSol[i] = 420.9687;
+		}
+		var expectedSolValue = -418.9829 * n;
+		
+		// Define the initial point: (420,...,420)
+		var x0 = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			x0[i] = 410;
+		}
+		
+		// Define the lower and upper bounds: [-500, 500]^n
+		var lowerBounds = new Array(n);
+		var upperBounds = new Array(n);
+		for (var i = 0; i < n; ++i) {
+			lowerBounds[i] = -500;
+			upperBounds[i] = 500;
+		}
+		
+		// Compute the minimum of the function f, with default values
+		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { alpha: 0.1, 
+		                                                                                               lowerBounds: lowerBounds, 
+		                                                                                               upperBounds: upperBounds }});
+		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Schwefel, optimal point');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Schwefel, optimal function value');
+	}
+
+	// Test function Trefethen
+	{
+		// Define the function
+		var f = function(x) {
+			return Math.exp(Math.sin(50*x[0])) + Math.sin(60*Math.exp(x[1])) + Math.sin(70 * Math.sin(x[0])) + Math.sin(Math.sin(80 * x[1])) - Math.sin(10*(x[0] + x[1])) + 1/4 * (x[0]*x[0] + x[1] * x[1]);
+		}
+		
+		// The minimum of the function f is attained at (-0.0244,0.2106) and is equal to -3.3069
+		var expectedSol = [-0.0244,0.2106];
+		var expectedSolValue = -3.3069;
+		
+		// Define the initial point: (-0.02, 0.20)
+		var x0 = [-0.02, 0.20];
+
+		// Define the lower and upper bounds: [-1, 1]^2
+		var lowerBounds = [-1, -1];
+		var upperBounds = [1, 1];
+		
+		// Compute the minimum of the function f, with default values
+		// As this function is particularly difficult to optimize, restart the algorithm several times
+		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
+		                                                                                               upperBounds: upperBounds }});
+		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Trefethen, optimal point');
+		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Trefethen, optimal function value');
+	}
+});
+
+
+QUnit.test('Optimization problems solver - GSS', function(assert) {    	
 	// References
 	// J.J. More', B.S. Garbow and K.E. Hillstrom, "Testing Unconstrained Optimization Software", ACM Transactions on Mathematical Software, vol. 7(1), pp. 17-41, 1981.
 	// Test problems for partially separable optimization and results for the routine PSPMIN, Ph.L. Toint
@@ -321,7 +628,7 @@ QUnit.test('Unconstrained optimization problems solver - GSS', function(assert) 
 
 		// Compute the minimum of the function f, with default values
 		var sol = PortfolioAllocation.gssSolve_(f, x0, null, null, {eps: 1e-8});
-		
+
 		// Check the result on the located minimizer, using the nullity of the gradient as a necessary and sufficient condition
 		assert.equal(Math.abs(gradf(sol[0]).vectorNorm('infinity')) <= 1e-3, true, 'Test function 31 extended Freudenstein-Roth function');
 	}

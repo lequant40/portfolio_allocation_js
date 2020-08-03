@@ -1,4 +1,197 @@
 
+function randomCorrelationMatrix(n, opt) {
+	return Matrix_.randomCorrelation(n, opt);
+}
+function covarianceMatrix(arr, opt) {
+	var opt = opt;
+	if (opt === undefined) {
+		opt = { };
+	}
+	if (opt.method === undefined) {
+		opt.method = "covariance";
+	}
+	var covarianceMethod = opt.method;
+	if (covarianceMethod != "covariance" &&
+	    covarianceMethod != "sample-covariance" &&
+		covarianceMethod != "ledoit-wolf-shrinked-covariance") {
+			throw new Error('unsupported covariance matrix computation method');
+	}
+
+	var shrinkageTarget = opt.shrinkageTarget;
+	if ( covarianceMethod == "ledoit-wolf-shrinked-covariance" &&
+	    ["constant-variance-null-correlation", 
+		 "constant-variance-correlation", 
+		 "null-correlation", 
+		 "constant-correlation"].indexOf(shrinkageTarget) == -1 ) {
+		 throw new Error('unsupported covariance matrix shrinkage target');
+	}
+	var nbSeries = arr.length;
+	var nbObservations = arr[0].length;
+	var obj;
+	if (covarianceMethod == "covariance" || covarianceMethod == "sample-covariance") {
+		var covarianceFunction = covariance_;
+		if (covarianceMethod == "sample-covariance") {
+			covarianceFunction = sampleCovariance_;
+		}
+		obj = allocateMatrix_(nbSeries, nbSeries);
+		for (var i = 0; i < obj.nbRows; ++i) {
+			for (var j = 0; j < i; ++j) {
+				obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
+			}
+			for (var j = i; j < obj.nbColumns; ++j) {
+				obj.data[i * obj.nbColumns + j] = covarianceFunction(arr[i], arr[j]);
+			}
+		}
+	}
+	else if (covarianceMethod == "ledoit-wolf-shrinked-covariance") {
+		var means = Matrix_.fill(nbSeries, 1, function(i,j) { return mean_(arr[i-1]) });
+		var x = Matrix_.fill(nbSeries, nbObservations, function(i,j) { return arr[i-1][j-1] - means.data[i-1] });
+		var covMat = Matrix_.axty(1/nbObservations, x, x).toCovarianceMatrix();
+		var stdvarVec = covMat.getStandardDeviations();	
+		var corrMat = covMat.getCorrelationMatrix();
+		var prior;
+		var rBar;
+		if (shrinkageTarget == "constant-variance-null-correlation") {
+			var mu = covMat.trace() / nbSeries;
+			prior = Matrix_.fill(nbSeries, nbSeries, function(i,j) { if (i == j) { return mu; } else { return 0; }  });
+		}
+		else if (shrinkageTarget == "constant-variance-correlation") {
+			var phi = covMat.trace() / nbSeries;
+			var nu = 0;
+			for (var i = 0; i < nbSeries - 1; ++i) {
+				for (var j = i+1; j < nbSeries; ++j) {
+					nu += covMat.data[i * covMat.nbColumns + j];
+				}
+			}
+			nu *= 2/(nbSeries*(nbSeries-1)); 
+			prior = Matrix_.fill(nbSeries, nbSeries, function(i,j) { if (i == j) { return phi; } else { return nu; }  });
+		}	
+		else if (shrinkageTarget == "null-correlation") {
+			prior = Matrix_.fill(nbSeries, nbSeries, 
+								 function(i,j) { 
+									 if (i == j) { 
+										 return stdvarVec.data[i-1]*stdvarVec.data[i-1]; 
+									 } 
+									 else { 
+										 return 0;
+									 } 
+								 });
+		}
+		else if (shrinkageTarget == "constant-correlation") {
+			rBar = 0;
+			for (var i = 0; i < nbSeries - 1; ++i) {
+				for (var j = i+1; j < nbSeries; ++j) {
+					rBar += corrMat.data[i * corrMat.nbColumns + j];
+				}
+			}
+			rBar *= 2/(nbSeries*(nbSeries-1)); 
+			prior = Matrix_.fill(nbSeries, nbSeries, 
+								 function(i,j) { 
+									 if (i == j) { 
+										 return stdvarVec.data[i-1]*stdvarVec.data[i-1]; 
+									 } 
+									 else { 
+										return rBar*stdvarVec.data[i-1]*stdvarVec.data[j-1] ;
+									} 
+								 });
+		}
+		var piMat = Matrix_.fill(nbSeries, nbSeries, 
+								 function(i,j) { 
+									var pi_ij = 0;
+									for (var k = 0; k < nbObservations; ++k) {
+										 pi_ij += Math.pow((arr[i-1][k] - means.data[i-1])*(arr[j-1][k] - means.data[j-1]) - covMat.data[(i-1) * covMat.nbColumns + (j-1)], 2);
+									}
+									pi_ij /= nbObservations;
+									return pi_ij;
+								 });
+		var pi = piMat.sum();
+		var rho;
+		if (shrinkageTarget == "constant-variance-null-correlation") {
+			rho = 0;
+		}
+		else if (shrinkageTarget == "constant-variance-correlation") {
+			rho = 0;
+		}	
+		else if (shrinkageTarget == "null-correlation") {
+			rho = piMat.trace();
+		}
+		else if (shrinkageTarget == "constant-correlation") {
+			rho = 0;
+			for (var i = 1; i <= nbSeries; ++i) {
+				for (var j = 1; j <= nbSeries; ++j) {
+					if (i == j) {
+						continue;
+					}
+					var theta_ii__ij = 0;
+					for (var k = 0; k < nbObservations; ++k) {				
+						 theta_ii__ij += ( Math.pow(arr[i-1][k] - means.data[i-1], 2) - covMat.data[(i-1) * covMat.nbColumns + (i-1)] )
+										  *
+										  ( (arr[i-1][k] - means.data[i-1])*(arr[j-1][k] - means.data[j-1]) - covMat.data[(i-1) * covMat.nbColumns + (j-1)] );
+					}
+					theta_ii__ij /= nbObservations;
+					
+					var theta_jj__ij = 0;
+					for (var k = 0; k < nbObservations; ++k) {
+						 theta_jj__ij += ( Math.pow(arr[j-1][k] - means.data[j-1], 2) - covMat.data[(j-1) * covMat.nbColumns + (j-1)] )
+										  *
+										  ( (arr[i-1][k] - means.data[i-1])*(arr[j-1][k] - means.data[j-1]) - covMat.data[(i-1) * covMat.nbColumns + (j-1)] );
+					}
+					theta_jj__ij /= nbObservations;
+					rho += (stdvarVec.data[j-1]/stdvarVec.data[i-1]) * theta_ii__ij  
+						   +
+						   (stdvarVec.data[i-1]/stdvarVec.data[j-1]) * theta_jj__ij;
+				}
+			}
+			rho *= rBar/2;
+			rho += piMat.trace();
+		}
+		var gamma = Math.pow(Matrix_.xmy(covMat, prior).matrixNorm('frobenius'), 2);
+		var kappa = (pi - rho)/gamma;
+		var shrinkage = Math.max(0, Math.min(1, kappa/nbObservations));
+		obj = Matrix_.axpby(shrinkage, prior, 1-shrinkage, covMat);
+	}
+	else {
+		throw new Error('internal error: unsupported covariance matrix computation method');
+	}
+	addCovarianceMatrixMethods_(obj);
+	return obj;
+}
+function addCovarianceMatrixMethods_(matrix) {
+	var methods = {
+		'getCorrelationMatrix': function(out) { 
+			var obj = allocateMatrix_(this.nbRows, this.nbColumns, out);
+			for (var i = 0; i < obj.nbRows; ++i) {
+				var stdDevI = Math.sqrt(this.data[i * this.nbColumns + i]);
+				for (var j = 0; j < i; ++j) {
+					obj.data[i * obj.nbColumns + j] = obj.data[j * this.nbColumns + i];
+				}
+				for (var j = i; j < obj.nbColumns; ++j) {
+					var stdDevJ = Math.sqrt(this.data[j * this.nbColumns + j]);
+				
+					obj.data[i * obj.nbColumns + j] = this.data[i * this.nbColumns + j] / ( stdDevI * stdDevJ );
+				}
+			}
+			return obj;
+		},
+		'getVariances': function(out) { 
+			return this.diagonal(out);
+		},
+		'getStandardDeviations': function(out) { 
+			return this.diagonal(out).elemMap(function(i,j,val) { return Math.sqrt(val);}, out);
+		},
+    	'standardizedGeneralizedVariance': function () {
+        	var det = this.determinant();
+    		if (det < 0) {
+    		    throw new Error('covariance matrix is not positive semi-definite');
+    		}
+    		var sgv = Math.pow(det, 1/this.nbRows);
+    		return sgv;
+    	},
+	};
+  for (var name in methods) {
+    matrix[name] = methods[name];
+  }
+};
 function Matrix_(input) {
 	function fromDoubleArray(dblarr) {
 		that = allocateMatrix_(dblarr.length, dblarr[0].length);
@@ -65,6 +258,7 @@ function allocateMatrix_(n, m, out) {
 	}
 	return obj;
 }
+
 
 Matrix_.prototype = {
     constructor: Matrix_,
@@ -149,6 +343,22 @@ Matrix_.prototype = {
 	},	
 	isSquare: function() {
 	    return this.nbRows === this.nbColumns;
+	},
+	isSymmetric: function(eps) {
+		if (eps == undefined) {
+			eps = 0;
+		}	
+		if (!this.isSquare()) {
+			return false;
+		}
+		for (var i = 0; i < this.nbRows; ++i) {
+			for (var j = 0; j < this.nbColumns; ++j) {
+				if (Math.abs(this.data[i * this.nbColumns + j] - this.data[j * this.nbColumns + i]) > eps) {
+					return false;
+				}
+			}
+		}
+	    return true;
 	},
 	isVector: function() {
 	    return this.nbColumns === 1;
@@ -251,6 +461,18 @@ Matrix_.prototype = {
     	}
         return obj;
     },
+    column: function (j, out) {
+		if (j < 1 || j > this.nbColumns) {
+			throw new Error(
+			'index out of bounds when getting matrix column, (' + j + 
+			') in size (' + this.nbRows + ',' + this.nbColumns + ')');
+		}
+		var obj = allocateMatrix_(this.nbRows, 1, out);
+    	for (var i = 0; i < this.nbRows; ++i) {
+    		obj.data[i] = this.data[i * this.nbColumns + (j-1)] ;
+    	}
+        return obj;
+    },
 	elemMap: function (fct, out) {
 		var obj = allocateMatrix_(this.nbRows, this.nbColumns, out);
 		for (var i = 0; i < obj.nbRows; ++i) {
@@ -309,6 +531,16 @@ Matrix_.prototype = {
 		        det *= R.data[k];
 		}
 		return det;
+	},
+	trace: function () {
+    	if (!this.isSquare()) {
+    		throw new Error('matrix is not square: ' + '(' + this.nbRows + ',' + this.nbColumns + ')');
+    	}
+		var tr = 0;
+		for (var i = 0; i < this.nbRows; ++i) {
+			tr += this.data[i * this.nbColumns + i];
+		}
+		return tr;
 	},
 	matrixNorm: function(p) {
 		if (p == 'one') {
@@ -435,6 +667,10 @@ Matrix_.prototype = {
 		else {
 			throw new Error('unsupported vector norm: ' + p);
 		}
+	},
+	toCovarianceMatrix: function() {
+		addCovarianceMatrixMethods_(this);
+		return this;
 	},
 	
 	
@@ -789,7 +1025,7 @@ Matrix_.diagonal = function(x, out) {
 	}
     return obj;
 };
-Matrix_.fillSymetric = function(n, fct, out) {
+Matrix_.fillSymmetric = function(n, fct, out) {
 	if (n < 1) {
 		throw new Error('input number of rows and columns out of bounds: ' + n);
 	}
@@ -844,6 +1080,14 @@ Matrix_.identity = function(n) {
 		if (k % (n + 1) == 0) {
 			obj.data[k] = 1;
 		}
+	}
+    return obj;
+}
+Matrix_.normrnd = function(n, m, mu, sigma) {
+	var obj = allocateMatrix_(n, m);
+	var nbElements = n * m;
+	for (var k = 0; k < nbElements; ++k) {
+		obj.data[k] = normrnd_(mu, sigma);
 	}
     return obj;
 }
@@ -975,7 +1219,7 @@ Matrix_.svdDecomposition = function(A, opt) {
 	var m = A.nbRows;
 	var n = A.nbColumns;
 	var uu = new Matrix_(A); // represents U 
-	var u_frob_norm = uu.matrixNorm('frobenius'); 	
+	var u_frob_norm = uu.matrixNorm('frobenius');
 	var vv = Matrix_.identity(n); // represents V
 	var iter = 0;
 	var u_columns_two_norm_sq = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
@@ -1033,7 +1277,6 @@ Matrix_.svdDecomposition = function(A, opt) {
 	for (var j = 1; j <= n; ++j) {
 		var singVal_j = Math.sqrt(u_columns_two_norm_sq[j-1]); // == uu.vectorNorm('two', 'column', j);
 		sigmas[j-1] = singVal_j; 
-		
 		sigmas_idx[j-1] = j;
 	}
 	sigmas_idx.sort(function(a, b) { return sigmas[b-1] - sigmas[a-1]; });
@@ -1195,6 +1438,111 @@ Matrix_.linsolveBackSubstitution = function(A, b, out) {
 	}
 	return x;
 }
+Matrix_.randomOrthogonal = function(n) {
+	var z = Matrix_.normrnd(n, n); // Unlike the first reference, and like the second reference, no division by SQRT(2) is made
+	var qr = Matrix_.qrDecomposition(z);
+	var q = qr[0];
+	var r = qr[1];
+	var lambda = Matrix_.fill(1, n, function(i,j) { return r.data[(j-1) * r.nbColumns + (j-1)] >= 0 ? 1 : -1; });
+	return Matrix_.elementwiseProduct(q, lambda);
+}
+Matrix_.randomCorrelation = function(n, opt) {
+	if (opt === undefined) {
+		opt = { };
+	}
+	if (opt.eps === undefined) {
+		opt.eps = 1e-14;
+	}
+	if (opt.epsLambda === undefined) {
+		opt.epsLambda = 1e-8;
+	}
+	if (opt.lambda === undefined) {
+		opt.lambda = new simplexRandomSampler_(n).sample();
+		for (var i = 0; i < n; ++i) {
+			opt.lambda[i] *= n;
+		}
+	}
+	if (opt.lambda.length != n) {
+		throw new Error('number of input eigenvalues not equal to ' + n + ', but to ' + opt.lambda.length);
+	}
+	var sum_lambda = 0;
+	for (var i = 0; i < n; ++i) {
+		sum_lambda += opt.lambda[i];
+	}
+	if (Math.abs(sum_lambda - n) > opt.epsLambda) {
+		throw new Error('input eigenvalues not summing to ' + n);
+	}
+	var eps = opt.eps;
+	var lambda = Matrix_.fill(1, n, function(i,j) { return opt.lambda[j-1]; });
+	var u = Matrix_.randomOrthogonal(n);
+	var a = Matrix_.axty(1, Matrix_.elementwiseProduct(u, lambda), u);
+	for (var k = 1; k < n; ++k) {
+		var converged = true;
+		for (var l = 1; l <= n; ++l) {
+			var a_ll = a.data[(l-1) * a.nbColumns + (l-1)];
+			
+			if (Math.abs(a_ll - 1) > eps) {
+				converged = false;
+				break;
+			}
+			else {
+				if (a_ll != 1) {
+					a.data[(l-1) * a.nbColumns + (l-1)] = 1;
+				}
+			}
+		}
+		if (converged) {
+			break;
+		}
+		var i = -1; // first index for which a_ii < 1
+		var j = -1; // last index for which a_jj >1
+		for (var l = 1; l <= n; ++l) {
+			if (a.data[(l-1) * a.nbColumns + (l-1)] < 1 && i === -1) {
+				i = l;
+			}
+			if (a.data[(l-1) * a.nbColumns + (l-1)] > 1) {
+				j = l;
+			}
+		}
+		if (i > j) {
+			i = -1; // first index for which a_ii > 1
+			j = -1; // last index for which a_jj < 1
+			for (var l = 1; l <= n; ++l) {
+				if (a.data[(l-1) * a.nbColumns + (l-1)] > 1 && i === -1) {
+					i = l;
+				}
+				if (a.data[(l-1) * a.nbColumns + (l-1)] < 1) {
+					j = l;
+				}
+			}
+		}
+		var a_ii = a.data[(i-1) * a.nbColumns + (i-1)];
+		var a_ij = a.data[(i-1) * a.nbColumns + (j-1)];
+		var a_jj = a.data[(j-1) * a.nbColumns + (j-1)];
+		var t = (a_ij + Math.sqrt(a_ij*a_ij - (a_ii-1)*(a_jj-1) )) / (a_jj - 1);
+		var c = 1/Math.sqrt(1 + t*t);
+		var s = c*t;
+		for (var l = 1; l <= n; ++l) {
+			var t1 = a.data[(i-1) * a.nbColumns + (l-1)]; // a(i,l)
+			var t2 = a.data[(j-1) * a.nbColumns + (l-1)]; // a(j,l)
+			
+			a.data[(i-1) * a.nbColumns + (l-1)] = c*t1 - s*t2;
+			a.data[(j-1) * a.nbColumns + (l-1)] = s*t1 + c*t2;
+		}
+		for (var l = 1; l <= n; ++l) {
+			var t1 = a.data[(l-1) * a.nbColumns + (i-1)]; // a(l,i)
+			var t2 = a.data[(l-1) * a.nbColumns + (j-1)]; // a(l,j)
+			
+			a.data[(l-1) * a.nbColumns + (i-1)] = c*t1 - s*t2;
+			a.data[(l-1) * a.nbColumns + (j-1)] = s*t1 + c*t2;
+		}
+		a.data[(i-1) * a.nbColumns + (i-1)] = 1;
+	}
+	for (var l = 1; l <= n; ++l) {
+		a.data[(l-1) * a.nbColumns + (l-1)] = 1;
+	}
+	return a;
+}
 Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 	if (opt === undefined) {
 		opt = {};
@@ -1338,72 +1686,98 @@ Matrix_.linsolveExtendedKaczmarz = function(A, b, opt) {
 	}
 	return x_k;
 }
-function covarianceMatrix(varg_args) {
-	var arrs = arguments;
-	var obj = allocateMatrix_(arrs.length, arrs.length);
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < i; ++j) {
-			obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
-		}
-		for (var j = i; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = covariance_(arrs[i], arrs[j]);
-		}
+function meanVector(arr, opt) {
+	var opt = opt;
+	if (opt === undefined) {
+		opt = { };
 	}
-	addCovarianceMatrixMethods_(obj);
-	return obj;
-}
-function sampleCovarianceMatrix(varg_args) {
-	var arrs = arguments;
-	var obj = allocateMatrix_(arrs.length, arrs.length);
-	for (var i = 0; i < obj.nbRows; ++i) {
-		for (var j = 0; j < i; ++j) {
-			obj.data[i * obj.nbColumns + j] = obj.data[j * obj.nbColumns + i];
-		}
-		for (var j = i; j < obj.nbColumns; ++j) {
-			obj.data[i * obj.nbColumns + j] = sampleCovariance_(arrs[i], arrs[j]);
-		}
+	if (opt.method === undefined) {
+		opt.method = "sample-mean";
 	}
-	addCovarianceMatrixMethods_(obj);
-	return obj;
+	var meanMethod = opt.method;
+	if (meanMethod != "sample-mean" && meanMethod != "demiguel-shrinked-mean" ) {
+			throw new Error('unsupported mean vector computation method');
+	}
+	var nbSeries = arr.length;
+	var nbObservations = arr[0].length;
+	var means;
+	if (meanMethod == "sample-mean") {
+		var meanVector = Matrix_.fill(nbSeries, 1, function(i,j) { return mean_(arr[i-1]); });
+		means = meanVector;
+	}
+	else if (meanMethod == "demiguel-shrinked-mean") {
+		var meanVector = Matrix_.fill(nbSeries, 1, function(i,j) { return mean_(arr[i-1]); });
+		var nu = mean_(meanVector.toArray());
+		var prior = Matrix_.fill(nbSeries, 1, function(i,j) { return nu; });
+		var variances = Matrix_.fill(nbSeries, 1, function(i,j) { return covariance_(arr[i-1], arr[i-1]); });
+		var sigma_sq_b = variances.sum()/nbSeries;
+		var alpha = nbSeries/nbObservations * sigma_sq_b / ( nbSeries/nbObservations * sigma_sq_b + Math.pow(Matrix_.xmy(prior, meanVector).vectorNorm('two'), 2) );
+		means = Matrix_.axpby(alpha, prior, 1-alpha, meanVector);
+	}
+	else {
+		throw new Error('internal error: unsupported mean vector computation method');
+	}
+	return means;
 }
-Matrix_.prototype.toCovarianceMatrix = function() {
-	var cov = new Matrix_(this);
-	addCovarianceMatrixMethods_(this);
-	return this;
+function randomMeanVector(n) {
+	var meanVect = Matrix_.fill(n, 1, function(i,j) { return normrnd_(0, 1); });
+	return meanVect;
 }
-function addCovarianceMatrixMethods_(matrix) {
-	var methods = {
-		'getCorrelationMatrix': function(out) { 
-			var obj = allocateMatrix_(this.nbRows, this.nbColumns, out);
-			for (var i = 0; i < obj.nbRows; ++i) {
-				var stdDevI = Math.sqrt(this.data[i * this.nbColumns + i]);
-				for (var j = 0; j < i; ++j) {
-					obj.data[i * obj.nbColumns + j] = obj.data[j * this.nbColumns + i];
-				}
-				for (var j = i; j < obj.nbColumns; ++j) {
-					var stdDevJ = Math.sqrt(this.data[j * this.nbColumns + j]);
-				
-					obj.data[i * obj.nbColumns + j] = this.data[i * this.nbColumns + j] / ( stdDevI * stdDevJ );
-				}
-			}
-			return obj;
-		},
-		'getVariancesVector': function(out) { 
-			return this.diagonal(out);
-		},
-    	'standardizedGeneralizedVariance': function () {
-        	var det = this.determinant();
-    		if (det < 0) {
-    		    throw new Error('covariance matrix is not positive semi-definite');
-    		}
-    		var sgv = Math.pow(det, 1/this.nbRows);
-    		return sgv;
-    	},
-	};
-  for (var name in methods) {
-    matrix[name] = methods[name];
-  }
-};
+function perturbedMeanVector(meanVect, opt) {
+	var opt = opt;
+	if (opt === undefined) {
+		opt = { };
+	}
+	if (opt.method === undefined) {
+		opt.method = "chopra-ziemba";
+	}
+	var method = opt.method;
+	if (method != "chopra-ziemba") {
+			throw new Error('unsupported perturbation method');
+	}
+	
+	var k = opt.k;
+	if (opt.k === undefined) {
+		k = 0.05;
+	}
+	if (!meanVect.isVector()) {
+		throw new Error('input must be a vector');
+	}
+	var perturbedMeanVect = meanVect.elemMap(function(i,j,val) { return val * (1 + k*normrnd_(0,1));})
+	return perturbedMeanVect;
+}
+function randomVariances(n) {
+	return Matrix_.fill(n, 1, function(i,j) { return pnormrnd_(0, 1); });	
+}
+function perturbedVariances(variancesVect, opt) {
+	var opt = opt;
+	if (opt === undefined) {
+		opt = { };
+	}
+	if (opt.method === undefined) {
+		opt.method = "chopra-ziemba";
+	}
+	var method = opt.method;
+	if (method != "chopra-ziemba") {
+			throw new Error('unsupported perturbation method');
+	}
+	
+	var k = opt.k;
+	if (opt.k === undefined) {
+		k = 0.05;
+	}
+	if (!variancesVect.isVector()) {
+		throw new Error('input must be a vector');
+	}
+	var perturbedVariancesVect = variancesVect.elemMap(function(i,j,val) { 
+	                                                       var pvar = val * (1 + k*normrnd_(0,1)); 
+	                                                       while (pvar == 0) { 
+														       pvar = val * (1 + k*normrnd_(0,1));
+														   }
+														   return pvar;
+													   })
+	return perturbedVariancesVect;
+}
 function BitSet_(arr) {
 	function fromArray(arr) {
 		for (var i = 0; i < arr.length; ++i) {
@@ -1732,17 +2106,18 @@ function randomCompositionsIterator_(n, k) {
 		return this.r.slice(0);
 	}
 }
-function randomPermutationsIterator_(n, out) {
-	this.n = n;
-	if (out === undefined) {
+function randomPermutationsIterator_(n, outputArray, reuseOutputArray) {
+	if (outputArray === undefined) {
 		this.r = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
-		for (var i = 0; i < this.n; ++i) {
+		for (var i = 0; i < n; ++i) {
 			this.r[i] = i+1;
 		}
 	}
 	else {
-		this.r = out;
+		this.r = outputArray;
 	}
+	this.rrlen = this.r.length;
+	this.reuseOutputArray = reuseOutputArray;
 	function uniformrv() {
 		var rnd = Math.random();
 		while (rnd === 0) {
@@ -1751,14 +2126,14 @@ function randomPermutationsIterator_(n, out) {
 		return rnd;
 	}
 	this.next = function() {
-		if (out === undefined) {
-			var rr = this.r.slice(0);
+		if (this.reuseOutputArray) {
+			var rr = this.r;
 		}
 		else {
-			var rr = out;
+			var rr = this.r.slice(0);
 		}
-		for (var m = 1; m <= this.n; ++m) {
-			var l = m + Math.floor( uniformrv()*(this.n + 1 - m) );
+		for (var m = 1; m <= this.rrlen; ++m) {
+			var l = m + Math.floor( uniformrv()*(this.rrlen + 1 - m) );
 			
 			var tmp = rr[l-1];
 			rr[l-1] = rr[m-1];
@@ -2060,6 +2435,76 @@ function geometricMedian_(x) {
 	eps_f = 1e-2 / m;
 	sol = ccpsolveFISTA_(f_eps, gradf_eps, g, proxg, sol[0], {eps: 1e-4, maxIter: -1, maxLine: -1});
 	return sol[0];
+}
+function lineSegmentEuclidianProjection_(x, a, b) {
+	var eps = 1e-8; // the numerical zero
+	var x = new Matrix_(x);
+	
+	var a = new Matrix_(a);
+	var b = new Matrix_(b);
+	if (a.nbRows != x.nbRows || b.nbRows != x.nbRows) {
+		throw new Error('incompatible dimensions: ' + x.nbRows + ', ' + a.nbRows + ', ' + b.nbRows);
+	}
+	
+	var u = Matrix_.xmy(b, a); // b-a
+	var v = Matrix_.xmy(x, a); // x-a
+	var u_two_norm = u.vectorNorm('two');
+	if (u_two_norm <= eps) {
+		return a.toArray();
+	}
+	var t = Math.max(0, Math.min(1, Matrix_.vectorDotProduct(u, v) / (u_two_norm * u_two_norm)));
+	var proj_x = Matrix_.axpby(1, a, t, u);
+	return proj_x.toArray();
+}
+function quantile_(x, p, inputArraySorted) {
+	var xx = x;
+	if (!inputArraySorted) {
+		xx = x.slice(0).sort(function(a, b) { return a-b });
+	}
+    var i = p * (x.length - 1);
+	var i0 = Math.floor(i);
+	var res;
+    if (i0 == i) {
+    	res = xx[i0];
+    } else {
+        res = xx[i0] + (xx[i0 + 1] - xx[i0]) * (i - i0);
+    }
+    return res;
+}
+function boxRandomSampler_(n, l, u, reuseOutputArray) {
+	this.n = n;
+	this.x = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n); // the coordinates of a point being sampled
+	this.reuseOutputArray = reuseOutputArray;
+	this.l = l;
+	if (!this.l) {
+		this.l = typeof Float64Array === 'function' ? new Float64Array(this.n) : new Array(this.n); 
+		for (var i = 0; i < this.n; ++i) {
+			this.l[i] = 0; // default lower bounds values
+		}
+	}
+	this.u = u;
+	if (!this.u) {
+		this.u = typeof Float64Array === 'function' ? new Float64Array(this.n) : new Array(this.n); 
+		for (var i = 0; i < this.n; ++i) {
+			this.u[i] = 1; // default upper bounds values
+		}
+	}
+	for (var i = 0; i < this.n; ++i) {
+		if (this.l[i] > this.u[i]) {
+			throw new Error('empty box detected: lower bound strictly greater than upper bound');
+		}
+	}
+	this.sample = function() {
+		for (var i = 0; i < this.n; ++i) {
+			this.x[i] = Math.random() * (this.u[i] - this.l[i]) + this.l[i];
+		}
+		if (this.reuseOutputArray) {
+			return this.x;
+		}
+		else {
+			return this.x.slice(0);
+		}
+	}
 }
 function boxGridSampler_(n, k, l, u, reuseOutputArray) {
 	this.n = n;
@@ -2531,6 +2976,63 @@ function normcdf_(x) {
 	}
 	return 0.5 + sum * Math.exp(-0.5 * power - 0.91893853320467274178)
 }
+function normrnd_(mu, sigma) {
+	if (!mu) {
+		mu = 0;
+	}
+	if (!sigma) {
+		sigma = 1;
+	}
+	var u = Math.random(); // u ~ U[0,1[
+	while (u === 0.0) {
+		u = Math.random();
+	} // u ~ U]0,1[
+	var r = norminv_(u); // r ~ N(0,1)
+	return mu + sigma*r;
+}
+function pnormrnd_(mu, sigma) {
+	if (mu == undefined) {
+		mu = 0;
+	}
+	if (sigma == undefined) {
+		sigma = 1;
+	}
+	var sigma_sq = sigma*sigma;
+	var A = 1.136717791056118;
+	var mu_a = (1 - A*A)/A*sigma;
+	var mu_b = 0;
+	var mu_c = sigma * Math.sqrt(Math.PI/2);
+	var z;
+	while (true) {
+		var rho;
+		if (mu < mu_a) {
+			var a = (-mu + Math.sqrt(mu*mu + 4*sigma_sq)) / 2 / sigma_sq;
+			
+			z = -Math.log(1 - Math.random())/a;
+			rho = Math.exp( -(z-mu)*(z-mu) / 2 / sigma_sq - a*(mu-z+a*sigma_sq/2) );
+		}
+		else if (mu <= mu_b) { 
+			z = Math.abs(normrnd_())*sigma + mu;
+			rho = (z >= 0) ? 1 : 0;
+		}
+		else if (mu < mu_c) { 
+			var r = (Math.random() < mu/(mu + Math.sqrt(Math.PI/2)*sigma)) ? 1 : 0;
+			var u = Math.random()*mu;
+			var g = Math.abs(normrnd_()*sigma) + mu;
+			
+			z = r*u + (1-r)*g;
+			rho = r*Math.exp(-(z-mu)*(z-mu) / 2 /sigma_sq) + (1-r);
+		}
+		else { 
+			z = normrnd_()*sigma + mu;
+			rho = (z >= 0) ? 1 : 0;
+		}
+		if (Math.random() <= rho){
+			break;
+		}		
+	}
+	return z;
+}
 function norminv_(p) {
 	if (p <= 0.0 || p >= 1.0) {
 		if (p == 0.0) {
@@ -2592,11 +3094,7 @@ function hypersphereRandomSampler_(n, reuseOutputArray) {
 		var t = 0;
 		var s = 1;
 		for (var i = 0; i < this.n; ++i) {
-			var u = Math.random(); // u ~ U[0,1[
-			while (u === 0.0) {
-				u = Math.random();
-			} // u ~ U]0,1[
-			var r = norminv_(u); // r ~ N(0,1)
+			var r = normrnd_();
 			this.x[i] = r;
 			var absR = Math.abs(r);
 			if (absR != 0) {
@@ -2641,6 +3139,98 @@ function covariance_(x, y) {
 function sampleCovariance_(x, y) {
 	var nn = x.length;
 	return covariance_(x,y) * nn/(nn - 1);
+}
+function thresholdAcceptingSolve_(f, x0, opt) { 
+	function defaultNeighbourGenerator(x, neighbourGeneratorParameters) {
+		var alpha = neighbourGeneratorParameters.alpha;
+		var l = neighbourGeneratorParameters.lowerBounds;
+		var u = neighbourGeneratorParameters.upperBounds;
+		var n = x.length;
+		var xl = x.slice();
+		var xu = x.slice();
+		for (var i = 0; i < n; ++i) {
+			xl[i] = x[i] - alpha/2;
+			xu[i] = x[i] + alpha/2;
+			if (l) {
+				xl[i] = Math.max(xl[i], l[i]);
+			}
+			if (u) {
+				xu[i] = Math.min(xu[i], u[i]);
+			}
+		}
+		var xx = new boxRandomSampler_(n, xl, xu).sample();
+		return xx;
+	}
+	function computeThresholds(f, x_c, neighbourGeneratorParameters, nDeltas, nRounds) {	
+		var f_x_c = f(x_c);
+		var deltas = typeof Float64Array === 'function' ? new Float64Array(nDeltas) : new Array(nDeltas);
+		for (var i = 0; i < nDeltas; ++i) {
+			var x_i = neighbourGenerator(x_c, neighbourGeneratorParameters);
+			var f_x_i = f(x_i);
+			deltas[i] = Math.abs(f_x_c - f_x_i);
+			x_c = x_i;
+			f_x_c = f_x_i;
+		}
+		deltas.sort(function(a, b) { return a-b });
+		var taus = typeof Float64Array === 'function' ? new Float64Array(nRounds) : new Array(nRounds);
+		for (var i = 0; i < nRounds; ++i) {
+			taus[i] = quantile_(deltas, (nRounds - (i+1))/nRounds, true);
+		}
+		taus[nRounds-1] = 0;
+		return taus;
+	}
+	var n = x0.nbRows;
+	if (opt === undefined) {
+		opt = {};
+	}
+	var nRounds = opt.nRounds;
+	if (nRounds === undefined) {
+		nRounds = 10;
+	}
+	var nSteps = opt.nSteps;
+	if (nSteps === undefined) {
+		nSteps = 5000;
+	}
+	var nDeltas = opt.nDeltas;
+	if (nDeltas === undefined) {
+		nDeltas = nSteps;
+	}
+	var neighbourGenerator = opt.neighbourGenerator;
+	var neighbourGeneratorParameters = opt.neighbourGeneratorParameters;
+	if (neighbourGenerator === undefined) {
+		neighbourGenerator = defaultNeighbourGenerator;
+		
+		if (neighbourGeneratorParameters === undefined || 
+		    neighbourGeneratorParameters.alpha === undefined) {
+			neighbourGeneratorParameters = { alpha: 1e-3 };
+		}
+	}
+	var x_c = x0.slice();
+	var taus = computeThresholds(f, x_c, neighbourGeneratorParameters, nDeltas, nRounds);
+	var x_best = x0.slice();
+	var f_x_best = f(x_best);
+	var x_c = x0.slice();
+	var f_x_c = f(x_c);
+	for (var r = 0; r < nRounds; ++r) {
+		for (var i = 0; i < nSteps; ++i) {
+			var x_c_tmp = x_c.slice();
+			var x_ri = neighbourGenerator(x_c, neighbourGeneratorParameters);
+			var f_x_ri = f(x_ri);
+			var delta = f_x_ri - f_x_c;
+			if (delta < taus[r]) {
+				x_c = x_ri.slice();
+				f_x_c = f_x_ri;
+			}
+			else {
+				x_c = x_c_tmp;
+			}
+			if (f_x_ri < f_x_best) {
+				f_x_best = f_x_ri;
+				x_best = x_ri.slice();
+			}
+		}
+	}
+	return [x_best, f_x_best];
 }
  function gssSolve_(f, x0, l, u, opt) {
 	function coordinateDirectionsPollingSetGenerator(x, alpha, Ip, Im) {
@@ -2913,7 +3503,7 @@ function sampleCovariance_(x, y) {
 			break;
 		}
 	}
-	return x_k;	
+	return [x_k, f_x_k];
 }
 function goldenSectionSearch_(f, x_min, x_max, opt) {
 	if (opt === undefined) {
@@ -3792,6 +4382,36 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	var fctVal = Matrix_.vectorDotProduct(c, x_kp);
 	return [x_kp, fctVal];		
  }
+function returns(x, opt) {
+	var opt = opt;
+	if (opt === undefined) {
+		opt = { };
+	}
+	if (opt.method === undefined) {
+		opt.method = "arithmetic";
+	}
+	var method = opt.method;
+	if (method != "arithmetic" &&
+	    method != "logarithmic") {
+			throw new Error('unsupported returns computation method');
+	}
+	var returns = typeof Float64Array === 'function' ? new Float64Array(x.length - 1) : new Array(x.length - 1); 
+
+	if (method == "arithmetic") {
+		for (var i = 0; i < x.length - 1; ++i) {
+			returns[i] = (x[i+1] - x[i])/x[i];
+		}
+	}
+	else if (method == "logarithmic") {
+		for (var i = 0; i < x.length - 1; ++i) {
+			returns[i] = Math.log(x[i+1]/x[i]);
+		}
+	}
+	else {
+		throw new Error('internal error: unsupported returns computation method');
+	}
+	return returns;
+}
 function simplexCharacteristicFunction_(x, l, u) {
 	var n = x.length;
 	var eps_tol = 1e-12; // used to numerically determine some conditions
@@ -3848,32 +4468,104 @@ function simplexEmptinessCheck_(n, l, u) {
 	}
 	return [sumLowerBounds, sumUpperBounds];
 }
-function simplexSparseEuclidianProjection_(x, k) {
+function simplexSparseEuclidianProjection_(x, k, l, u) {
 	var n = x.length;
 	if (k === n) {
-		return simplexEuclidianProjection_(x);
+		return simplexEuclidianProjection_(x, l, u);
 	}
-	var idx = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n);
-	for (var i = 0; i < n; ++i) {
-		idx[i] = i;
+	if (!l && !u) {
+		var idx = typeof UInt32Array === 'function' ? new UInt32Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			idx[i] = i;
+		}
+		var compareIndexes = function (a, b) {
+			return x[b] - x[a];
+		};
+		select_(idx, k, compareIndexes);
+		var x_k = x.slice(0, k);
+		for (var i = 0; i < k; ++i) {
+			x_k[i] = x[idx[i]];
+		}
+		var proj_x_k = simplexEuclidianProjection_(x_k);
+		var y = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < k;  ++i) {
+			y[idx[i]] = proj_x_k[i];
+		}
+		for (var i = k; i < n;  ++i) {
+			y[idx[i]] = 0;
+		}
+		return y;
 	}
-	var compareIndexes = function (a, b) {
-	    return x[b] - x[a];
-	};
-	select_(idx, k, compareIndexes);
-	var x_k = x.slice(0, k);
-	for (var i = 0; i < k; ++i) {
-		x_k[i] = x[idx[i]];
+	else {
+		var x = new Matrix_(x);
+		var minDistanceValue = Infinity;
+		var minDistanceIndexes = [];
+		var minDistanceProjX = null;
+		for (var K = 1; K <= k; ++K) {
+			var nextKSubsetIterator = new kSubsetsIterator_(n, K, false);
+			var nextKSubset = nextKSubsetIterator.next();
+			
+			while (nextKSubset != -1) {
+				var subsetNbIndexes = nextKSubset.length;
+				var subsetIndexes = typeof UInt32Array === 'function' ? new UInt32Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				for (var i = 0; i < subsetNbIndexes; ++i) {
+					subsetIndexes[i] = nextKSubset[i];
+				}
+				var subsetX = typeof Float64Array === 'function' ? new Float64Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				for (var i = 0; i < subsetNbIndexes; ++i) {
+					subsetX[i] = x.data[subsetIndexes[i]-1];
+				}
+				var subsetL = typeof Float64Array === 'function' ? new Float64Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				if (l) {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetL[i] = l[subsetIndexes[i]-1];
+					}
+				}
+				else {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetL[i] = 0;
+					}
+				}
+				var subsetU = typeof Float64Array === 'function' ? new Float64Array(subsetNbIndexes) : new Array(subsetNbIndexes);
+				if (u) {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetU[i] = u[subsetIndexes[i]-1];
+					}
+				}
+				else {
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						subsetU[i] = 1;
+					}
+				}
+				try {
+					var proj_subsetX = simplexEuclidianProjection_(subsetX, subsetL, subsetU);
+					var proj_x = Matrix_.zeros(n, 1);
+					for (var i = 0; i < subsetNbIndexes; ++i) {
+						proj_x.data[subsetIndexes[i] - 1] = proj_subsetX[i];
+					}
+					var d_x_proj_x = Matrix_.axpby(1, x, -1, proj_x).vectorNorm('two');
+					if (d_x_proj_x < minDistanceValue) {
+						minDistanceValue = d_x_proj_x;
+						minDistanceIndexes = subsetIndexes;
+						minDistanceProjX = proj_x;
+					}
+					
+				}
+				catch (e) {
+					if (e.message !== "infeasible problem detected: the restricted simplex is empty") {
+						throw(e);
+					}
+				}
+				var nextKSubset = nextKSubsetIterator.next();
+			}
+		}
+		if (minDistanceValue != Infinity) {
+			return minDistanceProjX.toArray();
+		}
+		else {
+			throw new Error('infeasible problem detected');
+		}
 	}
-	var proj_x_k = simplexEuclidianProjection_(x_k);
-	var y = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
-	for (var i = 0; i < k;  ++i) {
-		y[idx[i]] = proj_x_k[i];
-	}
-	for (var i = k; i < n;  ++i) {
-		y[idx[i]] = 0;
-	}
-	return y;
 }
 function simplexEuclidianProjection_(x, l, u) {
 	var n = x.length;
@@ -4353,11 +5045,6 @@ function equalRiskBoundingWeights (sigma, opt) {
 	}
 	return weights.toArray();
 }
-function equalRiskBudgetWeights (sigma, opt) {
-	var weights = new Matrix_(sigma).elemMap(function(i,j,val) { return 1/Math.sqrt(val); })
-	weights = weights.normalize(weights);
-	return weights.toArray();
-}
 function equalRiskContributionWeights (sigma, opt) {	
 	var sigma = new Matrix_(sigma);
 	var nbAssets = sigma.nbRows;
@@ -4405,85 +5092,31 @@ function globalMinimumVarianceWeights (sigma, opt) {
 	var weights = sol[0];
 	return weights.toArray();
 }
-function meanVarianceOptimizationWeights(mu, sigma, opt) {	
-	if (opt === undefined) {
-		opt = { constraints: {} };
-	}
-	if (opt.constraints === undefined) {
-		opt.constraints = {};
-	}
-	var optimizationMethod = opt.optimizationMethod;
-	if (optimizationMethod === undefined) {
-		throw new Error('missing mean-variance optimization method');
-	}
-	if (optimizationMethod !== 'targetReturn' &&  
-	    optimizationMethod !== 'targetVolatility' &&
-		optimizationMethod !== 'minimumVariance' &&
-		optimizationMethod !== 'maximumTargetVolatility') {
-		throw new Error('unsupported mean-variance optimization method');
-	}
-	var targetReturn = opt.constraints["return"]; // .return does not work within Google Script
-	if (optimizationMethod === 'targetReturn' && targetReturn === undefined) {
-		throw new Error('missing mean-variance optimization method return constraint');
-	}
-	
-	var targetVolatility = opt.constraints.volatility;
-	if (optimizationMethod === 'targetVolatility' && targetVolatility === undefined) {
-		throw new Error('missing mean-variance optimization method volatility constraint');
-	}
-
-	var maxTargetVolatility = opt.constraints.maxVolatility;
-	if (optimizationMethod === 'maximumTargetVolatility' &&  maxTargetVolatility === undefined) {
-		throw new Error('missing mean-variance optimization method maximum volatility constraint');
-	}
-	var mu = new Matrix_(mu);
-	var sigma = new Matrix_(sigma);
-	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
-	var efficientPortfolio;
-	if (optimizationMethod == 'targetReturn') {
-		efficientPortfolio = computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfolios);
-		if (efficientPortfolio.length == 0) {
-			throw new Error('return not reachable');
-		}
-		else {
-			efficientPortfolio = efficientPortfolio[0];
-		}
-	}
-	else if (optimizationMethod == 'targetVolatility') {
-		efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cornerPortfolios);
-		if (efficientPortfolio.length == 0) {
-			throw new Error('volatility not reachable');
-		}
-		else {
-			efficientPortfolio = efficientPortfolio[0];
-		}
-	}
-	else if (optimizationMethod == 'minimumVariance') {
-		efficientPortfolio = computeMinimumVarianceEfficientPortfolio_(cornerPortfolios);
-	}
-	else if (optimizationMethod == 'maximumTargetVolatility') {
-		var opt_mv = { maxIter: opt.maxIter, constraints: opt.constraints };
-		
-		efficientPortfolio = computeMaximumTargetVolatilityEfficientPortfolio_(mu, sigma, maxTargetVolatility, cornerPortfolios, opt_mv);
-	}
-	else {
-		throw new Error('internal error');
-	}
-	var weights = efficientPortfolio;
+function inverseVolatilityWeights (sigma, opt) {
+	var weights = new Matrix_(sigma).elemMap(function(i,j,val) { return 1/Math.sqrt(val); })
+	weights = weights.normalize(weights);
 	return weights.toArray();
 }
 function maximumSharpeRatioWeights(mu, sigma, rf, opt) {
-	function computeReturn_(mu, weights) {
-		return Matrix_.vectorDotProduct(mu, weights);
+	var eps = 1e-8; // the numerical zero
+	function portfolioReturn(x, mu, sigma) {
+		return Matrix_.vectorDotProduct(mu, x);
 	}
-	function computeVolatility_(sigma, weights) {
-		return Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights));
+	function portfolioVolatility(x, mu, sigma) {	
+		var sigma_x_x = Matrix_.vectorDotProduct(Matrix_.xy(sigma, x), x);		
+		if (Math.abs(sigma_x_x) <= eps) {
+			sigma_x_x = 0;
+		}
+		else if (sigma_x_x < 0 && sigma_x_x < -eps) {
+			throw new Error('negative volatility, covariance matrix might not be semi-definite positive');
+		}
+		var s_x = Math.sqrt(sigma_x_x);
+		return s_x;
 	}
 	function computeSharpeRatio_(mu, sigma, rf, weights) {
-		var eps = 1e-8; // the numerical zero
-		var ret = computeReturn_(mu, weights);
+		var ret = portfolioReturn(weights, mu, sigma);
 		var excessRet = ret - rf;
-		var vol = computeVolatility_(sigma, weights);
+		var vol = portfolioVolatility(weights, mu, sigma);
 		if (Math.abs(vol) < eps) {
 			vol = eps;
 		}
@@ -4491,7 +5124,6 @@ function maximumSharpeRatioWeights(mu, sigma, rf, opt) {
 		return [sharpeRatio, ret, vol];
 	}
 	function computeMaximumSharpeRatioCornerPortfolio_(mu, sigma, rf, cornerPortfolios) {
-		var eps = 1e-8; // the numerical zero
 		var idx_min = cornerPortfolios.length - 1;
 		var idx_max = 0;
 
@@ -4599,13 +5231,14 @@ function maximumSharpeRatioWeights(mu, sigma, rf, opt) {
 	}
 	var mu = new Matrix_(mu);
 	var sigma = new Matrix_(sigma);
-	var eps = 1e-8; // the numerical zero
 	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
 	var idx = cornerPortfolios.length - 1;
 	var weights = cornerPortfolios[idx][0];
-	var volatility = computeVolatility_(sigma, weights);
+	var volatility = portfolioVolatility(weights, mu, sigma);
 	if (volatility < eps) {
-		var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(sigma, eps, cornerPortfolios);
+		var efficientPortfolio = computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, 
+		                                                               {constraint: "volatility",
+															            constraintValue: eps});		
 		if (efficientPortfolio.length == 0) {
 			throw new Error('no corner portfolio with a strictly positive volatility: the covariance matrix might not be semi-definite positive');
 		}
@@ -4616,9 +5249,11 @@ function maximumSharpeRatioWeights(mu, sigma, rf, opt) {
 	}
 	var idx = cornerPortfolios.length - 1;
 	var weights = cornerPortfolios[idx][0];
-	var ret = computeReturn_(mu, weights);
+	var ret = portfolioReturn(weights, mu, sigma);
 	if (ret < rf + eps) {
-		var efficientPortfolio = computeTargetReturnEfficientPortfolio_(mu, rf + eps, cornerPortfolios);
+		var efficientPortfolio = computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, 
+		                                                                {constraint: "return",
+															             constraintValue: rf + eps});
 		if (efficientPortfolio.length == 0) {
 			throw new Error('no corner portfolio with a strictly positive excess return');
 		}
@@ -4657,7 +5292,356 @@ function maximumSharpeRatioWeights(mu, sigma, rf, opt) {
 	var weights = maxSharpeRatio[0];
 	return weights.toArray();
 }
+function meanVarianceOptimizationWeights(mu, sigma, opt) {	
+	var eps = 1e-8; // the numerical zero
+	function portfolioReturn(x, mu, sigma) {
+		return Matrix_.vectorDotProduct(mu, x);
+	}
+	function portfolioVolatility(x, mu, sigma) {	
+		var sigma_x_x = Matrix_.vectorDotProduct(Matrix_.xy(sigma, x), x);		
+		if (Math.abs(sigma_x_x) <= eps) {
+			sigma_x_x = 0;
+		}
+		else if (sigma_x_x < 0 && sigma_x_x < -eps) {
+			throw new Error('negative volatility, covariance matrix might not be semi-definite positive');
+		}
+		var s_x = Math.sqrt(sigma_x_x);
+		return s_x;
+	}
+	if (opt === undefined) {
+		opt = { constraints: {} };
+	}
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
+	var fullInvestmentContraint = true;
+	if (opt.constraints.fullInvestment !== undefined) {
+		fullInvestmentContraint = opt.constraints.fullInvestment;
+	}
+	var returnConstraint = opt.constraints["return"]; // .return does not work within Google Script
+	var volatilityConstraint = opt.constraints.volatility;
+	var maxVolatilityConstraint = opt.constraints.maxVolatility;
+	var riskToleranceConstraint = opt.constraints.riskTolerance;
+	if (returnConstraint === undefined && volatilityConstraint === undefined &&
+		maxVolatilityConstraint === undefined && riskToleranceConstraint == undefined) {
+		throw new Error('missing return, volatility or risk tolerance constraints');
+	}
+	if ( (returnConstraint !== undefined && volatilityConstraint !== undefined) ||
+		 (returnConstraint !== undefined && maxVolatilityConstraint !== undefined) ) {
+		throw new Error('simultaneous return and volatility constraints');
+	}
+	if ( riskToleranceConstraint !== undefined && 
+	     (returnConstraint !== undefined || maxVolatilityConstraint !== undefined || volatilityConstraint !== undefined) ) {
+		throw new Error('simultaneous risk tolerance and return or volatility constraints');
+	}
+	var mu = new Matrix_(mu);
+	var sigma = new Matrix_(sigma);
+	var nbAssets = sigma.nbColumns;
+	var cornerPortfolios;
+	if (fullInvestmentContraint) {
+		cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
+	}
+	else {
+		mu = Matrix_.fill(nbAssets + 1, 1, 
+							function(i, j) { 
+								if (i <= nbAssets) {
+									return mu.getValue(i, 1);
+								}
+								else {
+									return 0;
+								}
+							});
+		sigma = Matrix_.fill(nbAssets + 1, nbAssets + 1, 
+							function(i, j) { 
+								if (i <= nbAssets && j <= nbAssets) {
+									return sigma.getValue(i, j);
+								}
+								else {
+									return 0;
+								}
+							});
+		var minWeights = null;
+		if (opt.constraints.minWeights) {
+			minWeights = typeof Float64Array === 'function' ? new Float64Array(nbAssets + 1) : new Array(nbAssets + 1); 
+			for (var i = 0; i < nbAssets; ++i) {
+				minWeights[i] = opt.constraints.minWeights[i];
+			}
+			minWeights[nbAssets] = 0; // risk free asset, no min weight
+		}
+		var maxWeights = null;
+		if (opt.constraints.maxWeights) {
+			maxWeights = typeof Float64Array === 'function' ? new Float64Array(nbAssets + 1) : new Array(nbAssets + 1); 
+			for (var i = 0; i < nbAssets; ++i) {
+				maxWeights[i] = opt.constraints.maxWeights[i]
+			}
+			maxWeights[nbAssets] = 1; // risk free asset, no max weight
+		}
+		var newOpt = { maxIter: opt.maxIter, constraints: opt.constraints };
+		if (opt.constraints.minWeights) {
+			newOpt.constraints.minWeights = minWeights;
+		}
+		if (opt.constraints.maxWeights) {
+			newOpt.constraints.maxWeights = maxWeights;
+		}
+		cornerPortfolios = computeCornerPortfolios_(mu, sigma, newOpt);			
+	}
+	var efficientPortfolioWeights;
+	if (returnConstraint !== undefined) {
+		var efficientPortfolio = computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, {constraint: "return", 
+																						              constraintValue: returnConstraint});
+		if (efficientPortfolio.length == 0) {
+			throw new Error('no matching efficient portfolio with a return equal to ' + returnConstraint);
+		}
+		else {
+			efficientPortfolioWeights = efficientPortfolio[0];
+		}
+	}
+	else if (volatilityConstraint !== undefined) {
+		var efficientPortfolio = computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, {constraint: "volatility", 
+																						              constraintValue: volatilityConstraint});
+		if (efficientPortfolio.length == 0) {
+			throw new Error('no matching efficient portfolio with a volatility equal to ' + volatilityConstraint);
+		}
+		else {
+			efficientPortfolioWeights = efficientPortfolio[0];
+		}
+	}
+	else if (riskToleranceConstraint !== undefined) {
+		var highestRiskTolerancePortfolioWeights = cornerPortfolios[0][0];
+		var highestRiskTolerance = cornerPortfolios[0][1];
+		var lowestRiskTolerancePortfolioWeights = cornerPortfolios[cornerPortfolios.length-1][0];
+		var lowestRiskTolerance = cornerPortfolios[cornerPortfolios.length-1][1];
+		if (riskToleranceConstraint > highestRiskTolerance - eps) {
+			efficientPortfolioWeights = highestRiskTolerancePortfolioWeights;
+		}
+		else if (riskToleranceConstraint < lowestRiskTolerance + eps) {
+			efficientPortfolioWeights = lowestRiskTolerancePortfolioWeights;
+		}
+		else {
+			var efficientPortfolio = computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, {constraint: "riskTolerance", 
+																										  constraintValue: riskToleranceConstraint});
+			if (efficientPortfolio.length == 0) {
+				throw new Error('internal error: no matching efficient portfolio with a risk tolerance equal to ' + riskToleranceConstraint);
+			}
+			else {
+				efficientPortfolioWeights = efficientPortfolio[0];
+			}
+		}																						  
+	}
+	else if (maxVolatilityConstraint !== undefined) {
+		var highestVolatilityPortfolioWeights = cornerPortfolios[0][0];
+		var highestVolatility = portfolioVolatility(highestVolatilityPortfolioWeights, mu, sigma);
+		if (maxVolatilityConstraint > highestVolatility - eps) {
+			efficientPortfolioWeights = highestVolatilityPortfolioWeights;
+		}
+		else {
+			var efficientPortfolio = computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, {constraint: "volatility", 
+																						                  constraintValue: maxVolatilityConstraint});
+			if (efficientPortfolio.length == 0) {
+				throw new Error('no matching efficient portfolio with a volatility lower than or equal to ' + maxVolatilityConstraint);
+			}
+			else {
+				efficientPortfolioWeights = efficientPortfolio[0];
+			}
+		}
+	}	
+	if (!fullInvestmentContraint) {
+		efficientPortfolioWeights = Matrix_.fill(nbAssets, 1, 
+												function(i, j) { 
+													if (i <= nbAssets) {
+														return efficientPortfolioWeights.getValue(i, 1);
+													}
+												});
+	}
+	return efficientPortfolioWeights.toArray();
+}
+function computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, opt) {
+	var eps = 1e-8; // the numerical zero
+	function portfolioReturn(x, mu, sigma, lambda) {
+		return Matrix_.vectorDotProduct(mu, x);
+	}
+	function portfolioVolatility(x, mu, sigma, lambda) {	
+		var sigma_x_x = Matrix_.vectorDotProduct(Matrix_.xy(sigma, x), x);		
+		if (Math.abs(sigma_x_x) <= eps) {
+			sigma_x_x = 0;
+		}
+		else if (sigma_x_x < 0 && sigma_x_x < -eps) {
+			throw new Error('negative volatility, covariance matrix might not be semi-definite positive');
+		}
+		var s_x = Math.sqrt(sigma_x_x);
+		return s_x;
+	}
+	function portfolioRiskTolerance(x, mu, sigma, lambda) {
+		return lambda;
+	}
+	function computeEnclosingCornerPortfolios(fct, fctValue, cornerPortfolios) {		
+		var idx_min = cornerPortfolios.length - 1;
+		var idx_max = 0
+
+		var weights_min = cornerPortfolios[idx_min][0];
+		var weights_max = cornerPortfolios[idx_max][0];
+		
+		var lambda_min = cornerPortfolios[idx_min][1];
+		var lambda_max = cornerPortfolios[idx_max][1];
+
+		var fct_min = fct(weights_min, mu, sigma, lambda_min);
+		var fct_max = fct(weights_max, mu, sigma, lambda_max);
+		if (fctValue > fct_max + eps || fctValue < fct_min - eps) {
+			return [];
+		}
+		if (Math.abs(fctValue - fct_min) <= eps) {
+			return [[idx_min, weights_min, fct_min]];
+		}
+		else if (Math.abs(fctValue - fct_max) <= eps) {
+			return [[idx_max, weights_max, fct_max]];
+		}
+		while (idx_min - idx_max != 1) { 
+			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // formula avoiding numerical overflow
+			var weights_middle = cornerPortfolios[idx_middle][0];
+			var lambda_middle = cornerPortfolios[idx_middle][1];
+			var fct_middle = fct(weights_middle, mu, sigma, lambda_middle);
+			if (fct_middle > fctValue) {
+				idx_max = idx_middle;
+				fct_max = fct_middle;
+				weights_max = weights_middle;
+			}
+			else if (fct_middle < fctValue) {
+				idx_min = idx_middle;
+				fct_min = fct_middle;
+				weights_min = weights_middle;
+			}
+			else { // the target constraint function value is exactly attained on the idx_middle-th corner portfolio
+				return [[idx_middle, weights_middle, fct_middle]];
+			}
+		}
+		return [[idx_min, weights_min, fct_min], [idx_max, weights_max, fct_max]];
+	}
+	var constraint = opt.constraint;
+	if (constraint === undefined || constraint === null) {
+		throw new Error('internal error: missing constraint');
+	}
+	
+	var constraintFct;
+	if (constraint == "return") {
+		constraintFct = portfolioReturn;
+	}
+	else if (constraint == "volatility") {
+		constraintFct = portfolioVolatility;
+	}
+	else if (constraint == "riskTolerance") {
+		constraintFct = portfolioRiskTolerance;
+	}
+	else {
+		throw new Error('internal error: unknown constraint');
+	}
+	
+	var constraintValue = opt.constraintValue;
+	if (constraintValue === undefined || constraintValue === null) {
+		throw new Error('internal error: missing constraint value');
+	}
+	if (cornerPortfolios.length === 0) {
+		throw new Error('internal error: no corner portfolios');
+	}
+	var enclosingCornerPortfolios = computeEnclosingCornerPortfolios(constraintFct, 
+	                                                                 constraintValue, 
+																	 cornerPortfolios);
+	if (enclosingCornerPortfolios.length == 0) {
+		return [];
+	}
+	else if (enclosingCornerPortfolios.length == 1) {
+		var idx_min = enclosingCornerPortfolios[0][0];
+		var weights = enclosingCornerPortfolios[0][1];
+		return [weights, idx_min];
+	}
+	else {
+		var idx_min = enclosingCornerPortfolios[0][0];
+		var weights_min = enclosingCornerPortfolios[0][1];
+		var fct_min = enclosingCornerPortfolios[0][2];
+			
+		var idx_max = enclosingCornerPortfolios[1][0];
+		var weights_max = enclosingCornerPortfolios[1][1];
+		var fct_max = enclosingCornerPortfolios[1][2];
+		var t;
+		if (constraint === "return") {
+			t = (fct_max - constraintValue)/(fct_max - fct_min);
+		}		
+		else if (constraint === "volatility") {		
+			var variance_cross = Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights_min), weights_max); // <Sigma*w_min/w_max>
+			var a = fct_min * fct_min + fct_max * fct_max - 2 * variance_cross; // always >= 0, by semi-definite positivity of the covariance matrix
+			var b = -2 * (fct_max * fct_max - variance_cross); // 
+			var c = fct_max * fct_max - constraintValue*constraintValue; //always > 0
+			var b_p = b/2; // reduced discriminant
+			var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
+			var disc = b_p*b_p - a*c;
+			if (disc < 0) {
+				throw new Error('internal error; the covariance matrix might not be semi-definite positive');
+			}
+			var q = -(b_p + sign_b_p * Math.sqrt(disc));
+			var r1 = q/a;
+			var r2 = c/q;
+			
+			if (r1 > 0 && r1 < 1) {
+				t = r1;
+			}
+			else if (r2 > 0 && r2 < 1) {
+				t = r2;
+			}
+			else {
+				throw new Error('internal error: the covariance matrix might not be semi-definite positive');
+			}
+		}
+		else if (constraint === "riskTolerance") {
+			t = (fct_max - constraintValue)/(fct_max - fct_min);
+		}
+		else {
+			throw new Error('internal error: unknown constraint');
+		}
+		var weights = Matrix_.fill(weights_min.nbRows, 1, 
+							   	   function(i,j) { 
+									   return t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1); 
+								   });
+		return [weights, idx_min, idx_max];
+	}
+}
+function meanVarianceEfficientFrontierNearestWeights(inputWeights, mu, sigma, opt) {
+	var eps = 1e-8; // the numerical zero
+	var mu = new Matrix_(mu);
+	var sigma = new Matrix_(sigma);
+	var inputWeights = new Matrix_(inputWeights);
+	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
+	if (cornerPortfolios.length == 0) {
+		throw new Error('internal error: no corner portfolios');
+	}
+	var weights;
+	var minDist = Number.POSITIVE_INFINITY;
+	for (var i = 0; i < cornerPortfolios.length - 1; ++i) {
+		var w_e = cornerPortfolios[i][0];
+		var w_b = cornerPortfolios[i+1][0];
+		var proj = lineSegmentEuclidianProjection_(inputWeights, w_b, w_e);
+		var dist = Matrix_.xmy(inputWeights, new Matrix_(proj)).vectorNorm('two');
+		if (dist <= minDist) {
+			weights = proj;
+			minDist = dist;
+		}
+	}
+	return weights;
+}
 function meanVarianceEfficientFrontierPortfolios(mu, sigma, opt) {
+	var eps = 1e-8; // the numerical zero
+	function portfolioReturn(x, mu, sigma) {
+		return Matrix_.vectorDotProduct(mu, x);
+	}
+	function portfolioVolatility(x, mu, sigma) {	
+		var sigma_x_x = Matrix_.vectorDotProduct(Matrix_.xy(sigma, x), x);		
+		if (Math.abs(sigma_x_x) <= eps) {
+			sigma_x_x = 0;
+		}
+		else if (sigma_x_x < 0 && sigma_x_x < -eps) {
+			throw new Error('negative volatility, covariance matrix might not be semi-definite positive');
+		}
+		var s_x = Math.sqrt(sigma_x_x);
+		return s_x;
+	}
 	if (opt === undefined) {
 		opt = { constraints: {} };
 	}
@@ -4675,12 +5659,11 @@ function meanVarianceEfficientFrontierPortfolios(mu, sigma, opt) {
 			throw new Error('efficient frontier made of only one corner portfolio: only one efficient portfolio can be computed');
 		}
 		else {
-			var portfolioWeights = cornerPortfolios[0][0];
-			var portfolioReturn = Matrix_.vectorDotProduct(mu, portfolioWeights);
-			var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, portfolioWeights), 
-																	     portfolioWeights));
+			var weights = cornerPortfolios[0][0];
+			var ret = portfolioReturn(weights, mu, sigma);
+			var vol = portfolioVolatility(weights, mu, sigma);
 			
-			return [[portfolioWeights.toArray(), portfolioReturn, portfolioVolatility]];
+			return [[weights.toArray(), ret, vol]];
 		}
 	}
 	else { // cornerPortfolios.length >= 2
@@ -4688,318 +5671,63 @@ function meanVarianceEfficientFrontierPortfolios(mu, sigma, opt) {
 			throw new Error('efficient frontier made of several corner portfolios: at least two efficient portfolios must be computed');
 		}
 	}
-	var lambda_min = cornerPortfolios[cornerPortfolios.length - 1][1];
-	var lambda_max = cornerPortfolios[0][1];
+	var lambda_min = cornerPortfolios[0][1];
+	var lambda_max = cornerPortfolios[cornerPortfolios.length-1][1];
 	var delta_lambda = (lambda_max - lambda_min)/(nbPortfolios - 1);
 	
-	var lambda_i = lambda_min; // the first lambda_i point is lambda_min
-	var lambda_i_min_idx = cornerPortfolios.length - 1;
-	var lambda_i_max_idx = lambda_i_min_idx - 1;
-	var lambda_i_min = cornerPortfolios[lambda_i_min_idx][1];
-	var lambda_i_max = cornerPortfolios[lambda_i_max_idx][1];
-	var w_i_min = cornerPortfolios[lambda_i_min_idx][0];
-	var w_i_max = cornerPortfolios[lambda_i_max_idx][0];
-	{
-		var minimumVariancePortfolioWeights = cornerPortfolios[lambda_i_min_idx][0];
-		var portfolioReturn = Matrix_.vectorDotProduct(mu, minimumVariancePortfolioWeights);
-		var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, minimumVariancePortfolioWeights), 
-																	minimumVariancePortfolioWeights));
-		
-		efficientFrontier[0] = [minimumVariancePortfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
-	}
-	for (var i = 1; i < nbPortfolios - 1; ++i) {
+	for (var i = 0; i < nbPortfolios; ++i) {
 		var lambda_i = lambda_min + i * delta_lambda;
-		while (lambda_i > lambda_i_max) {
-			--lambda_i_min_idx;
-			--lambda_i_max_idx;
-			
-			lambda_i_min = cornerPortfolios[lambda_i_min_idx][1];
-			lambda_i_max = cornerPortfolios[lambda_i_max_idx][1];
-			
-			w_i_min = cornerPortfolios[lambda_i_min_idx][0];
-			w_i_max = cornerPortfolios[lambda_i_max_idx][0];
+		var weights = computeMeanVarianceEfficientPortfolio_(mu, sigma, cornerPortfolios, {constraint: "riskTolerance", 
+																						   constraintValue: lambda_i});																						   
+		if (weights.length == 0) {
+			throw new Error('internal error: no matching efficient portfolio with a risk tolerance equal to ' + lambda_i);
 		}
-		var t = (lambda_i - lambda_i_min)/(lambda_i_max - lambda_i_min);
-		var portfolioWeights = Matrix_.fill(nbAssets, 1, 
-								function(i,j) { 
-									return (1-t)*w_i_min.getValue(i, 1) + t*w_i_max.getValue(i, 1); 
-								})
-		var portfolioReturn = Matrix_.vectorDotProduct(mu, portfolioWeights);
-		var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, portfolioWeights), 
-																	   portfolioWeights));
-		
-		efficientFrontier[i] = [portfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
-	}
-	lambda_i = lambda_max;
-	lambda_i_min_idx = 1;
-	lambda_i_max_idx = lambda_i_min_idx - 1;
-	{
-		var maximumReturnPortfolioWeights = cornerPortfolios[lambda_i_max_idx][0];
-		var portfolioReturn = Matrix_.vectorDotProduct(mu, maximumReturnPortfolioWeights);
-		var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, maximumReturnPortfolioWeights), 
-																	 maximumReturnPortfolioWeights));
-		
-		efficientFrontier[nbPortfolios - 1] = [maximumReturnPortfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
+		else {
+			weights = weights[0];
+			
+			var ret = portfolioReturn(weights, mu, sigma);
+			var vol = portfolioVolatility(weights, mu, sigma);
+			efficientFrontier[(nbPortfolios - 1) - i] = [weights.toArray(), ret, vol];
+		}
 	}
 	return efficientFrontier;
 }
-function meanVarianceCornerPortfolios(mu, sigma, opt) {
+function meanVarianceEfficientFrontierCornerPortfolios(mu, sigma, opt) {
+	var eps = 1e-8; // the numerical zero
+	function portfolioReturn(x, mu, sigma) {
+		return Matrix_.vectorDotProduct(mu, x);
+	}
+	function portfolioVolatility(x, mu, sigma) {	
+		var sigma_x_x = Matrix_.vectorDotProduct(Matrix_.xy(sigma, x), x);		
+		if (Math.abs(sigma_x_x) <= eps) {
+			sigma_x_x = 0;
+		}
+		else if (sigma_x_x < 0 && sigma_x_x < -eps) {
+			throw new Error('negative volatility, covariance matrix might not be semi-definite positive');
+		}
+		var s_x = Math.sqrt(sigma_x_x);
+		return s_x;
+	}
 	var mu = new Matrix_(mu);
 	var sigma = new Matrix_(sigma);
 	var cornerPortfolios = computeCornerPortfolios_(mu, sigma, opt);
-	var efficientFrontier = new Array(cornerPortfolios.length);
-	for (var i = 0; i < cornerPortfolios.length; ++i) {
-		var portfolioWeights = cornerPortfolios[i][0];
-		var portfolioReturn = Matrix_.vectorDotProduct(mu, portfolioWeights);
-		var portfolioVolatility = Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, portfolioWeights), 
-																	       portfolioWeights));
-		
-		efficientFrontier[cornerPortfolios.length - 1 - i] = [portfolioWeights.toArray(), portfolioReturn, portfolioVolatility];
-	}
-	return efficientFrontier;
-}
-function computeTargetReturnEfficientPortfolio_(mu, targetReturn, cornerPortfolios) {
-	function computeReturn_(mu, weights) {
-		return  Matrix_.vectorDotProduct(mu, weights);
-	}
-	function computeEnclosingCornerPortfolios_(targetReturn, mu, cornerPortfolios) {
-		var eps = 1e-8; // the numerical zero
-		var idx_min = cornerPortfolios.length - 1;
-		var idx_max = 0
-
-		var weights_min = cornerPortfolios[idx_min][0];
-		var weights_max = cornerPortfolios[idx_max][0];
-
-		var return_min = computeReturn_(mu, weights_min);
-		var return_max = computeReturn_(mu, weights_max);
-		if (targetReturn - return_max > eps || -eps > targetReturn - return_min) {
-			return [];
+	var efficientFrontier = [];
+	var weights = cornerPortfolios[0][0];
+	var ret = portfolioReturn(weights, mu, sigma);
+	var vol = portfolioVolatility(weights, mu, sigma);
+	efficientFrontier.push([weights.toArray(), ret, vol]);
+	var currentWeights = weights;
+	for (var i = 1; i < cornerPortfolios.length; ++i) {
+		var weights = cornerPortfolios[i][0];
+		if (Matrix_.areEqual(weights, currentWeights, eps)) {
+			continue;
 		}
-		if (Math.abs(targetReturn - return_min) <= eps) {
-			return [[idx_min, weights_min, return_min]];
-		}
-		else if (Math.abs(targetReturn - return_max) <= eps) {
-			return [[idx_max, weights_max, return_max]];
-		}
-		while (idx_min - idx_max != 1) { 
-			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // formula avoiding numerical overflow
-			var weights_middle = cornerPortfolios[idx_middle][0];
-			var return_middle = computeReturn_(mu, weights_middle);
-			if (return_middle - targetReturn > eps) {
-				idx_max = idx_middle;
-				return_max = return_middle;
-				weights_max = weights_middle;
-			}
-			else if (return_middle - targetReturn < -eps) {
-				idx_min = idx_middle;
-				return_min = return_middle;
-				weights_min = weights_middle;
-			}
-			else { // the target return is exactly attained on the idx_middle-th corner portfolio
-				return [[idx_middle, weights_middle, return_middle]];
-			}
-		}
-		return [[idx_min, weights_min, return_min], [idx_max, weights_max, return_max]];
+		var ret = portfolioReturn(weights, mu, sigma);
+		var vol = portfolioVolatility(weights, mu, sigma);
+		efficientFrontier.push([weights.toArray(), ret, vol]);
+		currentWeights = weights;
 	}
-	var enclosingCornerPortfolios = computeEnclosingCornerPortfolios_(targetReturn, mu, cornerPortfolios);
-	if (enclosingCornerPortfolios.length == 0) {
-		return [];
-	}
-	else if (enclosingCornerPortfolios.length == 1) {
-		var idx_min = enclosingCornerPortfolios[0][0];
-		var weights = enclosingCornerPortfolios[0][1];
-		return [weights, idx_min];
-	}
-	else {
-		var idx_min = enclosingCornerPortfolios[0][0];
-		var weights_min = enclosingCornerPortfolios[0][1];
-		var return_min = enclosingCornerPortfolios[0][2];
-		
-		var idx_max = enclosingCornerPortfolios[1][0];
-		var weights_max = enclosingCornerPortfolios[1][1];
-		var return_max = enclosingCornerPortfolios[1][2];
-		var t = (return_max - targetReturn)/(return_max - return_min);
-		var weights = Matrix_.fill(weights_min.nbRows, 1, 
-							   	   function(i,j) { 
-									   return t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1); 
-								   });
-		return [weights, idx_min, idx_max];
-	}
-}
-function computeTargetVolatilityEfficientPortfolio_(sigma, targetVolatility, cornerPortfolios) {
-	function computeVolatility_(sigma, weights) {
-		return Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights));
-	}
-	function computeEnclosingCornerPortfolios_(targetVolatility, sigma, cornerPortfolios) {
-		var eps = 1e-8;
-		var idx_min = cornerPortfolios.length - 1;
-		var idx_max = 0
-
-		var weights_min = cornerPortfolios[idx_min][0];
-		var weights_max = cornerPortfolios[idx_max][0];
-
-		var volatility_min = computeVolatility_(sigma, weights_min);
-		var volatility_max = computeVolatility_(sigma, weights_max);
-		if (targetVolatility - volatility_max > eps || -eps > targetVolatility - volatility_min) {
-			return [];
-		}
-		if (Math.abs(targetVolatility - volatility_min) <= eps) {
-			return [[idx_min, weights_min, volatility_min]];
-		}
-		else if (Math.abs(targetVolatility - volatility_max) <= eps) {
-			return [[idx_max, weights_max, volatility_max]];
-		}
-		while (idx_min - idx_max != 1) { 
-			var idx_middle = Math.floor(idx_max + (idx_min - idx_max)/2); // formula avoiding numerical overflow
-			var weights_middle = cornerPortfolios[idx_middle][0];
-			var volatility_middle = computeVolatility_(sigma, weights_middle);
-			if (volatility_middle - targetVolatility > eps) {
-				idx_max = idx_middle;
-				volatility_max = volatility_middle;
-				weights_max = weights_middle;
-			}
-			else if (volatility_middle - targetVolatility < -eps) {
-				idx_min = idx_middle;
-				volatility_min = volatility_middle;
-				weights_min = weights_middle;
-			}
-			else { // the target volatility is exactly attained on the idx_middle-th corner portfolio
-				return [[idx_middle, weights_middle, volatility_middle]];
-			}
-		}
-		return [[idx_min, weights_min, volatility_min], [idx_max, weights_max, volatility_max]];
-	}
-	var enclosingCornerPortfolios = computeEnclosingCornerPortfolios_(targetVolatility, sigma, cornerPortfolios);
-	if (enclosingCornerPortfolios.length == 0) {
-		return [];
-	}
-	else if (enclosingCornerPortfolios.length == 1) {
-		var idx_min = enclosingCornerPortfolios[0][0];
-		var weights = enclosingCornerPortfolios[0][1];
-		return [weights, idx_min];
-	}
-	else {
-		var idx_min = enclosingCornerPortfolios[0][0];
-		var weights_min = enclosingCornerPortfolios[0][1];
-		var volatility_min = enclosingCornerPortfolios[0][2];
-		var variance_min = volatility_min * volatility_min;
-		
-		var idx_max = enclosingCornerPortfolios[1][0];
-		var weights_max = enclosingCornerPortfolios[1][1];
-		var volatility_max = enclosingCornerPortfolios[1][2];
-		var variance_max = volatility_max * volatility_max;
-		var variance_cross = Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights_min), weights_max); // <Sigma*w_min/w_max>
-		var a = variance_min + variance_max - 2 * variance_cross; // always >= 0, by semi-definite positivity of the covariance matrix
-		var b = -2 * (variance_max - variance_cross); // 
-		var c = variance_max - targetVolatility*targetVolatility; //always > 0
-		var b_p = b/2; // reduced discriminant
-		var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
-		var disc = b_p*b_p - a*c;
-		if (disc < 0) {
-			throw new Error('internal error, the covariance matrix might not be semi-definite positive');
-		}
-		var q = -(b_p + sign_b_p * Math.sqrt(disc));
-		var r1 = q/a;
-		var r2 = c/q;
-		
-		var t;
-		if (r1 > 0 && r1 < 1) {
-			t = r1;
-		}
-		else if (r2 > 0 && r2 < 1) {
-			t = r2;
-		}
-		else {
-			throw new Error('internal error, the covariance matrix might not be semi-definite positive');
-		}
-		var weights = Matrix_.fill(weights_min.nbRows, 1, 
-							   	   function(i,j) { 
-									   return t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1); 
-								   });
-		return [weights, idx_min, idx_max];
-	}
-}
-function computeMinimumVarianceEfficientPortfolio_(cornerPortfolios) {
-	if (cornerPortfolios.length === 0) { // this case should never occur
-		throw new Error('internal error: empty list of corner portfolios');
-	}
-	return cornerPortfolios[cornerPortfolios.length - 1][0];
-}
-function computeMaximumTargetVolatilityEfficientPortfolio_(mu, sigma, maxVolatility, cornerPortfolios, opt) {
-	function computeVolatility_(sigma, weights) {
-		return Math.sqrt(Matrix_.vectorDotProduct(Matrix_.xy(sigma, weights), weights));
-	}
-	var eps = 1e-8; // the numerical accuracy for testing equality	
-	
-	var nbAssets = sigma.nbColumns;
-	
-	var weights; // the weights to be computed
-	var highestVolatilityWeights = cornerPortfolios[0][0];
-	var highestVolatility = computeVolatility_(sigma, highestVolatilityWeights);
-	
-	if (maxVolatility > highestVolatility + eps) {
-		weights = highestVolatilityWeights;
-	}
-	else {
-		var lowestVolatilityWeights = cornerPortfolios[cornerPortfolios.length - 1][0];
-		var lowestVolatility = computeVolatility_(sigma, lowestVolatilityWeights);
-		
-		if (maxVolatility < lowestVolatility - eps) {
-			var newMu = Matrix_.fill(nbAssets + 1, 1, 
-									function(i, j) { 
-										if (i <= nbAssets) {
-											return mu.getValue(i, 1);
-										}
-										else {
-											return 0;
-										}
-									});
-			var newSigma = Matrix_.fill(nbAssets + 1, nbAssets + 1, 
-										function(i, j) { 
-											if (i <= nbAssets && j <= nbAssets) {
-												return sigma.getValue(i, j);
-											}
-											else {
-												return 0;
-											}
-										});
-			var newCornerPortfolios = computeCornerPortfolios_(newMu, newSigma, opt);
-			var newWeights;
-			if (newCornerPortfolios.length === 1) { 
-				newWeights = newCornerPortfolios[0][0];
-				
-				if (newCornerPortfolios[0][0].getValue(nbAssets + 1, 1) != 1) { // this case should never occur, as per description above
-					throw new Error('internal error');
-				}
-			}
-			else {				
-				var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(newSigma, maxVolatility, newCornerPortfolios);
-				
-				if (efficientPortfolio.length === 0) { // this case should never occur, since the new efficient frontier includes a 0 volatility portfolio and at least 2 corner portfolios
-					throw new Error('internal error');
-				}
-				else {
-					newWeights = efficientPortfolio[0];
-				}
-			}
-			weights = Matrix_.fill(nbAssets, 1, 
-									function(i, j) { 
-										if (i <= nbAssets) {
-											return newWeights.getValue(i, 1);
-										}
-									});
-		}
-		else {
-			var efficientPortfolio = computeTargetVolatilityEfficientPortfolio_(sigma, maxVolatility, cornerPortfolios);
-			if (efficientPortfolio.length === 0) { // this case should never occur, since maxVolatility belongs to [lowestVolatility, highestVolatility]
-				throw new Error('internal error');
-			}
-			else {
-				weights = efficientPortfolio[0];
-			}
-		}
-	}
-	return weights;
+	return efficientFrontier.reverse();
 }
 function computeCornerPortfolios_(mu, sigma, opt) {	
 	var eps = 1e-8; // the numerical zero
@@ -5246,8 +5974,8 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 					variablesStatusManager.setOnUpperBound(idx_out);
 				}
 				var variablesInIdx = variablesStatusManager.getInIndexes();
-				var Mi_out_idx_out_idx = Mi.getValue(idx_out, idx_out);
-				if (Math.abs(Mi_out_idx_out_idx) <= eps) {
+				var Mi_out_idx_out_idx = Mi.getValue(idx_out, idx_out);				
+				if (Mi_out_idx_out_idx <= eps) {
 					Mi_out_idx_out_idx = eps;
 				}
 				for (var i = 1; i <= variablesInIdx.length; ++i) {
@@ -5288,7 +6016,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 					
 					xi_j -= M.getValue(idx_in, in_idx_i) * xi.getValue(in_idx_i, 1);
 				}
-				if (Math.abs(xi_j) <= eps) {
+				if (xi_j <= eps) {
 					xi_j = eps;
 				}
 				for (var i = 1; i <= variablesInIdx.length; ++i) {
@@ -5338,12 +6066,10 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 			for (var j = 1; j <= variablesInIdx.length; ++j) {
 				var in_idx_j = variablesInIdx[j-1];
 				
-				var Mi_in_idx_i_in_idx_j = Mi.getValue(in_idx_i, in_idx_j);
-				
-				alpha_in_idx_i += Mi_in_idx_i_in_idx_j * b_bar.getValue(in_idx_j, 1);
+				alpha_in_idx_i += Mi.getValue(in_idx_i, in_idx_j) * b_bar.getValue(in_idx_j, 1);
 			
 				if (in_idx_j <= nbAssets) {
-					beta_in_idx_i += Mi_in_idx_i_in_idx_j * mu.getValue(in_idx_j, 1);
+					beta_in_idx_i += Mi.getValue(in_idx_i, in_idx_j) * mu.getValue(in_idx_j, 1);
 				}
 			}
 			alpha.setValue(in_idx_i, 1, 
@@ -5406,7 +6132,7 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 				}
 			}
 		}
-		lambda_e = max_([lambda_out, lambda_in, 0])[0];
+		lambda_e = Math.max(lambda_out, lambda_in, 0);
 		for (var i = 1; i <= variablesInIdx.length; ++i) {
 			var in_idx_i = variablesInIdx[i-1];
 			if (variablesStatusManager.isAsset(in_idx_i)) {
@@ -5414,29 +6140,12 @@ function computeCornerPortfolios_(mu, sigma, opt) {
 													   alpha.getValue(in_idx_i, 1) + lambda_e * beta.getValue(in_idx_i, 1));
 			}
 		}
-		cornerPortfoliosWeights.push([new Matrix_(currentCornerPortfolioWeights), lambda_e]);			
+		cornerPortfoliosWeights.push([new Matrix_(currentCornerPortfolioWeights), lambda_e]);
 		if (lambda_e < eps) {
 			break;
 		}
 	}
-	var finalCornerPortfoliosWeights = new Array(cornerPortfoliosWeights.length);
-	var idx = 0;
-	var cornerPortfolio = cornerPortfoliosWeights[idx][0];
-	var lambda = cornerPortfoliosWeights[idx][1];
-	finalCornerPortfoliosWeights[idx] = [cornerPortfolio, lambda]; 
-	for (var i = 1; i < cornerPortfoliosWeights.length; ++i) {
-		var cornerPortfolio_i = cornerPortfoliosWeights[i][0];
-		var lambda_i = cornerPortfoliosWeights[i][1];
-		
-		if (!Matrix_.areEqual(cornerPortfolio_i, cornerPortfolio, eps)) {
-			++idx;
-		}
-		finalCornerPortfoliosWeights[idx] = [cornerPortfolio_i, lambda_i];
-		cornerPortfolio = cornerPortfolio_i;
-		lambda = lambda_i;
-	}
-	finalCornerPortfoliosWeights.length = idx + 1;
-	return finalCornerPortfoliosWeights;
+	return cornerPortfoliosWeights;	
 }
 function minimaxWeights (assetsReturns, opt) {
 	if (opt === undefined) {
@@ -5484,12 +6193,12 @@ function minimaxWeights (assetsReturns, opt) {
 }
 function minimumCorrelationWeights (sigma, opt) {
 	var sigma = new Matrix_(sigma).toCovarianceMatrix();
-	var variances = sigma.getVariancesVector();
+	var variances = sigma.getVariances();
 	var invStddevs = variances.elemMap(function(i,j,val) { return 1/Math.sqrt(val); });
 	var rho = sigma.getCorrelationMatrix();
 	var nbAssets = rho.nbRows;
 	if (nbAssets <= 2) {
-		return equalRiskBudgetWeights(variances, opt);
+		return inverseVolatilityWeights(variances, opt);
 	}
 	var elemRho = rho.toArray(function(i, j, val) {
 		return j > i;
@@ -5524,8 +6233,8 @@ function minimumTrackingErrorWeights (assetsReturns, benchmarkReturns, opt) {
 	if (opt.constraints  === undefined) {
 		opt.constraints = {};
 	}
-	if (opt.softConstraints  === undefined) {
-		opt.softConstraints = {};
+	if (opt.optimizationMethodParams === undefined) {
+		opt.optimizationMethodParams = {};
 	}
 	if (opt.eps === undefined) {
 		opt.eps = 1e-04;
@@ -5539,153 +6248,276 @@ function minimumTrackingErrorWeights (assetsReturns, benchmarkReturns, opt) {
 	if (opt.constraints.maxNbAssets === undefined && opt.constraints.minNbAssets) {
 		opt.constraints.maxNbAssets = assetsReturns.length;
 	}
-	if (opt.softConstraints.lambdai === undefined && (opt.softConstraints.Ai && opt.softConstraints.bi)) {
-		opt.softConstraints.lambdai = 1;
-	}
 	var eps = opt.eps;
 	var maxIterations = opt.maxIter;
 	
 	var minNbAssets = opt.constraints.minNbAssets;
 	var maxNbAssets = opt.constraints.maxNbAssets;
-	var cardinalityConstraints = (minNbAssets || maxNbAssets) ? true : false;
+	var cardinalityConstraints = minNbAssets || maxNbAssets;
 	
 	var lowerBounds = opt.constraints.minWeights;
 	var upperBounds = opt.constraints.maxWeights;
-	
-	var Ai = opt.softConstraints.Ai;
-	var bi = opt.softConstraints.bi;
-	var lambdai = opt.softConstraints.lambdai;
-	var softInequalityConstraints = (Ai && bi) ? true : false;
+	var optimizationMethod;
+	if (cardinalityConstraints) {
+		optimizationMethod = opt.optimizationMethod;
+		
+		if (optimizationMethod === undefined) {
+			optimizationMethod = 'combinatorial';
+		}
+		
+		if (optimizationMethod != 'combinatorial' && optimizationMethod != 'thresholdAccepting') {
+			throw new Error('unsupported optimisation method');
+		}
+	}
+	var nRounds;
+	var nSteps;
+	var nDeltas;
+	if (optimizationMethod == 'thresholdAccepting') {
+		nRounds = opt.optimizationMethodParams.nRounds;
+		if (nRounds === undefined) {
+			nRounds = 3;
+		}
+		
+		nSteps = opt.optimizationMethodParams.nSteps;
+		if (nSteps === undefined) {
+			nSteps = 5000;
+		}
+
+		nDeltas = opt.optimizationMethodParams.nDeltas;
+		if (nDeltas === undefined) {
+			nDeltas = nSteps;
+		}
+	}
 	var nbAssets = assetsReturns.length;
 	var nbPeriods = assetsReturns[0].length;
-	var nbSoftInequalityConstraints = softInequalityConstraints ? bi.length : 0;
 	var benchmarkReturns = new Matrix_(benchmarkReturns);
-	if (softInequalityConstraints) {
-		var bi = new Matrix_(bi);
-	}		
-	function computeMinimumTrackingErrorVolatilityPortfolio(subsetNbAssets, 
-	                                                        subsetAssetsReturns, benchmarkReturns, 
-															subsetLowerBounds, subsetUpperBounds, 
-															subsetAi, subsetBi) {
-		var X = subsetAssetsReturns;
+	function computeMinimumTrackingErrorVolatilityPortfolio(assetsReturns, benchmarkReturns, 
+															lowerBounds, upperBounds) {
+		var nbAssets = assetsReturns.nbColumns;
+		var X = assetsReturns;
 		var Y = benchmarkReturns;
 		function f(w) {
 			var te = Matrix_.xmy(Matrix_.xy(X, w), Y).vectorNorm('two');
 			
-			if (softInequalityConstraints) {
-				var ineqe = Matrix_.xmy(Matrix_.xy(subsetAi, w), subsetBi).elemMap(function(i,j,val) { return Math.max(0, val); }).vectorNorm('two');
-				
-				return 0.5 * te * te + 0.5 * lambdai * ineqe * ineqe;
-			}
-			else {			
-				return 0.5 * te * te;
-			}
+			return 0.5 * te * te;
 		}
 		function gradf(w) {
 			var gte = Matrix_.txy(X, Matrix_.xmy(Matrix_.xy(X, w), Y));
 			
-			if (softInequalityConstraints) {
-				var gineqe = Matrix_.txy(subsetAi, Matrix_.xmy(Matrix_.xy(subsetAi, w), subsetBi).elemMap(function(i,j,val) { return Math.max(0, val); }));
-				
-				return Matrix_.axpby(1, gte, lambdai, gineqe);
-			}
-			else {
-				return gte;
-			}
+			return gte;
 		}
 		function g(w) {
-			return simplexCharacteristicFunction_(w.data, subsetLowerBounds, subsetUpperBounds);
+			return simplexCharacteristicFunction_(w.data, lowerBounds, upperBounds);
 		}
 		function proxg(w) {
-			return new Matrix_(simplexEuclidianProjection_(w.data, subsetLowerBounds, subsetUpperBounds));
+			return new Matrix_(simplexEuclidianProjection_(w.data, lowerBounds, upperBounds));
 		}
-		var x0 = new Matrix_(simplexEuclidianProjection_(Matrix_.ones(subsetNbAssets, 1).data, subsetLowerBounds, subsetUpperBounds));
+		var x0 = new Matrix_(simplexEuclidianProjection_(Matrix_.ones(nbAssets, 1).data, lowerBounds, upperBounds));
 		var sol = ccpsolveFISTA_(f, gradf, g, proxg, x0, {eps: eps, maxIter: maxIterations, maxLine: maxIterations});
 		return sol;
 	} 
 	var weights;
 	if (!cardinalityConstraints) {
 		var assetsReturns = Matrix_.fill(nbPeriods, nbAssets, function(i,j) { return assetsReturns[j-1][i-1]; });
-		var Ai;
-		if (softInequalityConstraints) {
-			Ai = new Matrix_(Ai);
-		}
-		weights = computeMinimumTrackingErrorVolatilityPortfolio(nbAssets, 
-																 assetsReturns, benchmarkReturns, 
-																 lowerBounds, upperBounds,
-																 Ai, bi)[0];		
+		weights = computeMinimumTrackingErrorVolatilityPortfolio(assetsReturns, benchmarkReturns, 
+																 lowerBounds, upperBounds)[0];		
 	}
 	else {
-		var minTEValue = Infinity;
-		var minTEAssetsIndexes = [];
-		var minTEAssetsWeights = [];
-		for (var K = minNbAssets; K <= maxNbAssets; ++K) {
-			var nextKSubsetIterator = new kSubsetsIterator_(nbAssets, K, false);
-			var nextKSubset = nextKSubsetIterator.next();
-			
-			while (nextKSubset != -1) {
-				var subsetNbAssets = nextKSubset.length;
-				var subsetAssetsIdx = typeof UInt32Array === 'function' ? new UInt32Array(subsetNbAssets) : new Array(subsetNbAssets);
-				for (var i = 0; i < nextKSubset.length; ++i) {
-					subsetAssetsIdx[i] = nextKSubset[i];
+		if (optimizationMethod == 'thresholdAccepting') {
+			var assetsReturns = Matrix_.fill(nbPeriods, nbAssets, function(i,j) { return assetsReturns[j-1][i-1]; });
+			if (!lowerBounds) {
+				lowerBounds = typeof Float64Array === 'function' ? new Float64Array(nbAssets) : new Array(nbAssets);
+				for (var i = 0; i < nbAssets; ++i) {
+					lowerBounds[i] = 0;
 				}
-				var subsetAssetsReturns = Matrix_.fill(nbPeriods, subsetNbAssets, 
-													   function(i,j) { 
-														   return assetsReturns[subsetAssetsIdx[j-1]-1][i-1]; 
-													   });
-				var subsetLowerBounds;
-				if (lowerBounds) {
-					subsetLowerBounds = typeof Float64Array === 'function' ? new Float64Array(subsetNbAssets) : new Array(subsetNbAssets);
-					for (var i = 0; i < subsetNbAssets; ++i) {
-						subsetLowerBounds[i] = lowerBounds[subsetAssetsIdx[i]-1];
-					}
-				}
-				var subsetUpperBounds;
-				if (upperBounds) {
-					subsetUpperBounds = typeof Float64Array === 'function' ? new Float64Array(subsetNbAssets) : new Array(subsetNbAssets);
-					for (var i = 0; i < subsetNbAssets; ++i) {
-						subsetUpperBounds[i] = upperBounds[subsetAssetsIdx[i]-1];
-					}
-				}
-				var subsetAi;
-				if (softInequalityConstraints) {
-					subsetAi = Matrix_.fill(nbSoftInequalityConstraints, subsetNbAssets, 
-											function(i,j) { 
-												return Ai[i-1][subsetAssetsIdx[j-1]-1]; 
-											});
-				}			
-				var subsetAssetsWeights;
-				var subsetPortfolioTrackingError = Infinity;
-				try {
-					var subsetSol = computeMinimumTrackingErrorVolatilityPortfolio(subsetNbAssets, 
-																				   subsetAssetsReturns, benchmarkReturns, 
-																				   subsetLowerBounds, subsetUpperBounds,
-																				   subsetAi, bi);
-																				   
-					subsetAssetsWeights = subsetSol[0];
-					subsetPortfolioTrackingError = subsetSol[1];
-				}
-				catch (e) {
-					if (e.message !== "infeasible problem detected: the restricted simplex is empty") {
-						throw(e);
-					}
-				}
-				if (subsetPortfolioTrackingError < minTEValue) {
-					minTEValue = subsetPortfolioTrackingError;
-					minTEAssetsIndexes = subsetAssetsIdx;
-					minTEAssetsWeights = subsetAssetsWeights;
-				}
-				var nextKSubset = nextKSubsetIterator.next();
 			}
+			if (!upperBounds) {
+				upperBounds = typeof Float64Array === 'function' ? new Float64Array(nbAssets) : new Array(nbAssets);
+				for (var i = 0; i < nbAssets; ++i) {
+					upperBounds[i] = 1;
+				}
+			}
+			function f(w) {
+				var w = new Matrix_(w);
+				
+				var te = Matrix_.xmy(Matrix_.xy(assetsReturns, w), benchmarkReturns).vectorNorm('two');
+				
+				return 0.5 * te * te;
+			}
+			function neighbourGenerator(x, neighbourGeneratorParameters) {		
+				function randomIndex(min, max) { // 0, n --> 0, n-1
+					return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+				}
+				var l = neighbourGeneratorParameters.lowerBounds;
+				var u = neighbourGeneratorParameters.upperBounds;
+				var alpha = 5/100;
+				var eps = 1e-12;
+				var nbAssets = x.length;
+				var xx = x;
+				var nbNonNullAssets = 0;
+				for (var i = 0; i < nbAssets; ++i) {
+					if (xx[i] > eps) {
+						++nbNonNullAssets;
+					}
+				}
+				var toBuyToSellIndexes = new Array(0);
+				if (nbNonNullAssets == maxNbAssets) {
+					for (var i = 0; i < nbAssets; ++i) {
+						if (xx[i] > eps && xx[i] < u[i] - eps) { // increasing the position size of asset i is feasible
+							toBuyToSellIndexes.push([i, -1]);
+						}
+					}
+					for (var i = 0; i < nbAssets; ++i) {
+						var toSellIndexes = new Array(0);
+						if (xx[i] <= eps && xx[i] < u[i] - eps) { // asset i is not already in the portfolio and adding it to the portfolio is feasible
+							var alphab = Math.max(l[i], Math.min(u[i] - xx[i], alpha));
+							for (var j = 0; j < nbAssets; ++j) {
+								if (xx[j] > eps && (xx[j] - alphab <= eps)) { // asset j is already in the portfolio and its position size can be fully swapped with asset i
+									toSellIndexes.push([j, xx[j]]);
+								}
+							}
+						}
+						if (toSellIndexes.length != 0) {
+							toBuyToSellIndexes.push([i, toSellIndexes]);
+						}
+					}
+				}
+				else if (nbNonNullAssets < maxNbAssets) {
+					for (var i = 0; i < nbAssets; ++i) {
+						if (xx[i] < u[i] - eps) { // increasing the position size of asset i, or adding asset i is feasible
+							toBuyToSellIndexes.push([i, -1]);
+						}
+					}
+				}
+				else {
+					throw new Error('internal error: number of assets strictly greater than the allowed maximum number of assets');
+				}
+				var toBuyToSell = toBuyToSellIndexes[randomIndex(0, toBuyToSellIndexes.length)];
+				var toBuyIndex = toBuyToSell[0];
+				alpha = Math.min(u[toBuyIndex] - xx[toBuyIndex], alpha);
+				if (xx[toBuyIndex] <= eps) {
+					alpha = Math.max(l[toBuyIndex], alpha);
+				}
+				var toSellIndexes;
+				if (toBuyToSell[1] == -1) {
+					toSellIndexes = new Array(0);
+					if (nbNonNullAssets == minNbAssets) {
+						for (var i = 0; i < nbAssets; ++i) {
+							if (xx[i] > eps && xx[i] > eps + l[i]) { // decreasing the position size of asset i is feasible because the resulting weight will be > l[i], and so, will not force a full sell of the position
+								var alphas = Math.min(alpha, xx[i] - l[i] - 2*eps); // -2*eps is in order to prevent null positions in case there is no lower bound for the asset i, otherwise, the cardinality constraint would be violated
+								if (xx[toBuyIndex] <= eps) {
+									if (alphas >= l[toBuyIndex]) {
+										toSellIndexes.push([i, alphas]);
+									}
+								}
+								else {
+									toSellIndexes.push([i, alphas]);
+								}
+								
+							}
+						}
+					}
+					else if (nbNonNullAssets > minNbAssets) {
+						for (var i = 0; i < nbAssets; ++i) {
+							if (xx[i] > eps && (xx[i] - alpha <= eps)) { // full sell of the asset i is feasible
+								toSellIndexes.push([i, xx[i]]);
+							}
+							else if (xx[i] > eps && (xx[i] > eps + l[i])) { // decreasing the position size of asset i is feasible
+								toSellIndexes.push([i, Math.min(alpha, xx[i] - l[i])]);
+							}
+						}
+					}
+					else {					
+						throw new Error('internal error: number of assets strictly lower than the allowed minimum number of assets');
+					}
+				}
+				else {
+					toSellIndexes = toBuyToSell[1];
+				}
+				var toSellIndex = toSellIndexes[randomIndex(0, toSellIndexes.length)];
+				alpha = toSellIndex[1];
+				xx[toSellIndex[0]] -= alpha;			
+				xx[toBuyIndex] += alpha;
+				return xx;
+			}
+			var x0 = randomWeights(nbAssets, { constraints: {
+											            minNbAssets: minNbAssets, maxNbAssets: maxNbAssets, 
+											            minWeights: lowerBounds, maxWeights: upperBounds 
+											        }
+												  });
+			weights = thresholdAcceptingSolve_(f, x0,
+											   {nSteps: nSteps, nRounds: nRounds, nDeltas: nDeltas,
+											    neighbourGenerator: neighbourGenerator, 
+												neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
+		                                                                        upperBounds: upperBounds }})[0];
+			weights = new Matrix_(weights);
 		}
-		if (minTEValue != Infinity) {
-			weights = Matrix_.zeros(nbAssets, 1);
-			for (var i = 0; i < minTEAssetsIndexes.length; ++i) {
-				weights.data[minTEAssetsIndexes[i] - 1] = minTEAssetsWeights.data[i];
+		else if (optimizationMethod == 'combinatorial') {
+			var minTEValue = Infinity;
+			var minTEAssetsIndexes = [];
+			var minTEAssetsWeights = [];
+			for (var K = minNbAssets; K <= maxNbAssets; ++K) {
+				var nextKSubsetIterator = new kSubsetsIterator_(nbAssets, K, false);
+				var nextKSubset = nextKSubsetIterator.next();
+				
+				while (nextKSubset != -1) {
+					var subsetNbAssets = nextKSubset.length;
+					var subsetAssetsIdx = typeof UInt32Array === 'function' ? new UInt32Array(subsetNbAssets) : new Array(subsetNbAssets);
+					for (var i = 0; i < nextKSubset.length; ++i) {
+						subsetAssetsIdx[i] = nextKSubset[i];
+					}
+					var subsetAssetsReturns = Matrix_.fill(nbPeriods, subsetNbAssets, 
+														   function(i,j) { 
+															   return assetsReturns[subsetAssetsIdx[j-1]-1][i-1]; 
+														   });
+					var subsetLowerBounds;
+					if (lowerBounds) {
+						subsetLowerBounds = typeof Float64Array === 'function' ? new Float64Array(subsetNbAssets) : new Array(subsetNbAssets);
+						for (var i = 0; i < subsetNbAssets; ++i) {
+							subsetLowerBounds[i] = lowerBounds[subsetAssetsIdx[i]-1];
+						}
+					}
+					var subsetUpperBounds;
+					if (upperBounds) {
+						subsetUpperBounds = typeof Float64Array === 'function' ? new Float64Array(subsetNbAssets) : new Array(subsetNbAssets);
+						for (var i = 0; i < subsetNbAssets; ++i) {
+							subsetUpperBounds[i] = upperBounds[subsetAssetsIdx[i]-1];
+						}
+					}
+					var subsetAssetsWeights;
+					var subsetPortfolioTrackingError = Infinity;
+					try {
+						var subsetSol = computeMinimumTrackingErrorVolatilityPortfolio(subsetAssetsReturns, benchmarkReturns, 
+																					   subsetLowerBounds, subsetUpperBounds);
+																					   
+						subsetAssetsWeights = subsetSol[0];
+						subsetPortfolioTrackingError = subsetSol[1];
+					}
+					catch (e) {
+						if (e.message !== "infeasible problem detected: the restricted simplex is empty") {
+							throw(e);
+						}
+					}
+					if (subsetPortfolioTrackingError < minTEValue) {
+						minTEValue = subsetPortfolioTrackingError;
+						minTEAssetsIndexes = subsetAssetsIdx;
+						minTEAssetsWeights = subsetAssetsWeights;
+					}
+					var nextKSubset = nextKSubsetIterator.next();
+				}
+			}
+			if (minTEValue != Infinity) {
+				weights = Matrix_.zeros(nbAssets, 1);
+				for (var i = 0; i < minTEAssetsIndexes.length; ++i) {
+					weights.data[minTEAssetsIndexes[i] - 1] = minTEAssetsWeights.data[i];
+				}
+			}
+			else {
+				throw new Error('infeasible problem detected');
 			}
 		}
 		else {
-			throw new Error('infeasible problem detected');
+			throw new Error('internal error: unsupported optimisation method');
 		}
 	}
 	return weights.toArray();
@@ -5736,6 +6568,190 @@ function numericalOptimizationWeights (nbAssets, fct, opt) {
 	    throw new Error('unsupported optimisation method');
 	}
 }
+function postOptimizationWeights (originalWeights, opt) {
+	if (opt === undefined) {
+		opt = { roundingMethodParams: {}, 
+		        roundingOptimizationMethodParams: {} };
+	}
+	if (opt.roundingOptimizationMethodParams === undefined) {
+		opt.roundingOptimizationMethodParams = {};
+	}
+	if (opt.roundingMethodParams === undefined) {
+		opt.roundingMethodParams = {};
+	}
+	if (opt.roundingMethod === undefined) {
+		opt.roundingMethod = "rationalizing";
+	}
+	if (opt.roundingMethod == "rationalizing" && opt.roundingMethodParams.k == undefined) {
+		opt.roundingMethodParams.k = 20;
+	}
+	var roundingMethod = opt.roundingMethod;
+	if (roundingMethod != 'rationalizing' && roundingMethod != 'roundlotting') {
+		throw new Error('unsupported rounding method');
+	}
+	var k;
+	if (roundingMethod == "rationalizing") {
+		k = opt.roundingMethodParams.k;
+	}
+	var portfolioValue = opt.roundingMethodParams.portfolioValue;
+	var assetsPrices = opt.roundingMethodParams.assetsPrices;
+	var sizeLots = opt.roundingMethodParams.sizeLots;
+	if (roundingMethod == 'roundlotting') {
+		if (portfolioValue == undefined || portfolioValue == 0) {
+			throw new Error('missing portfolio value');
+		}
+		if (assetsPrices == undefined) {
+			throw new Error('missing assets prices');
+		}
+		if (sizeLots === undefined) {
+			sizeLots = typeof Float64Array === 'function' ? new Float64Array(originalWeights.length) : new Array(originalWeights.length);		
+			for (var i = 0; i < sizeLots.length; ++i) {
+				sizeLots[i] = 1;
+			}
+		}
+	}
+	
+	var nRounds;
+	var nSteps;
+	var nDeltas;
+	if (roundingMethod == 'roundlotting') {
+		nRounds = opt.roundingOptimizationMethodParams.nRounds;
+		if (nRounds === undefined) {
+			nRounds = 3;
+		}
+		
+		nSteps = opt.roundingOptimizationMethodParams.nSteps;
+		if (nSteps === undefined) {
+			nSteps = 5000;
+		}
+
+		nDeltas = opt.roundingOptimizationMethodParams.nDeltas;
+		if (nDeltas === undefined) {
+			nDeltas = nSteps;
+		}
+	}
+	if (roundingMethod == "rationalizing") {
+		var roundedWeights = simplexRationalRounding_(originalWeights, k);
+		return roundedWeights;
+	}
+	else if  (roundingMethod == "roundlotting") {
+		var eps = 1e-12;
+		var nbAssets = originalWeights.length;
+		var originalWeights = new Matrix_.fill(nbAssets + 1, 1, function(i,j) { if (i <= nbAssets) { return originalWeights[i-1]; } else { return 0;} });
+		function f(q) {
+			var w = new Matrix_.fill(nbAssets + 1, 1, 
+			                         function(i,j) { 
+									    if (i <= nbAssets) { // true asset
+											return q[i-1] * sizeLots[i-1] * assetsPrices[i-1] / portfolioValue;
+										}
+                                        else { // cash
+											return q[nbAssets] / portfolioValue;
+									    }
+									  });
+			var rmse = Matrix_.xmy(originalWeights, w).vectorNorm('two');
+			return rmse;
+		}
+		function neighbourGenerator(q, neighbourGeneratorParameters) {					
+			function randomIndex(min, max) { // 0, n --> 0, n-1
+				return Math.floor(Math.random() * (max - min)) + min; //The maximum is exclusive and the minimum is inclusive
+			}
+			var nbSellableAssets = 0;
+			for (var i = 0; i < nbAssets; ++i) {
+				if (q[i] > 0) {
+					++nbSellableAssets;
+				}
+			}
+			var sellableAssets = typeof UInt32Array === 'function' ? new UInt32Array(nbSellableAssets) : new Array(nbSellableAssets);
+			for (var i = 0, j = 0; i < nbAssets; ++i) {
+				if (q[i] > 0) {
+					sellableAssets[j] = i;
+					++j;
+				}
+			}
+			if (sellableAssets.length != 0) {
+				var toSellIndex = sellableAssets[randomIndex(0, nbSellableAssets)];
+				var toSellNbLots = randomIndex(1, q[toSellIndex] + 1);
+				q[toSellIndex] -= toSellNbLots;
+				var cashAddition = assetsPrices[toSellIndex] * sizeLots[toSellIndex] * toSellNbLots;
+				q[nbAssets] += cashAddition;
+			}
+			var nbBuyableAssets = 1; // cash
+			for (var i = 0; i < nbAssets; ++i) {
+				if (originalWeights.getValue(i + 1, 1) > eps) {
+					++nbBuyableAssets;
+				}
+			}
+			var buyableAssets = typeof UInt32Array === 'function' ? new UInt32Array(nbBuyableAssets) : new Array(nbBuyableAssets);
+			for (var i = 0, j = 0; i < nbAssets; ++i) {
+				if (originalWeights.getValue(i + 1, 1) > eps) {
+					buyableAssets[j] = i;
+					++j;
+				}
+			}
+			buyableAssets[nbBuyableAssets - 1] = nbAssets;
+			var toBuyIndex = buyableAssets[randomIndex(0, nbBuyableAssets)];
+			if (toBuyIndex != nbAssets) {
+				var toBuyMaxNbLots = Math.floor( q[nbAssets] / (assetsPrices[toBuyIndex] * sizeLots[toBuyIndex]) );
+				var toBuyNbLots = randomIndex(0, toBuyMaxNbLots + 1);
+				q[toBuyIndex] += toBuyNbLots;
+				var cashRemoval = assetsPrices[toBuyIndex] * sizeLots[toBuyIndex] * toBuyNbLots;
+				q[nbAssets] -= cashRemoval;
+			}	
+			return q;
+		}
+		var q0 = typeof Float64Array === 'function' ? new Float64Array(nbAssets + 1) : new Array(nbAssets + 1);
+		var val = 0;
+		for (var i = 0; i < nbAssets; ++i) {
+			var lotPrice = assetsPrices[i] * sizeLots[i];
+			q0[i] = Math.floor( originalWeights.getValue(i + 1, 1) * portfolioValue / lotPrice );
+
+			val += q0[i] * lotPrice;
+		}
+		var cash = portfolioValue - val;
+		if (cash < 0) {
+			throw new Error('internal error: negative cash during intitial feasible point generation');
+		}
+		q0[nbAssets] = cash;
+		while (true) {
+			var assetIdx = -1;
+			var fMin = f(q0);
+			for (var i = 0; i < nbAssets; ++i) {
+				var lotPrice = assetsPrices[i] * sizeLots[i];
+				if (lotPrice < cash) {
+					q0[i] += 1;
+					q0[nbAssets] = cash - lotPrice;
+					
+					var fNew = f(q0);
+					if (fNew <= fMin) {
+						assetIdx = i;
+						fMin = fNew;
+					}
+					q0[i] -= 1;
+					q0[nbAssets] = cash;
+				}
+			}
+			if (assetIdx == -1) {
+				break;
+			}
+			q0[assetIdx] += 1;
+			cash -= assetsPrices[assetIdx] * sizeLots[assetIdx];
+		}
+		if (cash < 0) {
+			throw new Error('internal error: negative cash during intitial feasible point generation');
+		}
+		q0[nbAssets] = cash;
+		var q = thresholdAcceptingSolve_(f, q0,
+					  					 {nSteps: nSteps, nRounds: nRounds, nDeltas: nDeltas,
+										  neighbourGenerator: neighbourGenerator})[0];
+		var roundedWeights = new Matrix_.fill(nbAssets, 1, function(i,j) { return q[i-1] * sizeLots[i-1] * assetsPrices[i-1] / portfolioValue; }).toArray();
+		var qLots = new Matrix_.fill(nbAssets, 1, function(i,j) { return q[i-1]; }).toArray();
+		var cash = q[nbAssets];
+		return [qLots, roundedWeights, cash];
+	}
+	else {
+		throw new Error('internal error: unsupported rounding method');
+	}
+}
 function proportionalMinimumVarianceWeights (sigma, opt) {
 	var sigma = new Matrix_(sigma);
 	var nbAssets = sigma.nbRows;
@@ -5754,18 +6770,18 @@ function proportionalMinimumVarianceWeights (sigma, opt) {
 	weights = Matrix_.vectorHadamardProduct(weights, invVariancesWeights).normalize();
 	return weights.toArray();
 }
-function randomSubspaceOptimizationWeights(nbAssets, fct, opt) {			
+function randomSubspaceOptimizationWeights(nbAssets, subsetOptimizationFct, opt) {			
 	if (opt === undefined) {
 		opt = {};
 	}
 	if (opt.constraints === undefined) {
 		opt.constraints = {};
 	}
-	if (opt.subsetPortfolioOptimizationMethodParams === undefined) {
-		opt.subsetPortfolioOptimizationMethodParams = {};
+	if (opt.subsetOptimizationFctOpt === undefined) {
+		opt.subsetOptimizationFctOpt = {};
 	}
-	if (opt.subsetPortfolioOptimizationMethodParams.constraints === undefined) {
-		opt.subsetPortfolioOptimizationMethodParams.constraints = {};
+	if (opt.subsetOptimizationFctOpt.constraints === undefined) {
+		opt.subsetOptimizationFctOpt.constraints = {};
 	}
 	if (nbAssets <= 1) {
 		return [1];
@@ -5820,29 +6836,29 @@ function randomSubspaceOptimizationWeights(nbAssets, fct, opt) {
 	else {
 		throw new Error('unsupported subsets generation method');
 	}
-	var subsetPortfolioOptimizationMethodParams = opt.subsetPortfolioOptimizationMethodParams;
+	var subsetOptimizationFctOpt = opt.subsetOptimizationFctOpt;
 	var nbFeasibleGeneratedPortfolios = 0;
 	var generatedPortfoliosWeights = new Array(nbSubsets); 
 	if (opt.constraints.minWeights) {
-		subsetPortfolioOptimizationMethodParams.constraints.minWeights = typeof Float64Array === 'function' ? new Float64Array(sizeSubsets) : new Array(sizeSubsets);
+		subsetOptimizationFctOpt.constraints.minWeights = typeof Float64Array === 'function' ? new Float64Array(sizeSubsets) : new Array(sizeSubsets);
 	}
 	if (opt.constraints.maxWeights) {
-		subsetPortfolioOptimizationMethodParams.constraints.maxWeights = typeof Float64Array === 'function' ? new Float64Array(sizeSubsets) : new Array(sizeSubsets);
+		subsetOptimizationFctOpt.constraints.maxWeights = typeof Float64Array === 'function' ? new Float64Array(sizeSubsets) : new Array(sizeSubsets);
 	}
 	for (var k = 0; k < nbSubsets; ++k) {
 		var subsetAssetsIdx = subsetAssetsIdxIterator.next();
 		if (opt.constraints.minWeights) {
 			for (var i = 0; i < sizeSubsets; ++i) {
-				subsetPortfolioOptimizationMethodParams.constraints.minWeights[i] = opt.constraints.minWeights[subsetAssetsIdx[i]-1];
+				subsetOptimizationFctOpt.constraints.minWeights[i] = opt.constraints.minWeights[subsetAssetsIdx[i]-1];
 			}
 		}
 		if (opt.constraints.maxWeights) {
 			for (var i = 0; i < sizeSubsets; ++i) {
-				subsetPortfolioOptimizationMethodParams.constraints.maxWeights[i] = opt.constraints.maxWeights[subsetAssetsIdx[i]-1]
+				subsetOptimizationFctOpt.constraints.maxWeights[i] = opt.constraints.maxWeights[subsetAssetsIdx[i]-1]
 			}
 		}
 		try {
-			var subsetWeights = fct(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams);
+			var subsetWeights = subsetOptimizationFct(subsetAssetsIdx, subsetOptimizationFctOpt);
 			
 			if (subsetWeights.length != sizeSubsets) {
 				throw new Error('internal error: the portfolio optimization method did not return the expected number of weights');
@@ -5893,11 +6909,11 @@ function randomSubspaceMeanVarianceOptimizationWeights(mu, sigma, opt) {
 	if (opt.constraints === undefined) {
 		opt.constraints = {};
 	}
-	if (opt.subsetPortfolioOptimizationMethodParams === undefined) {
-		opt.subsetPortfolioOptimizationMethodParams = {};
+	if (opt.subsetsMeanVarianceOptimizationOpt === undefined) {
+		opt.subsetsMeanVarianceOptimizationOpt = {};
 	}
-	if (opt.subsetPortfolioOptimizationMethodParams.constraints === undefined) {
-		opt.subsetPortfolioOptimizationMethodParams.constraints = {};
+	if (opt.subsetsMeanVarianceOptimizationOpt.constraints === undefined) {
+		opt.subsetsMeanVarianceOptimizationOpt.constraints = {};
 	}
 	var mu = new Matrix_(mu);
 	var sigma = new Matrix_(sigma);
@@ -5914,17 +6930,17 @@ function randomSubspaceMeanVarianceOptimizationWeights(mu, sigma, opt) {
 		
 		opt.sizeSubsets = Math.max(2, Math.floor(r2));
 	}
-	opt.subsetPortfolioOptimizationMethodParams.subsetMu = Matrix_.zeros(opt.sizeSubsets, 1);
-	opt.subsetPortfolioOptimizationMethodParams.subsetSigma = Matrix_.zeros(opt.sizeSubsets, opt.sizeSubsets);
-	function subsetMeanVarianceOptimization(subsetAssetsIdx, subsetPortfolioOptimizationMethodParams) {
-		var subsetMu = mu.submatrix(subsetAssetsIdx, [1], subsetPortfolioOptimizationMethodParams.subsetMu);
-		var subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx, subsetPortfolioOptimizationMethodParams.subsetSigma);
+	opt.subsetOptimizationFctOpt = opt.subsetsMeanVarianceOptimizationOpt;
+	opt.subsetsMeanVarianceOptimizationOpt.subsetMu = Matrix_.zeros(opt.sizeSubsets, 1);
+	opt.subsetsMeanVarianceOptimizationOpt.subsetSigma = Matrix_.zeros(opt.sizeSubsets, opt.sizeSubsets);
+	function subsetMeanVarianceOptimization(subsetAssetsIdx, subsetsMeanVarianceOptimizationOpt) {
+		var subsetMu = mu.submatrix(subsetAssetsIdx, [1], subsetsMeanVarianceOptimizationOpt.subsetMu);
+		var subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx, subsetsMeanVarianceOptimizationOpt.subsetSigma);
 		try {
-			return meanVarianceOptimizationWeights(subsetMu, subsetSigma, subsetPortfolioOptimizationMethodParams);
+			return meanVarianceOptimizationWeights(subsetMu, subsetSigma, subsetsMeanVarianceOptimizationOpt);
 		}
 		catch (e) {
-			if (e.message === 'return not reachable' ||
-			    e.message === 'volatility not reachable' ||
+			if (e.message.includes('no matching efficient portfolio') ||
 				e.message === 'infeasible problem detected: the restricted simplex is empty') {
 				throw new Error('infeasible portfolio optimization problem');
 			}
@@ -5943,6 +6959,7 @@ function randomWeights (nbAssets, opt) {
 	if (opt.constraints === undefined) {
 		opt.constraints = {};
 	}
+	var cardinalityConstraints = opt.constraints.minNbAssets || opt.constraints.maxNbAssets;
 	var nbMinAssets = opt.constraints.minNbAssets;
 	if (nbMinAssets === undefined) {
 		nbMinAssets = 1;
@@ -6008,10 +7025,17 @@ function randomWeights (nbAssets, opt) {
 			continue;
 		}
 		var selectedAssetsWeights = new simplexRandomSampler_(nbSelectedAssets + nbSlackAssets, lowerBounds, upperBounds).sample();
-		for (var i = 0; i < nbSelectedAssets; ++i) {
-			if (selectedAssetsWeights[i] == 0) { 
-				continue;
+		try {
+			if (cardinalityConstraints) {
+				for (var i = 0; i < nbSelectedAssets; ++i) {
+					if (selectedAssetsWeights[i] == 0) { 
+						throw new Error('generated weights not compatible with cardinality constraints');
+					}
+				}
 			}
+		}
+		catch (e) {
+			continue;
 		}
 		break;
 	}
@@ -6024,85 +7048,322 @@ function randomWeights (nbAssets, opt) {
 	return weights.toArray();
 }
 function riskBudgetingWeights (sigma, rb, opt) {
-	var eps_tol = 1e-12;
+	function computeVolatility(x, sigma_x) {
+		var sigma_x_x = Matrix_.vectorDotProduct(sigma_x, x);		
+		if (Math.abs(sigma_x_x) <= epsSdp) {
+			sigma_x_x = 0;
+		}
+		else if (sigma_x_x < 0 && sigma_x_x < -epsSdp) {
+			throw new Error('negative volatility during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
+		}
+		var s_x = Math.sqrt(sigma_x_x);
+		return s_x;
+	}
+	function coordinatesDescentSolve(lambda, lowerBounds, upperBounds) {
+		var x = Matrix_.fill(nbAssets, 1, function(i,j) { return 1/nbAssets; });
+		var log_x = x.elemMap(function(i,j,val) { return Math.log(val);});
+		var x_old = Matrix_.copy(x);
+		var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
+		var s_x = computeVolatility(x, sigma_x); // sigma(x)
+		
+		var rb_d_log_x = Matrix_.vectorDotProduct(rb, log_x); // Matrix_.vectorDotProduct(rb, log_x)
+		var obj_old = 0.5 * s_x - rb_d_log_x; // the objective function to be minimized, c.f. formula 3 of the second reference
+		var cs = new coordinatesSampler(nbAssets);
+		var cycle = 0;
+		while (true) {
+			if	(nbCycles != -1 && cycle == nbCycles) {
+				break;
+			}
+			if (nbCycles == -1 && cycle >= maxCycles) {
+				throw new Error('maximum number of cycles reached: ' + maxCycles);
+			}
+			++cycle;
+			cs.generateCoordinates();
+			var obj_old_i
+			var obj_new_i;
+			while (true) {
+				var i = cs.sampleCoordinate();
+				if (i == -1) {
+					break;
+				}
+				if (opt.coordinatesSampler === 'acf') {
+					obj_old_i = 0.5 * s_x - rb_d_log_x;
+				}
+				var xi_old = x.data[i-1];
+				var log_xi_old = log_x.data[i-1];
+				var a = sigma.data[(i-1)*sigma.nbColumns + (i-1)]; // sigma_i^2, always > 0
+				var b = sigma_x.data[i-1] - x.data[i-1] * a; // (SIGMA*x)_i - x_i*sigma_i^2, might be any sign
+				var c = -lambda * rb.data[i-1] * s_x; // -lambda * b_i * sigma(x), always <= 0 (== 0 iff the covariance matrix is semi-definite positive and sigma(x) == 0)
+				var b_p = b/2; // reduced discriminant
+				var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
+				var disc = b_p*b_p - a*c;
+				if (disc < 0) {
+				   throw new Error('internal error: negative discriminant detected, the covariance matrix might not be semi-definite positive');
+				}
+				var q = -(b_p + sign_b_p * Math.sqrt(disc));
+				var r1 = q/a;
+				var r2 = c/q;
+				
+				var xi_star;
+				if (r1 > 0) {
+					xi_star = r1;
+				}
+				else if (r2 > 0) {
+					xi_star = r2;
+				}
+				else {
+					throw new Error('internal error: no strictly positive root detected, the covariance matrix might not be semi-definite positive');
+				}
+				if (lowerBounds && xi_star < lowerBounds[i-1]) {
+					xi_star = lowerBounds[i-1];
+				}
+				if (upperBounds && xi_star > upperBounds[i-1]) {
+					xi_star = upperBounds[i-1];
+				}
+				x.data[i-1] = xi_star;
+				log_x.data[i-1] = Math.log(xi_star);
+				
+				rb_d_log_x -= log_xi_old * rb.data[i-1];
+				rb_d_log_x += log_x.data[i-1] * rb.data[i-1];
+				for (var j = 1; j <= nbAssets; ++j) {
+					sigma_x.data[j-1] += sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_star;
+					sigma_x.data[j-1] -= sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_old;
+				}
+				s_x = computeVolatility(x, sigma_x);
+				if (opt.coordinatesSampler === 'acf') {
+					obj_new_i = 0.5 * s_x - rb_d_log_x;
+					var gain = obj_old_i - obj_new_i;
+					if (cycle == 1) {
+						cs.updateAverageGain(gain);
+					}
+					else {
+						cs.updateSchedulingPreference(i, gain);
+					}
+				}	
+			}
+			var obj_new = 0.5 * s_x - rb_d_log_x;
+			if (nbCycles == -1 && Math.abs(obj_new - obj_old) <= eps) {
+				break;
+			}
+			obj_old = obj_new;
+		}
+		return x;
+	}
+	function cyclicCoordinatesSampler(n) {
+		this.n = n;
+		this.k = n;
+		this.sampleCoordinate = function() {
+			if (this.k == this.n) {
+				return -1;
+			}
+			else {
+				return ++this.k;
+			}        
+		}
+		this.generateCoordinates = function() {
+			this.k = 0;
+		}
+	}
+	function shuffledCyclicCoordinatesSampler(n) {
+		this.n = n;
+		this.k = n;
+		this.r = typeof Uint32Array === 'function' ? new Uint32Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			this.r[i] = i+1;
+		}
+		this.sampleCoordinate = function() {
+			if (this.k == this.n) {
+				return -1;
+			}
+			else {
+				return this.r[this.k++];
+			}        
+		}
+		this.generateCoordinates = function() {
+			this.r = new randomPermutationsIterator_(undefined, this.r, true).next();
+			this.k = 0;
+		}
+	}
+	function randomizedCoordinatesSampler(n) {
+		this.n = n;
+		this.k = n;
+		
+		var p = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			p[i] = 1/n;
+		}
+		this.s = new aliasMethodSampler_(p);
+		this.sampleCoordinate = function() {
+			if (this.k == this.n) {
+				return -1;
+			}
+			else {
+				++this.k;
+				return this.s.sample() + 1;
+			}        
+		}
+		this.generateCoordinates = function() {
+			this.k = 0;
+		}
+	}
+	function adaptiveCoordinateFrequenciesSampler(n) {
+		this.n = n;
+		this.k = 0;
+		this.change_rate = 1/5; // c in the fifth reference
+		this.p_min = 1/20;
+		this.p_max = 20;	
+		this.idx_set_tmp = typeof Uint32Array === 'function' ? new Uint32Array(2*n) : new Array(2*n);
+		this.idx_set = null;
+		this.idx_set_len = 0;
+		this.pref = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			this.pref[i] = 1;
+		}
+		this.prefsum = n; // sum p_i, i=1..n
+		this.acc = typeof Float64Array === 'function' ? new Float64Array(n) : new Array(n);
+		for (var i = 0; i < n; ++i) {
+			this.acc[i] = 0.5;
+		}
+		this.gain_learning_rate = 1/n;
+		this.average_gain = 0;
+		this.sampleCoordinate = function() {
+			if (this.k == this.idx_set_len) {
+				return -1;
+			}
+			else {
+				return this.idx_set[this.k++];
+			}        
+		}
+		this.generateCoordinates = function() {
+			this.k = 0;
+			this.idx_set_len = 0;
+			var q = this.n / this.prefsum;
+			for (var i = 0; i < this.n; ++i) {
+				var a_i = this.acc[i] + q * this.pref[i];
+				var a_i_f = Math.floor(a_i);
+				
+				for (var j = 0; j < a_i_f; ++j) {
+					this.idx_set_tmp[this.idx_set_len] = i + 1;
+					this.idx_set_len++;
+				}
+				
+				this.acc[i] = a_i - a_i_f;
+			}
+			this.idx_set = new randomPermutationsIterator_(undefined, this.idx_set_tmp.slice(0, this.idx_set_len), true).next();
+		}
+		this.updateSchedulingPreference = function(i, gain) {
+			var p_new = this.pref[i-1] * Math.exp(this.change_rate * (gain / this.average_gain - 1));
+			if (p_new < this.p_min) {
+				p_new = this.p_min;
+			}
+			else if (p_new > this.p_max) {
+				p_new = this.p_max;
+			}
+			this.prefsum = this.prefsum + p_new - this.pref[i-1];
+			this.pref[i-1] = p_new;
+			this.average_gain = (1 - this.gain_learning_rate) * this.average_gain + this.gain_learning_rate * gain;
+		}
+		this.updateAverageGain = function(gain) {
+			this.average_gain += gain / this.n;
+		}
+	}
 	if (opt === undefined) {
 		opt = {};
 	}
-	var eps = opt.eps || 1e-8;
-	var maxIterations = opt.maxIter || 10000;
-	var outputPortfolioVolatility = false || opt.outputPortfolioVolatility; 
-	var sigma = new Matrix_(sigma);
-	var rb = new Matrix_(rb);
-
-	var nbAssets = sigma.nbRows;
-	var x = Matrix_.fill(nbAssets, 1, function(i,j) { return 1/nbAssets; });
-	var sigma_x = Matrix_.xy(sigma, x); // SIGMA*x
-	var s_x = Math.sqrt(Matrix_.vectorDotProduct(sigma_x, x)); // sigma(x)
-	var obj = 0.5 * s_x - Matrix_.vectorDotProduct(rb, x.elemMap(function(i,j,val) { return Math.log(val);})); // the objective function to be minimized, c.f. formula 3 of the second reference
-	var iter = 0;
-	var converged = false;
-	while (!converged) {
-    	converged = true;
-    	
-    	for (var i = 1; i <= nbAssets; ++i) {
-			var xi_old = x.data[i-1];
-    	    var a = sigma.data[(i-1)*sigma.nbColumns + (i-1)]; // sigma_i^2, always > 0
-    	    var b = sigma_x.data[i-1] - x.data[i-1] * a; // (SIGMA*x)_i - x_i*sigma_i^2, might be any sign
-    	    var c = -rb.data[i-1] * s_x; // -b_i * sigma(x), always <= 0 (== 0 iff the covariance matrix is semi-definite positive and sigma(x) == 0)
-    	    var b_p = b/2; // reduced discriminant
-			var sign_b_p = (b_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for b_p == 0 this returns 1
-			var disc = b_p*b_p - a*c;
-			if (disc < 0) {
-			    throw new Error('Negative discriminant during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
+	if (opt.eps === undefined) {
+		opt.eps = 1e-10;
+	}
+	if (opt.epsSdp === undefined) {
+		opt.epsSdp = 1e-12;
+	}
+	if (opt.maxCycles === undefined) {
+		opt.maxCycles = 10000;
+	}
+	if (opt.nbCycles === undefined) {
+		opt.nbCycles = -1;
+	}
+	if (opt.outputPortfolioVolatility === undefined) {
+		opt.outputPortfolioVolatility = false;
+	}
+	if (opt.coordinatesSampler === undefined) {
+		opt.coordinatesSampler = 'cyclic';
+	}
+	var eps = opt.eps;
+	var epsSdp = opt.epsSdp;
+	var maxCycles = opt.maxCycles;
+	var nbCycles = opt.nbCycles;
+	
+	var outputPortfolioVolatility = opt.outputPortfolioVolatility; 
+	
+	var coordinatesSampler;
+	if (opt.coordinatesSampler === 'cyclic') {
+		coordinatesSampler = cyclicCoordinatesSampler;
+	}
+	else if (opt.coordinatesSampler === 'shuffledCyclic') {
+		coordinatesSampler = shuffledCyclicCoordinatesSampler;
+	}	
+	else if (opt.coordinatesSampler === 'randomized') {
+		coordinatesSampler = randomizedCoordinatesSampler;
+	}
+	else if (opt.coordinatesSampler === 'acf') {
+		coordinatesSampler = adaptiveCoordinateFrequenciesSampler;
+	}
+	else {
+		throw new Error('unsupported coordinates sampler');
+	}
+	var lowerBounds = null;
+	var upperBounds = null;
+	if (opt.constraints.minWeights) {
+		lowerBounds = opt.constraints.minWeights; // no input checks
+		
+		if (!opt.constraints.maxWeights) {
+			upperBounds = typeof Float64Array === 'function' ? new Float64Array(opt.constraints.minWeights.length) : new Array(opt.constraints.minWeights.length);
+			for (var i = 0; i < upperBounds.length; ++i) {
+				upperBounds[i] = 1;
 			}
-    	    var q = -(b_p + sign_b_p * Math.sqrt(disc));
-    	    var r1 = q/a;
-    	    var r2 = c/q;
-    	    var xi_star = r1 > 0 ? r1 : r2;
-			x.data[i-1] = xi_star;
-			for (var j = 1; j <= nbAssets; ++j) {
-				sigma_x.data[j-1] += sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_star;
-				sigma_x.data[j-1] -= sigma.data[(j-1)*sigma.nbColumns + (i-1)] * xi_old;
-			}
-			var sigma_x_x = Matrix_.vectorDotProduct(sigma_x, x);		
-			if (sigma_x_x < 0) {
-				if (-sigma_x_x < eps_tol) {
-					sigma_x_x = 0;
-				}
-				else {
-					throw new Error('Negative volatility during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
-				}
-			}
-			s_x = Math.sqrt(sigma_x_x);
-			if (s_x != 0) {
-				var rci_star = x.data[i-1] * sigma_x.data[i-1] / s_x;
-
-				if (Math.abs(rci_star - rb.data[i-1]) > eps) {
-					converged = false;
-				}
-			}
-		}
-		var obj_star = 0.5 * s_x - Matrix_.vectorDotProduct(rb, x.elemMap(function(i,j,val) { return Math.log(val);}));		
-		if (Math.abs(obj_star - obj) > eps) {
-			converged = false;
-			obj = obj_star;
-		}
-		++iter;
-		if (iter > maxIterations) {
-			throw new Error('maximum number of iterations reached: ' + maxIterations);
 		}
 	}
-	var sum_x = x.sum();
-	x = x.normalize(x);
+	if (opt.constraints.maxWeights) {
+		upperBounds = opt.constraints.maxWeights; // no input checks
+		
+		if (!opt.constraints.minWeights) {
+			lowerBounds = typeof Float64Array === 'function' ? new Float64Array(opt.constraints.maxWeights.length) : new Array(opt.constraints.maxWeights.length);
+			for (var i = 0; i < lowerBounds.length; ++i) {
+				lowerBounds[i] = 0;
+			}
+		}
+	}
+	var sigma = new Matrix_(sigma);
+	var rb = new Matrix_(rb);
+	var nbAssets = sigma.nbRows;
+	var lambda = 1;
+	var weightsURb = coordinatesDescentSolve(lambda);
+	weightsURb = weightsURb.normalize();
+	var x;
+	if (lowerBounds || upperBounds) {
+		var sumBounds = simplexEmptinessCheck_(nbAssets, lowerBounds, upperBounds);
+		var volURb = computeVolatility(weightsURb, Matrix_.xy(sigma, weightsURb));
+		var a = 0.5 * volURb;
+		var b = 2 * volURb;
+		var lambda_star = bisection_(function (lambda) { 
+						 		         var weights = coordinatesDescentSolve(lambda, lowerBounds, upperBounds); 
+								         return weights.sum() - 1; 
+							         }, 
+							         a, b);
+		x = coordinatesDescentSolve(lambda_star, lowerBounds, upperBounds);
+		
+	}
+	else {
+		x = weightsURb;
+	}
 	if (outputPortfolioVolatility === true) {
-		return [x.toArray(), s_x/sum_x];
+		return [x.toArray(), computeVolatility(x, Matrix_.xy(sigma, x))];
 	}
 	else {
 		return x.toArray();
 	}
-}
-function roundedWeights (originalWeights, k) {
-	var roundedWeights = simplexRationalRounding_(originalWeights, k);
-	return roundedWeights;	
 }
 

@@ -10,6 +10,7 @@ QUnit.test('Covariance matrix native creation', function(assert) {
   // Static data
   {
 	  var mat =  new PortfolioAllocation.Matrix([[1, 0], [0,1]]);
+	  console.log(mat)
 	  var matCov = mat.toCovarianceMatrix();
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(mat,matCov), true, 'Covariances matrices must be equal');
 	  assert.equal(typeof matCov.getCorrelationMatrix == 'function' &&

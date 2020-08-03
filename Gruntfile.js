@@ -87,7 +87,7 @@ module.exports = function(grunt) {
 
 	concat: {
 	  portfolio_allocation: {
-	    src: ['lib/header.js', 'lib/matrix/matrix.js', 'lib/matrix/covmatrix.js', 'lib/stats/*.js', 'lib/allocation/*.js', 'lib/footer.js'],
+	    src: ['lib/header.js', 'lib/matrix/*.js', 'lib/stats/*.js', 'lib/allocation/*.js', 'lib/footer.js'],
 	    dest: 'dist/portfolio_allocation.dev.js',
 	  }
 	},
@@ -110,14 +110,14 @@ module.exports = function(grunt) {
 	
 	qunit: { 
       dev: ['test/index_optimisation.html', 'test/index_bitset.html', 'test/index_matrix.html', 'test/index_simplex.html', 'test/index_vector.html', 'test/index_stats.html', 'test/index_combinatorics.html', 'test/index_covmatrix_dev.html', 'test/index_allocation_dev.html', 'test/index_computational_geometry_dev.html'],
-	  dist: ['test/index_allocation_dist.html', 'test/index_covmatrix_dist.html']
+	  dist: ['test/index_allocation_dist.html', 'test/index_covmatrix_dist.html', 'test/index_meanvector.html']
     }
 
   });
 
 
   //
-  grunt.registerTask('test', 'Tests the app.', function() {
+  grunt.registerTask('deliver-dev', 'Builds the app into a distributable dev package.', function() {
 	// Build the app in dev mode, and run all dev unit tests, 
 	// which are a superset of dist unit tests
 	grunt.task.run('concat:portfolio_allocation');
@@ -125,9 +125,15 @@ module.exports = function(grunt) {
 	grunt.task.run('uglify:portfolio_allocation_dev');
 	grunt.task.run('qunit:dev');
   });
-
+  
   //
-  grunt.registerTask('deliver', 'Builds the app into a distributable package.', function() {
+  grunt.registerTask('test-dev', 'Tests the app in dev mode.', function() {
+	// Run all dev unit tests, which are a superset of dist unit tests
+	grunt.task.run('qunit:dev');
+  });
+  
+  //
+  grunt.registerTask('deliver-dist', 'Builds the app into a distributable dist package.', function() {
     // Build the app in dist mode
 	grunt.task.run('concat:portfolio_allocation');
 	grunt.task.run('replace:portfolio_allocation')
@@ -136,6 +142,12 @@ module.exports = function(grunt) {
 
 	// Run the non-dev unit tests
 	grunt.task.run('qunit:dist');	
+  });
+  
+  //
+  grunt.registerTask('test-dist', 'Tests the app in dist mode.', function() {
+	// Run all dist unit tests
+	grunt.task.run('qunit:dist');
   });
   
   //

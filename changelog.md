@@ -1,4 +1,4 @@
-### 0.0.9 - XX/XX/XXXX
+### 0.0.9 - XX/08/2020
 - Removed comments from the generated Google Sheet script using a new grunt plugin
 - Added a method to extract the columns of a matrix
 - Added a method to generate random normal numbers, using the inverse method
@@ -8,11 +8,31 @@
 - Reworked the internals of the risk budgeting portfolio algorithm, and implemented 3 new coordinates sampler algorithms
 - Fixed bug https://github.com/lequant40/portfolio_allocation_js/issues/5 related to MVO optimization with maxTargetVolatility optimization method
 - Added min/max weights constraints in the ERC and RB portfolio allocation methods
-- Redesigned the meanVarianceEfficientFrontierPortfolios method to output portfolios less concentrated in high volatility; now, the generation is uniform on all efficient segments
 - Added a method to generate random normal numbers, with positive support (i.e., truncated to R^+)
-- Added a method to generate random covariance matrices
+- Added a method to generate randoms variances
+- Added a method to randomly perturb a variances vector
 - Added a method to test if a matrix is symmetric
 - Fixed bug https://github.com/lequant40/portfolio_allocation_js/issues/6 related to MVO optimization (corner portfolios computation)
+- Added a method to compute p-quantiles of a series of values
+- Updated the method to generate random portfolios: providing no cardinality constraints now defaults to strictly taking into account the min/max weights constraints
+- Added an heuristic stochastic optimization method: Threshold Accepting
+- Updated the minimum tracking error portfolio computation: added the Threshold Accepting optimization method to compute an approximate solution in case of cardinality constraints
+- Merged the computation of the covariance matrix and of the sample covariance matrix, breaking the public interface (= non-backward compatible interface change)
+- Added 4 shrinkage methods to compute covariance matrices (all based on Ledoit-Wolf's linear shrinkage)
+- Misc. refactoring of the mean-variance optimization methods, breaking the public interface (= non-backward compatible interface change)
+- Removed the possibility to add soft inequality constraints to the minimum tracking error portfolio (= non-backward compatible change)
+- Added a new constraint in the mean-variance optimization algorithm: risk tolerance
+- Updated the internals of the mean-variance optimization, so that all corner portfolios are now retained (numerically close portfolios were merged, which is incompatible with the addition of a risk tolerance constraint due to kinks, c.f. the unit tests)
+- Redesigned the meanVarianceEfficientFrontierPortfolios method to output portfolios uniformly distributed w.r.t. the risk tolerance parameter
+- Renamed the roundedWeights optimization method into postOptimizationWeights to better reflect what this method is doing, plus added a method to convert numerical portfolio weights into integer number of shares (roundlotting)
+- Added a method to compute the mean vector of series of values
+- Added a method to randomly perturb a mean vector
+- Added a method to generate random mean vectors
+- Renammed equalRiskBudgetWeights to inverseVolatilityWeights for better consistency (= non-backward compatible change)
+- Added a method to compute a shrinked mean vector of a series of values
+- Added a method to compute the euclidean projection on a line segment in R^n
+- Added a method to compute the nearest portfolio located on the mean-variance efficient frontier w.r.t. a given input portfolio
+- Added a method to compute arithmetic and logarithmic returns
 
 ### 0.0.8 - 16/04/2020
 - Introduced a function simplexEmptinessCheck_ to avoid copy/pasting feasibility checks on the restricted simplex everywhere

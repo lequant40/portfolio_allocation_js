@@ -1,7 +1,7 @@
 {
   "name": "portfolio-allocation",
   "version": "0.0.8",
-  "date": "2020-04-16",
+  "date": "2020-08-16",
   "author": "Roman Rubsamen <roman.rubsamen@gmail.com>",
   "contributors": [],
   "description": "A JavaScript library to allocate and optimize financial portfolios.",
@@ -34,7 +34,7 @@
   },
   "main": "dist/portfolio_allocation.dist.min.js",
   "scripts": {
-    "test": "grunt test"
+    "test": "grunt test-dist"
   },
   "dependencies": {}
 }
