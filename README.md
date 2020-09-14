@@ -1,6 +1,6 @@
 # PortfolioAllocation ([Changelog](changelog.md))
 
-[![npm][https://img.shields.io/npm/v/portfolio-allocation.svg]][https://www.npmjs.com/package/portfolio-allocation]
+[![npm](https://img.shields.io/npm/v/portfolio-allocation.svg)](https://www.npmjs.com/package/portfolio-allocation)
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
 [![Feature Requests](https://feathub.com/lequant40/portfolio_allocation_js?format=svg)](https://feathub.com/lequant40/portfolio_allocation_js)
 
@@ -116,7 +116,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
   Introduced by John Lintner in the research paper [The Valuation of Risk Assets and the Selection of Risky Investments in Stock Portfolios and Capital Budgets](https://www.jstor.org/stable/1924119), the MSR portfolio possesses the highest Sharpe ratio among all the mean-variance efficient portfolios.
 
 - Random subspace mean-variance optimization (RSO-MVO)  
-  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and formally studied by Benjamin J. Gillen in the research paper [Subset Optimization for Asset Allocation](https://authors.library.caltech.edu/79336/), the RSO-MVO portfolio combines the usage of a [random subspace optimization method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
+  Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and formally studied by Benjamin J. Gillen in the research paper [Subset Optimization for Asset Allocation](https://authors.library.caltech.edu/79336/), the RSO-MVO portfolio combines the usage of a [random subspace method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
 
 - Minimum tracking error portfolio, a.k.a. index tracking portfolio  
   The index tracking portfolio aims at replicating the performances of a given stock market index, or more generally of a given benchmark, with a limited number of its constituents.
@@ -133,9 +133,9 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
   The continuous set of all mean-variance efficient portfolios (the mean-variance efficient frontier) as well as its generating discrete set (the set of corner portfolios) can both be efficiently computed thanks to a specialized algorithm developed by Harry M. Markowitz: [the critical line method](https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm).
 
 - Computation of the nearest portfolio on the mean-variance efficient frontier    
-  Thanks to the Markowitz's critical line method, it is possible to compute the nearest mean-variance efficient portfolio of any given portfolio.
+  Thanks to the Markowitz's critical line method, it is possible to exactly compute the nearest mean-variance efficient portfolio of any given portfolio.
 
-- [ON-GOING WITH 0.0.10] Generation of perturbed mean vectors, variances and correlation matrices   
+- Generation of perturbed mean vectors, variances and correlation matrices   
   As demonstrated in [The effect of errors in means, variances, and covariances on optimal portfolio choice](https://jpm.pm-research.com/content/19/2/6) by Vijay Chopra and William Ziemba, the impact of estimation errors in expected returns, variances and correlation matrices on the output of a portfolio optimization algorithm can be significant, so that it is useful to have an algorithm to perturb these quantities for portfolio weights sensitivity analysis.
 
 - Generic random subspace optimization   
@@ -150,7 +150,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 - Computation of shrinkage estimators for mean vectors and covariance matrices   
   Shrinkage estimators for mean vectors can help to reduce the estimation errors in expected returns as observed in DeMiguel et al. [Size Matters: Optimal Calibration of Shrinkage Estimators for Portfolio Selection](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1891847), and shrinkage estimators for covariance matrices like Ledoit-Wolf's [A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices](http://www.ledoit.net/ole1_abstract.htm) provide an elegant solution to the problem of the ill-conditioning and non-invertibility of sample covariance matrices.
 
-- [ON-GOING WITH 0.0.10] Repairing indefinite or positive semi-definite correlation matrices   
+- Repairing indefinite or positive semi-definite correlation matrices   
   With certain use-cases (e.g. alteration of correlation pairs for stress testing), correlation matrices might lose their positive (semi) definiteness, which is possible to recover thanks for instance to the spectral method described by Rebonato and Jaeckel in their paper [The Most General Methodology to Create a Valid Correlation Matrix for Risk Management and Option Pricing Purposes](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1969689) or to other methods like the computation of the nearest correlation matrix addressed by Nicholas J. Higham in his paper [Computing the nearest correlation matrix - A problem from Finance](https://www.maths.manchester.ac.uk/~higham/narep/narep369.pdf).
 
   

@@ -1,4 +1,4 @@
-### 0.0.10 - xx/xx/2020
+### 0.0.10 - 14/09/2020
 - Added the Jacobi method in order to compute eigenvalues and eigenvectors of real symmetric matrices
 - Updated the method to generate random correlation matrices to output truly symmetric matrices, and not numerically symmetric matrices only
 - Added a method to repair the (semi) definite-positiveness of correlation matrices, using spectral decomposition
@@ -33,7 +33,7 @@ volatility of risk tolerance parameter; default is now return to have the whole 
 - Removed the possibility to compute corner portfolios from the outside of the library, as preparatory step to use another algorithm for the mean variance efficient frontier computation
 - Added a function to minimize a linear function over the restricted unit simplex of R^n
 - Improved the precision of the method to project on the restricted unit simplex of R^n, which was not precise for big numbers, typically encountered in FISTA algorithm
-- As a side effect, the minimumTrackingErrorWeights method can computed different portfolios now
+- As a side effect, the minimumTrackingErrorWeights method now computes better portfolios
 - Reworked some internals of the computeCornerPortfolios_ method related to the computation of the E-maximizing portfolio
 - Reword the internals of the mean-variance optimization methods, so that other algorithms that the critical line algorithm can be used to compute MV-efficient portfolios
 - Reworked the internals of the computeEfficientFrontierPortfolios, to remove the limit cases around the number of portfolios to be computed
@@ -44,6 +44,7 @@ volatility of risk tolerance parameter; default is now return to have the whole 
 - Reworked the internals of the maximumSharpeRatioWeights method to re-use the new internals of the mean-variance optimization methods
 - Reworked the internals of the mostDiversifiedWeights method to re-use the new internals of the mean-variance optimization methods, which allows for min/max weights and partial investment constraints
 - Added a RSO-GMV optimization method
+- Updated the randomSubspaceMeanVarianceOptimizatioWeights interface (non backward-compatible change), renamed the options subsetsOpt
 
 ### 0.0.9 - 03/08/2020
 - Removed comments from the generated Google Sheet script using a new grunt plugin
