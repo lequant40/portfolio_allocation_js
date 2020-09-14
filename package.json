@@ -12,16 +12,16 @@
   },
   "keywords": [
     "quantitative finance",
-    "google sheets",
     "portfolio allocation",
-    "portfolio optimization"
+    "portfolio optimization",
+    "mean variance optimization"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/lequant40/portfolio_allocation_js.git"
   },
   "devDependencies": {
-    "grunt": "^1.0.4",
+    "grunt": "^1.2.1",
     "grunt-contrib-concat": "^1.0.1",
     "grunt-contrib-qunit": "^3.1.0",
     "grunt-contrib-uglify": "^4.0.1",

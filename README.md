@@ -1,15 +1,16 @@
-# PortfolioAllocation v0.0.9 ([Changelog](changelog.md))
+# PortfolioAllocation ([Changelog](changelog.md))
 
+[![npm][https://img.shields.io/npm/v/portfolio-allocation.svg]][https://www.npmjs.com/package/portfolio-allocation]
 [![Travis Build Status](https://travis-ci.org/lequant40/portfolio_allocation_js.svg?style=flat)](https://travis-ci.org/lequant40/portfolio_allocation_js)
+[![Feature Requests](https://feathub.com/lequant40/portfolio_allocation_js?format=svg)](https://feathub.com/lequant40/portfolio_allocation_js)
 
 PortfolioAllocation is a JavaScript library designed to help constructing financial portfolios made of several assets: bonds, commodities, cryptocurrencies, currencies, exchange traded funds (ETFs), mutual funds, stocks...
 
-When constructing such portfolios, one of the main problem faced is to determine the proportion of the different assets to hold.
+When constructing such portfolios, one of the main problems faced is to determine the proportion of the different assets to hold.
 
 PortfolioAllocation solves this problem using mathematical optimization algorithms.
 
-Do not hesitate to report any bug / request additional features !
-
+Do not hesitate to [report any bug](https://github.com/lequant40/portfolio_allocation_js/issues) / [request additional features](https://feathub.com/lequant40/portfolio_allocation_js) !
 
 ## Features
 
@@ -134,8 +135,8 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 - Computation of the nearest portfolio on the mean-variance efficient frontier    
   Thanks to the Markowitz's critical line method, it is possible to compute the nearest mean-variance efficient portfolio of any given portfolio.
 
-- Generation of perturbed mean vectors   
-  As demonstrated in [The effect of errors in means, variances, and covariances on optimal portfolio choice](https://jpm.pm-research.com/content/19/2/6), the impact of estimation errors in expected returns on the output of a portfolio optimization algorithm can be significant, so that it is useful to have an algorithm to perturb mean vectors for portfolio weights sensitivity analysis.
+- [ON-GOING WITH 0.0.10] Generation of perturbed mean vectors, variances and correlation matrices   
+  As demonstrated in [The effect of errors in means, variances, and covariances on optimal portfolio choice](https://jpm.pm-research.com/content/19/2/6) by Vijay Chopra and William Ziemba, the impact of estimation errors in expected returns, variances and correlation matrices on the output of a portfolio optimization algorithm can be significant, so that it is useful to have an algorithm to perturb these quantities for portfolio weights sensitivity analysis.
 
 - Generic random subspace optimization   
   A direct extension of the RSO-MVO method, allowing to use the random subspace optimization method with any portfolio optimization method.
@@ -149,7 +150,10 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
 - Computation of shrinkage estimators for mean vectors and covariance matrices   
   Shrinkage estimators for mean vectors can help to reduce the estimation errors in expected returns as observed in DeMiguel et al. [Size Matters: Optimal Calibration of Shrinkage Estimators for Portfolio Selection](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1891847), and shrinkage estimators for covariance matrices like Ledoit-Wolf's [A Well-Conditioned Estimator for Large-Dimensional Covariance Matrices](http://www.ledoit.net/ole1_abstract.htm) provide an elegant solution to the problem of the ill-conditioning and non-invertibility of sample covariance matrices.
 
+- [ON-GOING WITH 0.0.10] Repairing indefinite or positive semi-definite correlation matrices   
+  With certain use-cases (e.g. alteration of correlation pairs for stress testing), correlation matrices might lose their positive (semi) definiteness, which is possible to recover thanks for instance to the spectral method described by Rebonato and Jaeckel in their paper [The Most General Methodology to Create a Valid Correlation Matrix for Risk Management and Option Pricing Purposes](https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1969689) or to other methods like the computation of the nearest correlation matrix addressed by Nicholas J. Higham in his paper [Computing the nearest correlation matrix - A problem from Finance](https://www.maths.manchester.ac.uk/~higham/narep/narep369.pdf).
 
+  
 ## Documentation
 
 The code is heavily documented, using [JSDoc](http://usejsdoc.org/).
@@ -161,7 +165,7 @@ That being said, the documentation is rather for developer's usage, so that in c
 
 ### Fork the project from [Github](https://github.com/)...
 
-### Instal the [Grunt](http://gruntjs.com/) dependencies and command line
+### Install the [Grunt](http://gruntjs.com/) dependencies and command line
 
 ```
 npm install

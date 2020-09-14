@@ -1,3 +1,50 @@
+### 0.0.10 - xx/xx/2020
+- Added the Jacobi method in order to compute eigenvalues and eigenvectors of real symmetric matrices
+- Updated the method to generate random correlation matrices to output truly symmetric matrices, and not numerically symmetric matrices only
+- Added a method to repair the (semi) definite-positiveness of correlation matrices, using spectral decomposition
+- Change of method name for Ledoit-Wolf covariance matrix shrinkage to "linear-shrinkage" (= non-backward compatible change)
+- Change of method name for DeMiguel mean vector shrinkage to "linear-shrinkage" (= non-backward compatible change)
+- Added a method to repair the (semi) definite-positiveness of correlation matrices, using shrinkage towards a target matrix
+- Added the possibility to provide standard deviations for random mean vectors and random variances vectors creation
+- Added a method to randomly perturb a correlation matrix
+- Added a method to compute the nearest correlation matrix in Frobenius norm, including a lower bound constraint on the smallest eigenvalue(s)
+- Added a method to repair the (semi) definite-positiveness of correlation matrices, using the computation of the nearest correlation matrix
+- Updated grunt version
+- Added a method to compute a covariance matrix from a correlation matrix and a vector of either variances or standard deviations
+- Updated the internals of the Minimum Tracking Error portfolio: now Threshold Accepting is the default method in case of cardinality constraints because of speed/precision/stability improvements in the neighbourhood generation function
+- Updated the internals of the Minimum Tracking Error portfolio: the generation of the initial point is now customizable in terms of the number of iterations
+- Updated the interface of the Minimum Tracking Error portfolio (= non-backward compatible change), the optimization method is now either "exact" or "heuristic" instead of "combinatorial" and "thresholdAccepting"
+- Updated the Minimum Tracking Error portfolio, adding the possibility to allow for partial investment
+- Fix for issue https://github.com/lequant40/portfolio_allocation_js/issues/7 (new way to instantiate Matrix objects and detect arrays)
+- Added a method to symmetrize a square matrix
+- Added a method to set 1's on the diagonal of a square matrix
+- Added a method to test if a matrix is unit diagonal
+- Added the Cholesky decomposition of a positive definite matrix
+- Added a method to determine if a matrix is a correlation matrix
+- Redesigned the meanVarianceEfficientFrontierPortfolios method to output portfolios uniformly distributed w.r.t. either return, 
+volatility of risk tolerance parameter; default is now return to have the whole efficient frontier properly covered (= non-backward compatible change)
+- Added a method to test for the emptyness of the restricted full unit simplex of R^n
+- Added a method to compute the euclidean projection of a point of R^n in the restricted full unit simplex of R^n
+- Added the characteristic function of the restricted full unit simplex of R^n
+- Fixed a bug in meanVarianceEfficientFrontierPortfolios, in which partial investment constraint was not taken into account
+- Fixed a bug in meanVarianceEfficientFrontierNearestWeights, in which partial investment constraint was not taken into account
+- Misc. internal changes in the maximumSharpeRatioWeights method, plus fixed a bug in which partial investment constraint was not taken into account
+- Updated the error message in case the critical line algorithm is failing due to equal returns, to better explain the issue behind https://github.com/lequant40/portfolio_allocation_js/issues/8 
+- Removed the possibility to compute corner portfolios from the outside of the library, as preparatory step to use another algorithm for the mean variance efficient frontier computation
+- Added a function to minimize a linear function over the restricted unit simplex of R^n
+- Improved the precision of the method to project on the restricted unit simplex of R^n, which was not precise for big numbers, typically encountered in FISTA algorithm
+- As a side effect, the minimumTrackingErrorWeights method can computed different portfolios now
+- Reworked some internals of the computeCornerPortfolios_ method related to the computation of the E-maximizing portfolio
+- Reword the internals of the mean-variance optimization methods, so that other algorithms that the critical line algorithm can be used to compute MV-efficient portfolios
+- Reworked the internals of the computeEfficientFrontierPortfolios, to remove the limit cases around the number of portfolios to be computed
+- Reworked the internals of the minimumTrackingErrorWeights method to improve the way partial investment constraint is managed (better numerical precision and better speed)
+- Reworked the mean-variance optimization to use the GSMO algorithm by default instead of the critical line algorithm, to ensure definiteness in all cases 
+- Reworked the internals of the globalMinimumVarianceWeights method to handle partial investment constraint, optional returns, as well as to re-use the new internals of the mean-variance optimization methods
+- Fixed misc. bugs in goldenSectionSearch optimization method, allowing the case of upper bound = lower bound, allowing the case where the minimum is found on one of the bounds, and allowing a constant function on the right of the interval
+- Reworked the internals of the maximumSharpeRatioWeights method to re-use the new internals of the mean-variance optimization methods
+- Reworked the internals of the mostDiversifiedWeights method to re-use the new internals of the mean-variance optimization methods, which allows for min/max weights and partial investment constraints
+- Added a RSO-GMV optimization method
+
 ### 0.0.9 - 03/08/2020
 - Removed comments from the generated Google Sheet script using a new grunt plugin
 - Added a method to extract the columns of a matrix

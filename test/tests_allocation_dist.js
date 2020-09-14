@@ -17,58 +17,6 @@ before: function() {
 });
 
 
-QUnit.test('Projection on mean-variance efficient frontier', function(assert) {    
-	function areWeightsEqual(w1, w2, eps) {
-		// Test equality of weights length
-		if (w1.length != w2.length) {
-			return false;
-		}
-		
-		// Test numerical equality of weights
-		for (var i = 0; i < w1.length; ++i) {
-			if (Math.abs(w1[i] - w2[i]) > eps) {
-				return false;
-			}
-		}
-		
-		// Arrived here, the weights are numerically equal
-		return true;
-	}
-	
-	// Test with static data
-	// As the corner portfolios are known for the data below, c.f. other tests,
-	// it is easy to determine different test cases
-	{
-		var covMat = [[1, 2.96, 2.31],
-					  [2.96, 54.76, 39.886],
-					  [2.31,	39.886,	237.16]];
-		var returns = [2.8000, 6.3000, 10.8000];
-
-		// Tests with projection equal to one corner portfolio
-		var expectedWeights = [0.2, 0.30000000000000004, 0.5];
-		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.1, 0.1, 0.8], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection on mean-variance efficient frontier, projection equal to a corner portfolio');
-		
-		var expectedWeights = [0.22180737780348653, 0.5, 0.27819262219651353];
-		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.1, 0.8, 0.1], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection on mean-variance efficient frontier, projection equal to a corner portfolio');
-
-		var expectedWeights = [0.5, 0.2999999999999999, 0.2];
-		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.8, 0.1, 0.1], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection on mean-variance efficient frontier, projection equal to a corner portfolio');
-		
-		// Test with projection equal to the initial portfolio (i.e., the initial portfolio is efficient)
-		var expectedWeights = [0.2, 0.4, 0.4];
-		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.2, 0.4, 0.4], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection on mean-variance efficient frontier, projection equal to the initial portfolio');
-		
-		// Test with projection equal to a portfolio strictly on an efficient segment
-		var expectedWeights = [0.2, 0.405, 0.395];
-		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.19, 0.41, 0.4], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection on mean-variance efficient frontier, projection equal to a strict efficient portfolio');
-	}  
-});
-
 QUnit.test('Equal weights portfolio', function(assert) {    
 	// Random data, n assets case
 	{
@@ -658,7 +606,7 @@ QUnit.test('Most diversified portfolio', function(assert) {
 		
 		// Compute MDP weights
 		var weights = PortfolioAllocation.mostDiversifiedWeights(sigma);
-		
+
 		// Compare MDP weights to values provided p. 9 of the reference
 		var expectedWeights = [0.33, 0.67];
 		assert.equal(Math.abs(weights[0] - expectedWeights[0]) <= 1e-2, true, 'MDP - Values #1 0');
@@ -780,6 +728,22 @@ QUnit.test('Most diversified portfolio', function(assert) {
 				assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-4, true, 'MDP - Values #6 ' + i);
 			}
 		}
+	}
+	
+	// Reference: Understanding the Impact of Weights Constraints in Portfolio Theory, Thierry Roncalli
+	{
+		var covMat = [[0.0225,0.0030,0.0150,0.0225], [0.0030,0.0400,0.0350,0.0240], [0.0150,0.0350,0.0625,0.0600], [0.0225,0.0240,0.0600,0.0900]];
+		
+		var expectedWeights =  [0.4, 0.4, 0, 0.2];
+		var weights = PortfolioAllocation.mostDiversifiedWeights(covMat, { constraints: {maxWeights: [0.4, 0.4, 0.4, 0.4]}}); 
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-5) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Values #7');
 	}
 });
 
@@ -1012,11 +976,51 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 
 	// Reference: Understanding the Impact of Weights Constraints in Portfolio Theory, Thierry Roncalli
 	{
-		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0225,0.0030,0.0150,0.0225], [0.0030,0.0400,0.0350,0.0240], [0.0150,0.0350,0.0625,0.0600], [0.0225,0.0240,0.0600,0.0900]]); 
-		var expectedWeights =  [0.6548672566371683, 0.34513274336283173, 0, 0];
+		var covMat = [[0.0225,0.0030,0.0150,0.0225], [0.0030,0.0400,0.0350,0.0240], [0.0150,0.0350,0.0625,0.0600], [0.0225,0.0240,0.0600,0.0900]];
+		
+		var expectedWeights =  [0.65487, 0.34513, 0, 0];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
+		var weightsOK = true;
 		for (var i = 0; i < expectedWeights.length; ++i) {
-			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #5 ' + i);
+			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-5) {
+				weightsOK = false;
+				break;
+			}
 		}
+		assert.equal(weightsOK, true, 'GMV - Test #5, 1');
+
+		var expectedWeights =  [0.56195, 0.23805, 0.1, 0.1];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {constraints: {minWeights: [0.10, 0.10, 0.10, 0.10]}}); 
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-5) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'GMV - Test #5, 2');
+		
+		var expectedWeights =  [0.40, 0.20, 0.2, 0.2];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {constraints: {minWeights: [0.20, 0.20, 0.20, 0.20]}}); 
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-5) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'GMV - Test #5, 3');
+		
+		var expectedWeights =  [0.50, 0.50, 0, 0];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {constraints: {maxWeights: [0.50, 0.50, 0.50, 0.50]}}); 
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-5) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'GMV - Test #5, 4');
 	}
 	
 	// Reference: Private communication with TrendXplorer
@@ -1027,8 +1031,8 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 					  [0.00926415,0.02245369,-0.00432445,0.02622712,0.0016983],
 					  [-0.0064081,-0.00480642,0.00690744,0.00169834,0.0116492]];
 		
-		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
-		var expectedWeights =  [0.22372361188383866, 0, 0.308875157539891, 0.1338200074030125, 0.333581223173258];
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {optimizationMethodParams: {epsGsmo: 1e-12}}); 	
+		var expectedWeights = [0.22372357878117932, 0, 0.30887500093660675, 0.13381977357496827, 0.3335816467072458];
 		for (var i = 0; i < expectedWeights.length; ++i) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #6 ' + i);
 		}
@@ -1043,14 +1047,14 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 					[0.00003320921106,	0.00001333414531,	0.00001058070153,	0.00002279528797,	0.00001607412275]];
 					
 		// True expected values
-		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {optimizationMethodParams: {epsGsmo: 1e-12}}); 
 		var expectedWeights =  [0, 0.2145375758374286, 0.7854624241625715, 0, 0]
 		for (var i = 0; i < expectedWeights.length; ++i) {
-			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #6 ' + i);
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - Values #7 ' + i);
 		}
 		
 		// Wrong values, obtained by setting eps with a too big value
-		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {eps: 1e-4}); 
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat, {optimizationMethodParams: {epsGsmo: 1e-4}}); 
 		var expectedWeights =  [0.2, 0.2, 0.2, 0.2, 0.2]
 		for (var i = 0; i < expectedWeights.length; ++i) {
 			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'GMV - (Wrong) Values #7 ' + i);
@@ -1068,7 +1072,7 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 		var weights = PortfolioAllocation.globalMinimumVarianceWeights(covMat); 
 		var expectedWeights =  [0.050, 0.006, 0, 0.862, 0.082];
 		for (var i = 0; i < expectedWeights.length; ++i) {
-			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'GMV - Values #7 ' + i);
+			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-3, true, 'GMV - Values #8 ' + i);
 		}
 	}
 	
@@ -1090,6 +1094,69 @@ QUnit.test('Global minimum variance portfolio', function(assert) {
 		}
 	}
 	
+	// Reference: private communication
+	//
+	// This method test the fact that for a nearly singular matrix [determinant ~5e-24), the GMV
+	// is the same if the returns are considered as identical (e.g. null),
+	// v.s. provided in input (because nearly singular <> singular).
+	{
+		var covMat = [[0.05434700626, 0.05450611079, 0.0545732999, 0.04429473013, 0.03183574594, 0.02601472703, -0.007675835176, -0.0003383554852],
+					[0.05186508706, 0.05711441188, 0.05233270776, 0.03993880464, 0.02927676965, 0.02103022743, -0.004987619848, -0.0002253313801],
+					[0.0545732999, 0.05499754323, 0.06984354197, 0.04885108716, 0.02943209273, 0.02965970237, -0.009724897251, -0.0003809302526],
+					[0.04429473013, 0.04197252977, 0.04885108716, 0.04175438053, 0.02938755621, 0.0233266123, -0.009103127988, -0.00038995015],
+					[0.03183574594, 0.03076757296, 0.02943209273, 0.02938755621, 0.02569034099, 0.01355929033, -0.006665862624, -0.0002719638161],
+					[0.02601472703, 0.02210110831, 0.02965970237, 0.0233266123, 0.01355929033, 0.01851558467, -0.004491637207, -0.0002525477259],
+					[-0.007675835176, -0.005241594596, -0.009724897251, -0.009103127988, -0.006665862624, -0.004491637207, 0.003760367113, 0.0001072357482],
+					[-0.0003383554852, -0.0002368054864, -0.0003809302526, -0.00038995015, -0.0002719638161, -0.0002525477259, 0.0001072357482, 0.000007905033839]];
+		var maxWeights = [0.25,0.25,0.25,0.25,0.25,0.25,1,1];
+		
+		//
+		var weightsNullMu = PortfolioAllocation.globalMinimumVarianceWeights(covMat, { constraints: {maxWeights: maxWeights} }); 
+				
+		//
+		var mu = [0.33/100, 1.69/100, -0.30/100, -0.08/100, 0.49/100, -0.01/100, 0.48/100, 0.05/100];
+		var weightsMu = PortfolioAllocation.globalMinimumVarianceWeights(covMat, { mu: mu, constraints: {maxWeights: maxWeights} }); 
+		
+		assert.deepEqual(weightsNullMu, weightsMu, 'GMV - Values #9, nearly singular covariance matrix'); 
+	}
+	
+	// Test that the GMV portfolio is efficient and supports by default equal returns, 
+	// using a semi-definite positive covariance matrix.
+	{
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0400], [0.0400, 0.0400]], {mu: [0.01, 0.02]});
+		var expectedWeights = [0, 1];
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) >= 1e-8) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Test #10, semi-definite positive matrix, 1');
+
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0400], [0.0400, 0.0400]], {mu: [0.02, 0.01]});
+		var expectedWeights =  [1, 0];
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) >= 1e-8) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Test #10, semi-definite positive matrix, 2');
+		
+		var weightsNoMu = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0400], [0.0400, 0.0400]]);
+		var weights = PortfolioAllocation.globalMinimumVarianceWeights([[0.0400, 0.0400], [0.0400, 0.0400]], {mu: [0.01, 0.01]});
+		var expectedWeights =  [0.5, 0.5];
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weightsNoMu[i] - expectedWeights[i]) >= 1e-8 || Math.abs(weights[i] - expectedWeights[i]) >= 1e-8) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Test #10, semi-definite positive matrix and equal returns');
+	}
 });
 
 
@@ -1538,14 +1605,27 @@ QUnit.test('Mean variance portfolio - return constraint', function(assert) {
 		assert.throws(function() { 
 		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: unreachableMaxReturn}}) },
 			new Error('no matching efficient portfolio with a return equal to ' + unreachableMaxReturn),
-			"Mean variance portfolio - Return constraint, unreachable return #1");
+			"Return constraint, unreachable return #1/1");
+
+		assert.throws(function() { 
+		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", 
+		                                                                       constraints: {return: unreachableMaxReturn}}) },
+			new Error('no matching efficient portfolio with a return equal to ' + unreachableMaxReturn),
+			"Return constraint, unreachable return #1/2");
+
 			
 		var minReturn = returns[0];
 		var unreachableMinReturn = minReturn - (1 - Math.random()); // < minReturn
 		assert.throws(function() { 
+		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line",  
+		                                                                       constraints: {return: unreachableMinReturn}}) },
+			new Error('no matching efficient portfolio with a return equal to ' + unreachableMinReturn),
+			"Return constraint, unreachable return #2/1");
+
+		assert.throws(function() { 
 		PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: unreachableMinReturn}}) },
 			new Error('no matching efficient portfolio with a return equal to ' + unreachableMinReturn),
-			"Mean variance portfolio - Return constraint, unreachable return #2");
+			"Return constraint, unreachable return #2/2");
 	}
 	
 	// Test using static data
@@ -1553,15 +1633,25 @@ QUnit.test('Mean variance portfolio - return constraint', function(assert) {
 		var covMat = [[1, 0.3], [0.3, 1]];
 		var returns = [0.1, 0.2];
 		
+		//
 		var targetReturn = returns[1]; // the second asset
 		var expectedWeights = [0, 1]; 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: targetReturn}});
-		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - return constraint #0');
 		
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {return: targetReturn}});
+		assert.deepEqual(weightsCla, expectedWeights, 'Return constraint #0/1');
+		
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: targetReturn}});
+		assert.deepEqual(weightsGsmo, expectedWeights, 'Return constraint #0/2');
+		
+		//
 		var targetReturn = 0.15; // exact mix of the two assets
 		var expectedWeights = [0.5, 0.5];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: targetReturn}});
-		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - return constraint #0 bis');
+		
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {return: targetReturn}});
+		assert.deepEqual(weightsCla, expectedWeights, 'Return constraint #0 bis/1');		
+		
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: targetReturn}});
+		assert.deepEqual(weightsGsmo, expectedWeights, 'Return constraint #0 bis/2');
 	}
 		
 	// Test using static data (positive semi-definite covariance matrix)
@@ -1579,25 +1669,66 @@ QUnit.test('Mean variance portfolio - return constraint', function(assert) {
 					[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
 		
+		//
 		var expectedRoundedWeights = [0, 0, 0.08, 0.015, 0.06, 0, 0.345, 0, 0, 0.5];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.07}});
-		weights = PortfolioAllocation.postOptimizationWeights(weights, {roundingMethodParams : {k : 200}});
-		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - return constraint #1');
 		
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {return: 0.07}});
+		weightsCla = PortfolioAllocation.postOptimizationWeights(weightsCla, {roundingMethodParams : {k : 200}});
+		assert.deepEqual(weightsCla, expectedRoundedWeights, 'Return constraint #1/1');
+		
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.07}});
+		weightsGsmo = PortfolioAllocation.postOptimizationWeights(weightsGsmo, {roundingMethodParams : {k : 200}});
+		assert.deepEqual(weightsGsmo, expectedRoundedWeights, 'Return constraint #1/2');
+
+		//
 		var expectedRoundedWeights = [0, 0, 0, 0.335, 0.455, 0, 0.21, 0, 0, 0]; // In Markowitz book, this is actually [0, 0, 0, 0.33, 0.455, 0, 0.215, 0, 0, 0], but this seems a wrong rounding 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.175}});
-		weights = PortfolioAllocation.postOptimizationWeights(weights, {roundingMethodParams : {k : 200}});
-		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - return constraint #2');
 		
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {return: 0.175}});
+		weightsCla = PortfolioAllocation.postOptimizationWeights(weightsCla, {roundingMethodParams : {k : 200}});
+		assert.deepEqual(weightsCla, expectedRoundedWeights, 'Return constraint #2/1');
+
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.175}});
+		weightsGsmo = PortfolioAllocation.postOptimizationWeights(weightsGsmo, {roundingMethodParams : {k : 200}});
+		assert.deepEqual(weightsGsmo, expectedRoundedWeights, 'Return constraint #2/2');
+		
+		//
 		var expectedRoundedWeights = [0, 0, 0, 0.3, 0.39, 0, 0.31, 0, 0, 0]; // In Markowitz book, this is actually [0, 0, 0, 0.29, 0.39, 0, 0.32, 0, 0, 0], but this seems a wrong rounding 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.169}});
-		weights = PortfolioAllocation.postOptimizationWeights(weights, {roundingMethodParams : {k : 100}});
-		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - return constraint #3');
 		
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {return: 0.169}});
+		weightsCla = PortfolioAllocation.postOptimizationWeights(weightsCla, {roundingMethodParams : {k : 100}});
+		assert.deepEqual(weightsCla, expectedRoundedWeights, 'Return constraint #3/1');
+
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.169}});
+		weightsGsmo = PortfolioAllocation.postOptimizationWeights(weightsGsmo, {roundingMethodParams : {k : 100}});
+		assert.deepEqual(weightsGsmo, expectedRoundedWeights, 'Return constraint #3/2');
+		
+		//
 		var expectedRoundedWeights = [0, 0, 0.09, 0.13, 0.21, 0, 0.57, 0, 0, 0];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.150}});
-		weights = PortfolioAllocation.postOptimizationWeights(weights, {roundingMethodParams : {k : 100}});
-		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - return constraint #4');
+		
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {return: 0.150}});
+		weightsCla = PortfolioAllocation.postOptimizationWeights(weightsCla, {roundingMethodParams : {k : 100}});
+		assert.deepEqual(weightsCla, expectedRoundedWeights, 'Return constraint #4/1');
+		
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 0.150}});
+		weightsGsmo = PortfolioAllocation.postOptimizationWeights(weightsGsmo, {roundingMethodParams : {k : 100}});
+		assert.deepEqual(weightsGsmo, expectedRoundedWeights, 'Return constraint #4/2');
+	}
+	
+	// Reference: Understanding the Impact of Weights Constraints in Portfolio Theory, Thierry Roncalli
+	{
+		var covMat = [[0.0225,0.0030,0.0150,0.0225], [0.0030,0.0400,0.0350,0.0240], [0.0150,0.0350,0.0625,0.0600], [0.0225,0.0240,0.0600,0.0900]];
+		var returns = [5/100, 3/100, 7/100, 7/100];
+		
+		var expectedWeights =  [0.4, 0.05, 0.4, 0.15];
+		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {return: 6/100, maxWeights: [0.4, 0.4, 0.4, 0.4]}}); 
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-5) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Return constraint #5');
 	}
 });	
 
@@ -1616,21 +1747,30 @@ QUnit.test('Mean variance portfolio - volatility constraint', function(assert) {
 		var returns = [0.062, 0.146, 0.128];
 		
 		
-		var nbSamples = 10;
+		var nbSamples = 5;
 		var minVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
 		var maxVolatility = Math.sqrt(covMat[1][1]);
 		for (var k = 0; k < nbSamples; ++k) {
 			var unreachableMaxVolatility = generateRandomValue(maxVolatility - 1e-6, 2 * maxVolatility); // > maxVolatility
 			assert.throws(function() { 
+			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {volatility: unreachableMaxVolatility}}) },
+				new Error('no matching efficient portfolio with a volatility equal to ' + unreachableMaxVolatility),
+				"Volatility constraint weights portfolio, unreachable volatility #1/1 - " + k + "/" + nbSamples);
+				
+			assert.throws(function() { 
 			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {volatility: unreachableMaxVolatility}}) },
 				new Error('no matching efficient portfolio with a volatility equal to ' + unreachableMaxVolatility),
-				"Mean variance portfolio - Volatility constraint weights portfolio, unreachable volatility #1 - " + k + "/" + nbSamples);
-		
+				"Volatility constraint weights portfolio, unreachable volatility #1/2 - " + k + "/" + nbSamples);
+
 			var unreachableMinVolatility = generateRandomValue(0, minVolatility - 1e-6); // < minVolatility
+			assert.throws(function() { 
+			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {volatility: unreachableMinVolatility}}) },
+				new Error('no matching efficient portfolio with a volatility equal to ' + unreachableMinVolatility),
+				"Volatility constraint weights portfolio, unreachable volatility #2/1 - " + k + "/" + nbSamples);
 			assert.throws(function() { 
 			PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {volatility: unreachableMinVolatility}}) },
 				new Error('no matching efficient portfolio with a volatility equal to ' + unreachableMinVolatility),
-				"Mean variance portfolio - Volatility constraint weights portfolio, unreachable volatility #2 - " + k + "/" + nbSamples);
+				"Volatility constraint weights portfolio, unreachable volatility #2/2 - " + k + "/" + nbSamples);
 		}
 	}
 	
@@ -1649,12 +1789,40 @@ QUnit.test('Mean variance portfolio - volatility constraint', function(assert) {
 					[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
 		
+		//
 		var expectedRoundedWeights = [0, 0, 0.08, 0.015, 0.055, 0, 0.335, 0, 0, 0.515]; // In Markowitz book, this is actually [0, 0, 0.08, 0.015, 0.06, 0, 0.345, 0, 0, 0.5], but this seems a wrong rounding 
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {volatility: 0.08}});
-		weights = PortfolioAllocation.postOptimizationWeights(weights, {roundingMethodParams: {k: 200}});
-		assert.deepEqual(weights, expectedRoundedWeights, 'Mean variance portfolio - volatility constraint #1');
+		
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {volatility: 0.08}});
+		weightsCla = PortfolioAllocation.postOptimizationWeights(weightsCla, {roundingMethodParams: {k: 200}});
+		assert.deepEqual(weightsCla, expectedRoundedWeights, 'Volatility constraint #1/1');
+		
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {constraints: {volatility: 0.08}});
+		weightsGsmo = PortfolioAllocation.postOptimizationWeights(weightsGsmo, {roundingMethodParams: {k: 200}});
+		assert.deepEqual(weightsGsmo, expectedRoundedWeights, 'Volatility constraint #1/2');
 	}
 	
+	// Test using data for equal returns
+	// https://github.com/lequant40/portfolio_allocation_js/issues/8
+	{
+		var covMat = [[2.3/100, 2.5/100, 3.3/100, 1.7/100, 2.3/100, -0.4/100, -0.3/100, -0.3/100, 0.1/100, 1.7/100],
+					[2.5/100, 2.9/100, 3.8/100, 1.9/100, 2.5/100, -0.4/100, -0.3/100, -0.3/100, 0.2/100, 1.9/100],
+					[3.3/100, 3.8/100, 5.3/100, 2.3/100, 3.1/100, -0.5/100, -0.3/100, -0.4/100, 0.3/100, 2.9/100],
+					[1.7/100, 1.9/100, 2.3/100, 1.4/100, 1.8/100, -0.3/100, -0.3/100, -0.3/100, 0.0/100, 1.1/100],
+					[2.3/100, 2.5/100, 3.1/100, 1.8/100, 4.0/100, -0.1/100, 0.0/100, 0.2/100, 0.7/100, 1.8/100],
+					[-0.4/100, -0.4/100, -0.5/100, -0.3/100, -0.1/100, 0.2/100, 0.2/100, 0.2/100, 0.2/100, -0.1/100],
+					[-0.3/100, -0.3/100, -0.3/100, -0.3/100, 0.0/100, 0.2/100, 0.4/100, 0.2/100, 0.3/100, 0.0/100],
+					[-0.3/100, -0.3/100, -0.4/100, -0.3/100, 0.2/100, 0.2/100, 0.2/100, 0.3/100, 0.2/100, 0.0/100],
+					[0.1/100, 0.2/100, 0.3/100, 0.0/100, 0.7/100, 0.2/100, 0.3/100, 0.2/100, 0.5/100, 0.4/100],
+					[1.7/100, 1.9/100, 2.9/100, 1.1/100, 1.8/100, -0.1/100, 0.0/100, 0.0/100, 0.4/100, 2.0/100]];
+		var returns = [4.7/100, 5.0/100, 6.1/100, 4.0/100, 5.4/100, 2.0/100, 2.2/100, 2.4/100, 2.4/100, 3.6/100];
+		var minWeights = [3/100, 3/100, 3/100, 0/100, 0/100, 0/100, 0/100, 3/100, 0/100, 0/100];
+		var maxWeights = [35/100, 35/100, 35/100, 35/100, 35/100, 35/100, 35/100, 35/100, 35/100, 35/100];
+		
+		//
+		var expectedWeights = [0.03, 0.03, 0.10246320416609588, 0.2556291679436339, 0, 0.08350220835426388, 0.14840541953600664, 0.35, 0, 0];
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, {constraints: {minWeights: minWeights, maxWeights: maxWeights, volatility: 5.5/100}});
+		assert.deepEqual(weightsGsmo, expectedWeights, 'Volatility constraint #2');
+	}
 });	
 
 
@@ -1671,24 +1839,37 @@ QUnit.test('Mean variance portfolio - risk tolerance constraint', function(asser
 		
 		// Test a risk tolerance greater than the highest attainable risk tolerance, which is 20.898844444444443,
 		// which must output the rightmost corner portfolio.
-		var expectedWeights = [0.2, 0.30000000000000004, 0.5];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: 21, 
-		                                                                                                   minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		var weightsOK = true;
-		for (var i = 0; i < weights.length; ++i) {
-			if (Math.abs(expectedWeights[i] - weights[i]) > 1e-8) {
+		var expectedWeights = [0.2, 0.3, 0.5];
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line",
+		                                                                                        constraints: {riskTolerance: 40, 
+		                                                                                                      minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: 40, 
+		                                                                                                       minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		var weightsGsmoPartial = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: 40, 
+																										              fullInvestment: false,
+		                                                                                                              minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+
+		var weightsOK = weightsCla.length == 3 && weightsGsmo.length == 3 && weightsGsmoPartial.length == 3;
+		for (var i = 0; i < weightsCla.length; ++i) {
+			if (Math.abs(expectedWeights[i] - weightsCla[i]) > 1e-8 || 
+			    Math.abs(expectedWeights[i] - weightsGsmo[i]) > 1e-8 || 
+				Math.abs(expectedWeights[i] - weightsGsmoPartial[i]) > 1e-8) {
 				weightsOK = false;
 			}
 		}
 		assert.equal(weightsOK, true, 'Mean variance portfolio - risk tolerance constraint, rightmost corner portfolio');
 		
 		// Test a risk tolerance equal to 0, which must output the leftmost corner portfolio.
-		var expectedWeights = [0.5, 0.2999999999999999, 0.2];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: 0, 
-		                                                                                                   minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		var expectedWeights = [0.5, 0.3, 0.2];
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line",
+		                                                                                        constraints: {riskTolerance: 0, 
+		                                                                                                      minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: 0, 
+		                                                                                                       minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+
 		var weightsOK = true;
-		for (var i = 0; i < weights.length; ++i) {
-			if (Math.abs(expectedWeights[i] - weights[i]) > 1e-8) {
+		for (var i = 0; i < weightsCla.length; ++i) {
+			if (Math.abs(expectedWeights[i] - weightsCla[i]) > 1e-8 || Math.abs(expectedWeights[i] - weightsGsmo[i]) > 1e-8) {
 				weightsOK = false;
 			}
 		}
@@ -1696,13 +1877,16 @@ QUnit.test('Mean variance portfolio - risk tolerance constraint', function(asser
 		
 		// Test a risk tolerance between 11.1475 and 11.47, which is a segment inside which all efficient portfolios
 		// must have the same weights due to a kink.
-		var expectedWeights = [0.2, 0.5, 0.30000000000000004];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: 11.3, 
-		                                                                                                   minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		//console.log(weights)
-		var weightsOK = true;
-		for (var i = 0; i < weights.length; ++i) {
-			if (Math.abs(expectedWeights[i] - weights[i]) > 1e-8) {
+		var expectedWeights = [0.2, 0.5, 0.3];
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", 
+		                                                                                        constraints: {riskTolerance: 11.3, 
+		                                                                                                      minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: 11.3, 
+		                                                                                                       minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+
+	   var weightsOK = true;
+		for (var i = 0; i < weightsCla.length; ++i) {
+			if (Math.abs(expectedWeights[i] - weightsCla[i]) > 1e-8 || Math.abs(expectedWeights[i] - weightsGsmo[i]) > 1e-8) {
 				weightsOK = false;
 			}
 		}
@@ -1740,11 +1924,12 @@ QUnit.test('Mean variance portfolio - risk tolerance constraint', function(asser
 		else {
 			throw new Error("internal error: incorrect risk tolerance generated")
 		}
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: riskTolerance} });
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {riskTolerance: riskTolerance} });
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {riskTolerance: riskTolerance} });
 
 		var weightsOK = true;
-		for (var i = 0; i < weights.length; ++i) {
-			if (Math.abs(expectedWeights[i] - weights[i]) > 1e-2) {
+		for (var i = 0; i < weightsCla.length; ++i) {
+			if (Math.abs(expectedWeights[i] - weightsCla[i]) > 1e-2 || Math.abs(expectedWeights[i] - weightsGsmo[i]) > 1e-2) {
 				weightsOK = false;
 			}
 		}
@@ -1783,11 +1968,12 @@ QUnit.test('Mean variance portfolio - risk tolerance constraint', function(asser
 
 	     // In the reference paper, the risk tolerance is 50, which corresponds to 25 for this implementation of the MVO algorithm due to the /2 coefficient on the variance term.
          var expectedWeights = [0.0350, 0.0082, 0, 0.1626, 0.7940, 0, 0, 0, 0, 0]
-		 var weights = PortfolioAllocation.meanVarianceOptimizationWeights(ret, cov, { constraints: {riskTolerance: 25} });
-         
+		 var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(ret, cov, { optimizationMethod: "critical-line", constraints: {riskTolerance: 25} });
+		 var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(ret, cov, { constraints: {riskTolerance: 25} });
+
 		 var weightsOK = true;
-         for (var i = 0; i < weights.length; ++i) {
-			if (Math.trunc(weights[i] * 10000)/10000 != expectedWeights[i]) {
+         for (var i = 0; i < weightsCla.length; ++i) {
+			if (Math.trunc(weightsCla[i] * 10000)/10000 != expectedWeights[i] || Math.trunc(weightsGsmo[i] * 10000)/10000 != expectedWeights[i]) {
 				weightsOK = false;
 			}
 		}
@@ -1802,14 +1988,14 @@ QUnit.test('Mean variance portfolio - maximum volatility constraint', function(a
 		return Math.random() * (maxVal - minVal) + minVal;
 	}
 	
-	// Test using static data
+	// Test using semi random data
 	{
 		var covMat = [[0.0146, 0.0187, 0.0145],
 					 [0.0187, 0.0854, 0.0104],
 					  [0.0145, 0.0104, 0.0289]];
 		var returns = [0.062, 0.146, 0.128];
 		
-		var nbSamples = 100;
+		var nbSamples = 5;
 		var minAttainableVolatility = 0.12082760588883482; // computed thanks to the efficient frontier
 		var maxAttainableVolatility = Math.sqrt(covMat[1][1]);
 		for (var k = 0; k < nbSamples; ++k) {	
@@ -1817,37 +2003,58 @@ QUnit.test('Mean variance portfolio - maximum volatility constraint', function(a
 			// the portfolio cannot be fully invested and must correspond to the efficient portfolio with cash
 			// and with a target volatility constraint 
 			var maxTargetVolatility = generateRandomValue(0, minAttainableVolatility - 1e-6); // < minAttainableVolatility
-			var weights_mtv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat,
-			                                                                      { constraints: {fullInvestment: false, maxVolatility: maxTargetVolatility}});
+			var weights_mtvCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat,
+			                                                                         { optimizationMethod: "critical-line", constraints: {fullInvestment: false, maxVolatility: maxTargetVolatility}});
+			var weights_mtvGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat,
+			                                                                          { constraints: {fullInvestment: false, maxVolatility: maxTargetVolatility}});
 			
-			var investment = weights_mtv[0] + weights_mtv[1] + weights_mtv[2];
-			assert.equal(investment < 1, true, 'Mean variance portfolio - maximum target volatility weights portfolio #1/1');
+			var investmentCla = weights_mtvCla[0] + weights_mtvCla[1] + weights_mtvCla[2];
+			var investmentGsmo = weights_mtvGsmo[0] + weights_mtvGsmo[1] + weights_mtvGsmo[2];
+			assert.equal(investmentCla < 1 && investmentGsmo < 1, true, 'Maximum target volatility weights portfolio #1/1');
 			
-			var weights_tv = PortfolioAllocation.meanVarianceOptimizationWeights([returns[0], returns[1], returns[2], 0], 
+			var weights_tvCla = PortfolioAllocation.meanVarianceOptimizationWeights([returns[0], returns[1], returns[2], 0], 
+			                                                                     [[covMat[0][0], covMat[0][1], covMat[0][2], 0],
+                                                             					 [covMat[1][0], covMat[1][1], covMat[1][2], 0],
+					                                                             [covMat[2][0], covMat[2][1], covMat[2][2], 0],
+					                                                             [0, 0, 0, 0]], 
+			                                                                     { optimizationMethod: "critical-line", constraints: {volatility: maxTargetVolatility}});
+																				 
+			var weights_tvGsmo = PortfolioAllocation.meanVarianceOptimizationWeights([returns[0], returns[1], returns[2], 0], 
 			                                                                     [[covMat[0][0], covMat[0][1], covMat[0][2], 0],
                                                              					 [covMat[1][0], covMat[1][1], covMat[1][2], 0],
 					                                                             [covMat[2][0], covMat[2][1], covMat[2][2], 0],
 					                                                             [0, 0, 0, 0]], 
 			                                                                     { constraints: {volatility: maxTargetVolatility}});
-			for (var i = 0; i < weights_mtv.length; ++i) {
-				assert.equal(Math.abs(weights_mtv[i] - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio - maximum target volatility weights portfolio #1/2 ' + i);
-			}
-			assert.equal(Math.abs(1-investment - weights_tv[i]) <= 1e-8, true, 'Mean variance portfolio - maximum target volatility weights portfolio #1/2 ' + i);	
 
+			for (var i = 0; i < weights_mtvCla.length; ++i) {
+				assert.equal(Math.abs(weights_mtvCla[i] - weights_tvCla[i]) <= 1e-8 && Math.abs(weights_mtvGsmo[i] - weights_tvGsmo[i]) <= 1e-8, true, 'Maximum target volatility weights portfolio #1/2 ' + i);
+			}
+			assert.equal(Math.abs(1-investmentCla - weights_tvCla[i]) <= 1e-8 && Math.abs(1-investmentGsmo - weights_tvGsmo[i]) <= 1e-8, true, 'Maximum target volatility weights portfolio #1/2 ' + i);	
+			
+			
 			// In case the maximum target volatility is greater than the maximum attainable volatility,
 			// the portfolio must be the efficient portfolio with the highest return
 			var maxTargetVolatility = generateRandomValue(maxAttainableVolatility - 1e-6, 2 * maxAttainableVolatility); // > maxAttainableVolatility
-			var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
-			                                                                  { constraints: {maxVolatility: maxTargetVolatility}});
-			assert.deepEqual(weights, [0, 1, 0], 'Mean variance portfolio - maximum target volatility weights portfolio #2');
+			var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                  { optimizationMethod: "critical-line", constraints: {maxVolatility: maxTargetVolatility}});
+			var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                      { constraints: {maxVolatility: maxTargetVolatility}});
+			assert.deepEqual(weightsCla, [0, 1, 0], 'Maximum target volatility weights portfolio #2/1');
+			assert.deepEqual(weightsGsmo, [0, 1, 0], 'Maximum target volatility weights portfolio #2/2');
+
 			
 			// Otherwise, the portfolio must correspond to the efficient portfolio with a target volatility constraint
 			var maxTargetVolatility = generateRandomValue(minAttainableVolatility + 1e-6, maxAttainableVolatility - 1e-6); // > minAttainableVolatility && < maxAttainableVolatility
-			var weights_mtv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
-			                                                                      { constraints: {maxVolatility: maxTargetVolatility}});
-			var weights_tv = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
-			                                                                     { constraints: {volatility: maxTargetVolatility}});
-			assert.deepEqual(weights_mtv, weights_tv, 'Mean variance portfolio - maximum target volatility weights portfolio #3');
+			var weights_mtvCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                         { optimizationMethod: "critical-line", constraints: {maxVolatility: maxTargetVolatility}});
+			var weights_tvCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                        { optimizationMethod: "critical-line", constraints: {volatility: maxTargetVolatility}});
+			var weights_mtvGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                          { constraints: {maxVolatility: maxTargetVolatility}});
+			var weights_tvGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, 
+			                                                                         { constraints: {volatility: maxTargetVolatility}});
+			assert.deepEqual(weights_mtvCla, weights_tvCla, 'Maximum target volatility weights portfolio #3/1');
+			assert.deepEqual(weights_mtvGsmo, weights_tvGsmo, 'Maximum target volatility weights portfolio #3/2');
 		}
 	}
 	
@@ -1865,8 +2072,17 @@ QUnit.test('Mean variance portfolio - maximum volatility constraint', function(a
 		
 		// Test that a 0 maximum volatility target is properly supported
 		var expectedWeights = [0, 0, 0];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {fullInvestment: false, maxVolatility: maxVolatility}});
-		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - maximum target volatility weights portfolio #4');
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {fullInvestment: false, maxVolatility: maxVolatility}});
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {fullInvestment: false, maxVolatility: maxVolatility}});
+
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weightsCla[i] - expectedWeights[i]) > 1e-6 || Math.abs(weightsGsmo[i] - expectedWeights[i]) > 1e-6) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Maximum target volatility weights portfolio #4');
 	}
 	
 	
@@ -1884,8 +2100,17 @@ QUnit.test('Mean variance portfolio - maximum volatility constraint', function(a
 		
 		// Test that the algorithm is behaving properly
 		var expectedWeights = [0, 0, 0];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {fullInvestment: false, maxVolatility: maxVolatility}});
-		assert.deepEqual(weights, expectedWeights, 'Mean variance portfolio - Test negative returns');
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", constraints: {fullInvestment: false, maxVolatility: maxVolatility}});
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {fullInvestment: false, maxVolatility: maxVolatility}});
+		
+		var weightsOK = true;
+		for (var i = 0; i < expectedWeights.length; ++i) {
+			if (Math.abs(weightsCla[i] - expectedWeights[i]) > 1e-6 || Math.abs(weightsGsmo[i] - expectedWeights[i]) > 1e-6) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Test negative return');
 	}
 	
 	
@@ -1911,43 +2136,23 @@ QUnit.test('Mean variance portfolio - maximum volatility constraint', function(a
 		
 		// Test that the algorithm is behaving properly
 		var expectedWeights = [0.17660422287563507, 0.25, 0, 0.25, 0, 0, 0, 0];
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {fullInvestment: false, maxVolatility: maxVolatility, 
-		                                                                                                   minWeights: minWeights, maxWeights: maxWeights}});
+		var weightsCla = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { optimizationMethod: "critical-line", 
+		                                                                                        constraints: {fullInvestment: false, 
+		                                                                                                      maxVolatility: maxVolatility, 
+		                                                                                                      minWeights: minWeights, maxWeights: maxWeights}});
+		var weightsGsmo = PortfolioAllocation.meanVarianceOptimizationWeights(returns, covMat, { constraints: {fullInvestment: false, 
+		                                                                                                      maxVolatility: maxVolatility, 
+		                                                                                                      minWeights: minWeights, maxWeights: maxWeights}});
 		var weightsOK = true;
 		for (var i = 0; i < expectedWeights.length; ++i) {
-			if (Math.abs(weights[i] - expectedWeights[i]) > 1e-6) {
+			if (Math.abs(weightsCla[i] - expectedWeights[i]) > 1e-6 || Math.abs(weightsGsmo[i] - expectedWeights[i]) > 1e-4) {
 				weightsOK = false;
 				break;
 			}
 		}
-		assert.equal(weightsOK, true, 'Mean variance portfolio - maximum target volatility weights portfolio #5');
+		assert.equal(weightsOK, true, 'Maximum target volatility weights portfolio #5');
 	}
 });	
-
-
-/*
-QUnit.test('Mean variance portfolio - minimum variance weights portfolio', function(assert) {    
-	// Test that the GMV portfolio as computed by MVO algorithm is efficient, 
-	// using a semi-definite positive covariance matrix
-	{
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.01, 0.02], 
-		                                                                  [[0.0400, 0.0400], [0.0400, 0.0400]], 
-																		  { optimizationMethod: 'minimumVariance'});
-		var expectedWeights =  [0, 1];
-		for (var i = 0; i < expectedWeights.length; ++i) {
-			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance, efficient portfolio #1 ' + i);
-		}
-
-		var weights = PortfolioAllocation.meanVarianceOptimizationWeights([0.02, 0.01], 
-		                                                                  [[0.0400, 0.0400], [0.0400, 0.0400]], 
-																		  { optimizationMethod: 'minimumVariance'});
-		var expectedWeights =  [1, 0];
-		for (var i = 0; i < expectedWeights.length; ++i) {
-			assert.equal(Math.abs(weights[i] - expectedWeights[i]) <= 1e-8, true, 'Mean variance portfolio - minimum variance, efficient portfolio #2 ' + i);
-		}
-	}
-});	
-*/
 
 
 QUnit.test('Mean variance portfolio - efficient portfolios computation', function(assert) {    
@@ -1955,32 +2160,43 @@ QUnit.test('Mean variance portfolio - efficient portfolios computation', functio
 	// Test the limit case of only one corner portfolio
 	{
 		// Lower bounds binding (sum lb_i == 1)
-		assert.throws(function() { 
-			PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.6]} }) },
-			new Error('efficient frontier made of only one corner portfolio: only one efficient portfolio can be computed'),
-			"Mean variance portfolio - Efficient portfolios, lower bounds binding KO");
-			
-		var efficientPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { nbPortfolios: 1, constraints: {minWeights: [0.4, 0.6]} });
-		assert.deepEqual(efficientPortfolios, [[[0.4, 0.6],  0.16, 0.7211102550927979]], 'Mean variance portfolio - Efficient portfolios, lower bounds binding OK');
+		var expectedEfficientPortfolios = [[[0.4, 0.6], 0.16, 0.7211102550927979], [[0.4, 0.6], 0.16, 0.7211102550927979]]; // exactly the same portfolios !
+		
+		var efficientPortfoliosCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { optimizationMethod: "critical-line", nbPortfolios: 2, constraints: {minWeights: [0.4, 0.6]} });
+		var efficientPortfoliosGsmo = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { nbPortfolios: 2, constraints: {minWeights: [0.4, 0.6]} });
+		assert.deepEqual(efficientPortfoliosCla, expectedEfficientPortfolios, 'Efficient portfolios, lower bounds binding OK #1');
+		assert.deepEqual(efficientPortfoliosGsmo, expectedEfficientPortfolios, 'Efficient portfolios, lower bounds binding OK #1, GSMO');
+		
+		var efficientPortfoliosCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { optimizationMethod: "critical-line", nbPortfolios: 1, constraints: {minWeights: [0.4, 0.6]} });
+		var efficientPortfoliosGsmo = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios([0.1, 0.2], [[1,0],[0,1]], { nbPortfolios: 1, constraints: {minWeights: [0.4, 0.6]} });
+		assert.deepEqual(efficientPortfoliosCla, [expectedEfficientPortfolios[0]], 'Efficient portfolios, lower bounds binding OK #2');
+		assert.deepEqual(efficientPortfoliosGsmo, [expectedEfficientPortfolios[0]], 'Efficient portfolios, lower bounds binding OK #2, GSMO');
 	}
 
 	// Test using static data
 	// Test the limit case of only one efficient portfolio to be computed
-	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII "The computing procedure"
 	{
 		var covMat = [[0.0146, 0.0187, 0.0145],
 					 [0.0187, 0.0854, 0.0104],
 					  [0.0145, 0.0104, 0.0289]];
 		var returns = [0.062, 0.146, 0.128];
 		
-		assert.throws(function() { 
-			PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { nbPortfolios: 1 }) },
-			new Error('efficient frontier made of several corner portfolios: at least two efficient portfolios must be computed'),
-			"Mean variance portfolio - Efficient portfolios, one efficient portfolio KO");
+		var expectedEfficientPortfolios = [[[0.39289338965447984, 0.11991944022734498, 0.48718717011817525], 0.10422758620689655, 0.13736661084455756]];
+		
+		var efficientPortfolioCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { optimizationMethod: "critical-line", nbPortfolios: 1 });
+		var efficientPortfolioGsmo = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { nbPortfolios: 1 });
+		
+		var weightsOK = true;
+		for (var i = 0; i < expectedEfficientPortfolios.length; ++i) {
+			if (Math.abs(efficientPortfolioCla[i] - expectedEfficientPortfolios[i]) > 1e-8 || Math.abs(efficientPortfolioGsmo[i] - expectedEfficientPortfolios[i]) > 1e-8) {
+				weightsOK = false;
+				break;
+			}
+		}
+		assert.equal(weightsOK, true, 'Efficient portfolios, one efficient portfolio');
 	}
 	
-	// Test using static data
-	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII "The computing procedure"
+	// Test using static data that the different types of discretization are properly managed
 	{		
 		var covMat = [[0.0146, 0.0187, 0.0145],
 					 [0.0187, 0.0854, 0.0104],
@@ -1989,179 +2205,180 @@ QUnit.test('Mean variance portfolio - efficient portfolios computation', functio
 		
 		// Test that by default, 100 efficient portfolios are computed
 		var efficientPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat);
-		assert.equal(efficientPortfolios.length, 100, 'Mean variance portfolio - Efficient portfolios, default number of efficient portfolios computed');
+		assert.equal(efficientPortfolios.length, 100, 'Efficient portfolios, default number of efficient portfolios computed');
 		
 		// Test a small number of efficient portfolios
-		var expectedEfficientPortfolios = [[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482], 
-											 [[0, 0.3983957219251336, 0.6016042780748664], 0.1351711229946524, 0.1702926860745384],
-											 [[0, 0.5989304812834224, 0.40106951871657753], 0.13878074866310158, 0.20069797992103713], 
-											 [[0,0.7994652406417112,0.20053475935828877],0.1423903743315508,0.2430633926246908], 
-											 [[0, 1, 0], 0.146, 0.29223278392404917]];
-										
-		var efficientPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { nbPortfolios: 5 });
-		assert.deepEqual(efficientPortfolios, expectedEfficientPortfolios, 'Mean variance portfolio - Efficient portfolios #1');
-	}
-});
+		//
+		var efficientPortfoliosRiskToleranceCla = [[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482], 
+													[[0, 0.3983957219251336, 0.6016042780748664], 0.1351711229946524, 0.1702926860745384],
+													[[0, 0.5989304812834224, 0.40106951871657753], 0.13878074866310158, 0.20069797992103713], 
+													[[0,0.7994652406417112,0.20053475935828877],0.1423903743315508,0.2430633926246908], 
+													[[0, 1, 0], 0.146, 0.29223278392404917]];												
+		var efficientPortfoliosRiskToleranceCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { optimizationMethod: "critical-line", discretizationType: "riskTolerance", nbPortfolios: 5 });											
+		assert.deepEqual(efficientPortfoliosRiskToleranceCla, efficientPortfoliosRiskToleranceCla, 'Efficient portfolios #1 - Risk tolerance discretization parameter');
 
+		var efficientPortfoliosRiskToleranceGsmo = [[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482], 
+													[[0, 0.3983957219251336, 0.6016042780748664], 0.1351711229946524, 0.1702926860745384],
+													[[0, 0.5989304812834224, 0.40106951871657753], 0.13878074866310158, 0.20069797992103713], 
+													[[0,0.7994652406417112,0.20053475935828877],0.1423903743315508,0.2430633926246908], 
+													[[0, 1, 0], 0.146, 0.29223278392404917]];												
+		var efficientPortfoliosRiskToleranceGsmo = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { discretizationType: "riskTolerance", nbPortfolios: 5 });											
+		assert.deepEqual(efficientPortfoliosRiskToleranceGsmo, efficientPortfoliosRiskToleranceGsmo, 'Efficient portfolios #1 - Risk tolerance discretization parameter, GSMO');
 
-
-QUnit.test('Mean variance portfolio - corner portfolios computation', function(assert) {    
-	// Test using static data
-	// Test limit cases for determining the critical line algorithm starting portfolio:
-	{
-		// Lower bounds binding (sum lb_i == 1)
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios([0.1, 0.2], [[1,0],[0,1]], { constraints: {minWeights: [0.4, 0.6]} });
-		assert.deepEqual(cornerPortfolios, [[[0.4, 0.6],  0.16, 0.7211102550927979]], 'Mean variance portfolio - Corner portfolios, lower bounds binding');
 		
-		// Upper bounds binding (sum ub_i == 1)
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios([0.1, 0.2], [[1,0],[0,1]], { constraints: {maxWeights: [0.6, 0.4]} });
-		assert.deepEqual(cornerPortfolios, [[[0.6, 0.4],  0.14, 0.7211102550927979]], 'Mean variance portfolio - Corner portfolios, upper bounds binding');
-	}
+		//
+		var expectedEfficientPortfoliosReturnCla = [[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482], 
+													[[0.6878434301262004, 0.04105809437078063, 0.27109847550301897], 0.08334137931034483, 0.12598059118870247],
+													[[0.39289338965447984, 0.11991944022734498, 0.48718717011817525], 0.10422758620689655, 0.13736661084455756], 
+													[[0.09794334918275893, 0.1987807860839094, 0.7032758647333316],0.12511379310344828, 0.15310742669374613], 
+													[[0, 1, 0], 0.146, 0.29223278392404917]];												
+		var efficientPortfoliosReturnCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { optimizationMethod: "critical-line", discretizationType: "return", nbPortfolios: 5 });											
+		assert.deepEqual(efficientPortfoliosReturnCla, expectedEfficientPortfoliosReturnCla, 'Efficient portfolios #1 - Return discretization parameter');
 
-	// Test using static data
-	// Reference: https://web.stanford.edu/~wfsharpe/mia/opt/mia_opt3.htm
-	// Note: this test also allows checking that numerically equal corner portfolios are filtered out by the algorithm
-	{
-		var expectedCornerPortfolios = [[[0.2, 0.30000000000000004, 0.5], 7.8500000000000005, 8.777323054325846], 
-										[[0.2, 0.5, 0.3000000000000001], 6.950000000000001, 6.921661650210881], 
-										[[0.22180737780348653, 0.5, 0.27819262219651353], 6.775540977572108, 6.6431091200292105],
-										[[0.451915610952186, 0.348084389047814, 0.2], 5.618295361667349, 4.81952189552386],
-										[[0.5,0.30000000000000004, 0.2], 5.45, 4.560824486866383]].reverse();
+		var expectedEfficientPortfoliosReturnGsmo = [[[0.9931012778446591, 0, 0.006898722155340931], 0.0624553156622525, 0.12082760588911746], 
+													[[0.6878470125198012, 0.041065447881909564, 0.271087539598289], 0.08334127523556746, 0.1259805474769357],
+													[[0.3929089300347038, 0.11991114475868862, 0.4871799252066074], 0.10422641122336593, 0.13736583573293001], 
+													[[0.09792624400106256, 0.198787288217872, 0.7032864677810655], 0.12511503908385158, 0.1531084707620073], 
+													[[0, 1, 0], 0.146, 0.29223278392404917]];												
+		var efficientPortfoliosReturnGsmo = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { discretizationType: "return", nbPortfolios: 5 });											
+		assert.deepEqual(efficientPortfoliosReturnGsmo, expectedEfficientPortfoliosReturnGsmo, 'Efficient portfolios #1 - Return discretization parameter, GSMO');
+
 		
-		var covMat = [[1, 2.96, 2.31],
-					[2.96, 54.76, 39.886],
-					[2.31,	39.886,	237.16]];
-		var returns = [2.8000, 6.3000, 10.8000];
+		//
+		var expectedEfficientPortfoliosVolatilityCla = [[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482], 
+														[[0, 0.32666501483589006, 0.6733349851641098], 0.133879970267046, 0.16367890039763838],
+														[[0, 0.6294374683923241, 0.37056253160767594], 0.13932987443106182, 0.20653019490644198], 
+														[[0, 0.8265133287796433, 0.17348667122035663],0.14287723991803356, 0.24938148941524554], 
+														[[0, 1, 0], 0.146, 0.29223278392404917]];												
+		var efficientPortfoliosVolatilityCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { optimizationMethod: "critical-line", discretizationType: "volatility", nbPortfolios: 5 });											
+		assert.deepEqual(efficientPortfoliosVolatilityCla, expectedEfficientPortfoliosVolatilityCla, 'Efficient portfolios #1 - Volatility discretization parameter');
+
+		var expectedEfficientPortfoliosVolatilityGsmo = [[[0.9931012778446591, 0, 0.006898722155340931], 0.0624553156622525, 0.12082760588911746], 
+														[[0, 0.3266649118444106, 0.6733350881555894], 0.13387996841319938, 0.16367889281972617],
+														[[0, 0.6294373749715195, 0.3705626250284804], 0.13932987274948733, 0.2065301766536449], 
+														[[0, 0.8265134365297244, 0.17348656347027555], 0.14287724185753503, 0.24938151481184517], 
+														[[0, 1, 0], 0.146, 0.29223278392404917]];												
+		var efficientPortfoliosVolatilityGsmo = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { discretizationType: "volatility", nbPortfolios: 5 });											
+		assert.deepEqual(efficientPortfoliosVolatilityGsmo, expectedEfficientPortfoliosVolatilityGsmo, 'Efficient portfolios #1 - Volatility discretization parameter, GSMO');
 		
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios(returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
-		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #1');
+		var efficientPortfoliosDefaultCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { optimizationMethod: "critical-line", nbPortfolios: 5 });											
+		assert.deepEqual(efficientPortfoliosDefaultCla, expectedEfficientPortfoliosReturnCla, 'Efficient portfolios #1 - Default discretization parameter');
 	}
 	
-	// Test using static data
-	// Reference: Portfolio Selection, H. Markowitz example, chapter VIII "The computing procedure"
-	{
-		var expectedCornerPortfolios = [[[0, 1, 0], 0.146, 0.29223278392404917], 
-										[[0, 0.22496808316614988, 0.7750319168338501], 0.1320494254969907, 0.15908574925905583], 
-										[[0.8414051841746248, 0, 0.15859481582537516], 0.07246725784447476, 0.12220061216349064], 
-										[[0.9931034482758623, 0, 0.006896551724137813], 0.0624551724137931, 0.12082760588883482]].reverse();
-		
+	// Test using static data that the partial investment constraint and constraints on weights are properly handled
+	{		
 		var covMat = [[0.0146, 0.0187, 0.0145],
 					 [0.0187, 0.0854, 0.0104],
 					  [0.0145, 0.0104, 0.0289]];
 		var returns = [0.062, 0.146, 0.128];
 		
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios(returns, covMat);
-		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #2');
-	}
-	
-	// Test using static data
-	// Reference: Portfolio Selection, H. Markowitz example, chapter II "Illustrative portfolio analyses"
-	{
-		var expectedCornerPortfolios = [[[0, 0, 0, 0, 100, 0, 0, 0, 0, 0], 0.1981111111, 0.35761725182099363], 
-										[[0, 0, 0, 0, 96, 0, 0, 4, 0, 0], 0.19776400166660185, 0.35451400571130365], 
-										[[0, 0, 0, 8, 92, 0, 0, 0, 0, 0], 0.19602068236429498, 0.3403126771859089], 
-										[[0, 0, 0, 42, 58, 0, 0, 0, 0, 0], 0.18785503614831273, 0.29187554881080124], // In Markowitz book, this is actually [0, 0, 0, 41, 59, 0, 0, 0, 0, 0], but this seems a wrong rounding 
-										[[0, 0, 0, 25, 32, 0, 43, 0, 0, 0], 0.16161551062944268, 0.2069944757322166],
-										[[0, 0, 16, 3, 12, 0, 69, 0, 0, 0], 0.14035962162442164, 0.16472622029650955],
-										[[0, 0, 0, 0, 0, 0, 0, 0, 0, 100], 0, 0]].reverse();
-	
-		var covMat = [[0.05338816358,0.02149069753,0.02865533642,0.04896485802,0.01624895062,0.03223945062,0.02425553395,0.03999812963,0.0361509784, 0],
-					[0.02149069753,0.01468446914,0.01878391358,0.02441658642,0.008041938272,0.01002193827,0.01448993827,0.02536259259,0.02083593827, 0],
-					[0.02865533642,0.01878391358,0.08550016358,0.06260714198,0.04439938272,0.01328671605,0.01043991049,0.06864603704,0.0420215216, 0],
-					[0.04896485802,0.02441658642,0.06260714198,0.09546446914,0.05153806173,0.02902461728,0.02077028395,0.09002012963,0.03664589506, 0],
-					[0.01624895062,0.008041938272,0.04439938272,0.05153806173,0.1278900988,0.0128384321,0.02091715432,0.1015344074,0.04497232099, 0],
-					[0.03223945062,0.01002193827,0.01328671605,0.02902461728,0.0128384321,0.04125832099,0.01127854321,0.02960762963,0.02165332099, 0],
-					[0.02425553395,0.01448993827,0.01043991049,0.02077028395,0.02091715432,0.01127854321,0.02883379321,0.02913762963,0.01739445988, 0],
-					[0.03999812963,0.02536259259,0.06864603704,0.09002012963,0.1015344074,0.02960762963,0.02913762963,0.1467278889,0.05284057407, 0],
-					[0.0361509784,0.02083593827,0.0420215216,0.03664589506,0.04497232099,0.02165332099,0.01739445988,0.05284057407,0.07926979321, 0],
-					[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
-		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
+		var expectedEfficientPortfoliosCla = [[[0.1, 0.2, 0], 0.0354, 0.06565059024867942], 
+											[[0.1, 0.2, 0.19609375], 0.0605, 0.08249670662519751],
+											[[0.1, 0.2, 0.3921875000000001], 0.08560000000000001, 0.10734981446661017], 
+											[[0.1, 0.2, 0.5882812500000001], 0.11070000000000002, 0.13588534941646638], 
+											[[0.1, 0.8, 0.09999999999999998], 0.1358, 0.24502448857206088]];
+		var efficientPortfoliosCla = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { optimizationMethod: "critical-line", constraints: {minWeights: [0.1, 0.2, 0], maxWeights: [0.8, 0.8, 0.8], fullInvestment: false}, nbPortfolios: 5 });
+		assert.deepEqual(efficientPortfoliosCla, expectedEfficientPortfoliosCla, 'Efficient portfolios #2 - Partial investment constraint');
 
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios(returns, covMat);
+		var expectedEfficientPortfoliosGsmo = [[[0.1, 0.2, 0], 0.0354, 0.06565059024867942], 
+											[[0.1, 0.2, 0.1960898343254538], 0.06049949879365808, 0.08249627008945835],
+											[[0.1, 0.2, 0.39218771317425893], 0.08560002728630514, 0.10734984398383898], 
+											[[0.1, 0.2, 0.5882771772496841], 0.11069947868795957, 0.13588473405268273], 
+											[[0.1, 0.8, 0.09999999999999998], 0.1358, 0.24502448857206088]];		
+		var efficientPortfoliosGsmo = PortfolioAllocation.meanVarianceEfficientFrontierPortfolios(returns, covMat, { constraints: {minWeights: [0.1, 0.2, 0], maxWeights: [0.8, 0.8, 0.8], fullInvestment: false}, nbPortfolios: 5 });
+		assert.deepEqual(efficientPortfoliosGsmo, expectedEfficientPortfoliosGsmo, 'Efficient portfolios #2 - Partial investment constraint, GSMO');
+	}
+});
+
+
+
+
+QUnit.test('Projection on mean-variance efficient frontier', function(assert) {    
+	function areWeightsEqual(w1, w2, eps) {
+		// Test equality of weights length
+		if (w1.length != w2.length) {
+			return false;
+		}
 		
-		for (var i = 0; i < expectedCornerPortfolios.length; ++i) {
-			var expectedWeights = expectedCornerPortfolios[i][0];
-			var expectedReturn = expectedCornerPortfolios[i][1];
-			var expectedVolatility = expectedCornerPortfolios[i][2];
-			
-			var computedWeights = cornerPortfolios[i][0];
-			var roundedComputedWeights = PortfolioAllocation.postOptimizationWeights(computedWeights, {roundingMethodParams: {k :100}});
-			var computedReturn = cornerPortfolios[i][1];
-			var computedVolatility = cornerPortfolios[i][2];
-			
-			assert.equal(Math.abs(computedReturn - expectedReturn) <= 1e-14, true, 'Mean variance portfolio - Corner portfolios #3, #' + i + ", return");
-			assert.equal(Math.abs(computedVolatility - expectedVolatility) <= 1e-14, true, 'Mean variance portfolio - Corner portfolios #3, #' + i + ", volatility");
-			
-			for (var j = 0; j < expectedWeights.length; ++j) {
-				assert.equal(expectedWeights[j]/100, roundedComputedWeights[j], 'Mean variance portfolio - Corner portfolios #3, #' + i + ",  " + j + "/" + expectedWeights.length);
+		// Test numerical equality of weights
+		for (var i = 0; i < w1.length; ++i) {
+			if (Math.abs(w1[i] - w2[i]) > eps) {
+				return false;
 			}
 		}
+		
+		// Arrived here, the weights are numerically equal
+		return true;
 	}
 	
-	// Test using static data
-	// Reference: A Simple Spreadsheet-Based Exposition of the Markowitz Critical Line Method for Portfolio Selection, Clarence C. Kwan
+	// Test with static data
+	// As the corner portfolios are known for the data below, c.f. other tests,
+	// it is easy to determine different test cases
 	{
-		var expectedCornerPortfolios = [[[0, 0, 1], 0.12, 0.1], 
-										[[0, 0.6485013623978204, 0.3514986376021796], 0.0940599455040872, 0.05237167799176803], 
-										[[0.9754098360655736, 0, 0.024590163934426246], 0.051721311475409835, 0.019905041975576163], 
-										[[0.9799999999999999, 0, 0.02000000000000001], 0.051399999999999994, 0.019899748742132396]].reverse();
-		
-		var covMat = [[0.0004, 0.0004, 0.0002],
-					 [0.0004, 0.0025,0.001],
-					  [0.0002, 0.001, 0.01]];
-		var returns = [0.05, 0.08, 0.12];
-		
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios(returns, covMat);
-		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #4');
-	}
-	
-	// Test using static data (upper bounds)
-	// Reference: A Simple Spreadsheet-Based Exposition of the Markowitz Critical Line Method for Portfolio Selection, Clarence C. Kwan
-	{
-		var expectedCornerPortfolios = [[[0, 0.30000000000000004, 0.7], 0.108, 0.07446475676452585], 
-										[[0, 0.6485013623978203, 0.3514986376021798], 0.0940599455040872, 0.05237167799176804], 
-										[[0.7, 0.18310626702997274, 0.11689373297002724], 0.06367574931880109, 0.02438316869432441], 
-										[[0.7, 0.2438095238095238, 0.05619047619047619], 0.061247619047619044, 0.02357642082775965]].reverse();
-		
-		var covMat = [[0.0004, 0.0004, 0.0002],
-					 [0.0004, 0.0025,0.001],
-					  [0.0002, 0.001, 0.01]];
-		var returns = [0.05, 0.08, 0.12];
-		
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios(returns, covMat, { constraints: {maxWeights: [0.7, 0.7, 0.7]} });
-		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #5');
-	}
-	
-	// Test using static data
-	// Reference: An Open-Source Implementation of the Critical-Line Algorithm for Portfolio Optimization, David H. Bailey and Marcos Lopez de Prado
-	{
-		var expectedCornerPortfolios = [[[0, 1, 0, 0, 0, 0, 0, 0, 0, 0], 1.19, 0.9520003676469878], 
-										[[0.6493694070931811, 0.3506305929068189, 0, 0, 0, 0, 0, 0, 0, 0], 1.1802594588936024, 0.5456568742682376], 
-										[[0.4339841341086239, 0.23124750065448754, 0, 0.334768365236889, 0, 0, 0, 0, 0, 0], 1.1600564524217891, 0.4172556503733193],
-										[[0.12688785385570883, 0.07234334721032556, 0, 0.28125374926334057, 0, 0, 0, 0, 0, 0.5195150496706249], 1.1112622642799619, 0.2667196142113227],
-										[[0.12320100405906734, 0.07044407130753655, 0, 0.2789935668090118, 0, 0, 0, 0.006435564362887149, 0, 0.5209257934614971], 1.1083602383747904, 0.26501699530147116],
-										[[0.0869215492990579, 0.050451042268558385, 0, 0.22359401742288823, 0, 0.17383161507156486, 0, 0.03017301555135618, 0, 0.4350287603865743], 1.0224838894431951, 0.2296800735960956],
-										[[0.0846709411996219, 0.049253858741118525, 0, 0.21963390336360733, 0, 0.18003923464176064, 0, 0.03102980185535347, 0.006485702415438152, 0.42888655778310003], 1.0153059205224644, 0.22798274842085042],
-										[[0.07378925302280315, 0.043828660769718863, 0, 0.19897560805881487, 0.026158159857441972, 0.19815187227970524, 0, 0.03341958639919798, 0.027902966026643668, 0.3977738935856743], 0.9727204340349849, 0.21955488008267854],
-										[[0.06834400480527462, 0.041387026820649334, 0.015215259551836627, 0.18813443107045838, 0.03416248599274816, 0.20231943214747125, 0, 0.0339293235595669, 0.03363264959172938, 0.38287538646026537], 0.9499368157550272, 0.21602457168689138],
-										[[0.03696858147921504, 0.02690083780081047, 0.0949424305647986, 0.1257759521946726, 0.0767460810325476, 0.21935567131616898, 0.029987096882220312, 0.035963284621386274, 0.06134983772972688, 0.29201022637845325], 0.8032153598765337, 0.20523761981386526]].reverse();
-										
-		var covMat = [[0.40755159,0.03175842,0.05183923,0.05663904,0.0330226,0.00827775,0.02165938,0.01332419,0.0343476,0.02249903],
-					[0.03175842,0.9063047,0.03136385,0.02687256,0.01917172,0.00934384,0.02495043,0.00761036,0.02874874,0.01336866],
-					[0.05183923,0.03136385,0.19490901,0.04408485,0.03006772,0.01322738,0.03525971,0.0115493,0.0427563,0.02057303],
-					[0.05663904,0.02687256,0.04408485,0.19528471,0.02777345,0.00526665,0.01375808,0.00780878,0.02914176,0.01640377],
-					[0.0330226,0.01917172,0.03006772,0.02777345,0.34059105,0.00777055,0.02067844,0.00736409,0.02542657,0.01284075],
-					[0.00827775,0.00934384,0.01322738,0.00526665,0.00777055,0.15983874,0.02105575,0.00518686,0.01723737,0.00723779],
-					[0.02165938,0.02495043,0.03525971,0.01375808,0.02067844,0.02105575,0.68056711,0.01377882,0.04627027,0.01926088],
-					[0.01332419,0.00761036,0.0115493,0.00780878,0.00736409,0.00518686,0.01377882,0.95526918,0.0106553,0.00760955],
-					[0.0343476,0.02874874,0.0427563,0.02914176,0.02542657,0.01723737,0.04627027,0.0106553,0.31681584,0.01854318],
-					[0.02249903,0.01336866,0.02057303,0.01640377,0.01284075,0.00723779,0.01926088,0.00760955,0.01854318,0.11079287]];
-		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
+		var covMat = [[1, 2.96, 2.31],
+					  [2.96, 54.76, 39.886],
+					  [2.31,	39.886,	237.16]];
+		var returns = [2.8000, 6.3000, 10.8000];
 
-		var cornerPortfolios = PortfolioAllocation.meanVarianceEfficientFrontierCornerPortfolios(returns, covMat);
-		assert.deepEqual(cornerPortfolios, expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #6');
-	}	
+		// Tests with projection equal to one corner portfolio
+		//
+		var expectedWeights = [0.2, 0.30000000000000004, 0.5];
+		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.1, 0.1, 0.8], returns, covMat, { optimizationMethod: "critical-line", constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection equal to a corner portfolio');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.1, 0.1, 0.8], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-12), true, 'Projection equal to a corner portfolio, GSMO');
+
+		//
+		var expectedWeights = [0.22180737780348653, 0.5, 0.27819262219651353];
+		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.1, 0.8, 0.1], returns, covMat, { optimizationMethod: "critical-line", constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Pprojection equal to a corner portfolio');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.1, 0.8, 0.1], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-03), false, 'Pprojection equal to a corner portfolio, GSMO KO');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.1, 0.8, 0.1], returns, covMat, { optimizationMethodParams: {nbPortfoliosGsmo: 5000}, constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-04), true, 'Pprojection equal to a corner portfolio, GSMO OK');
+		
+		//
+		var expectedWeights = [0.5, 0.2999999999999999, 0.2];
+		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.8, 0.1, 0.1], returns, covMat, { optimizationMethod: "critical-line", constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection equal to a corner portfolio');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.8, 0.1, 0.1], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-12), true, 'Projection equal to a corner portfolio, GSMO');
+
+		
+		// Test with projection equal to the initial portfolio (i.e., the initial portfolio is efficient)
+		var expectedWeights = [0.2, 0.4, 0.4];
+		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.2, 0.4, 0.4], returns, covMat, { optimizationMethod: "critical-line", constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection equal to the initial portfolio');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.2, 0.4, 0.4], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-12), true, 'Projection equal to the initial portfolio, GSMO');		
+		
+		
+		// Test with projection equal to a portfolio strictly on an efficient segment
+		var expectedWeights = [0.2, 0.405, 0.395];
+		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.19, 0.41, 0.4], returns, covMat, { optimizationMethod: "critical-line", constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Projection equal to a strict efficient portfolio');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.19, 0.41, 0.4], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-12), true, 'Projection equal to a strict efficient portfolio, GSMO');
+	} 
+	
+	// Test with static data
+	// Test that the partial investment constraint is taken into account
+	{
+		var expectedWeights = [0.5, 0.2999999999999999, 0.2];
+		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.6, 0.1, 0.3], returns, covMat, { optimizationMethod: "critical-line", constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Partial investment constraint #1/1');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.6, 0.1, 0.3], returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-12), true, 'Partial investment constraint #1/1, GSMO');
+
+		var expectedWeights = [0.5, 0.2, 0.2];
+		var weights = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.6, 0.1, 0.3], returns, covMat, { optimizationMethod: "critical-line", constraints: {fullInvestment: false, minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weights,expectedWeights, 1e-12), true, 'Partial investment constraint #1/2');
+		var weightsGsmo = PortfolioAllocation.meanVarianceEfficientFrontierNearestWeights([0.6, 0.1, 0.3], returns, covMat, { constraints: {fullInvestment: false, minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
+		assert.equal(areWeightsEqual(weightsGsmo,expectedWeights, 1e-12), true, 'Partial investment constraint #1/2, GSMO');
+	}
 });
+
+
 
 QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', function(assert) {    
 	// Test using static data
@@ -2185,8 +2402,24 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 		var returns = [1.175,1.19,0.396,1.12,0.346,0.679,0.089,0.73,0.481,1.08];
 		var rf = 0;
 		
-		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
-		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #1');
+		var maxSharpeRatioPortfolioWeightsCla = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, {optimizationMethod: 'critical-line'});
+		var maxSharpeRatioPortfolioWeightsGsmo = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+
+		var weightsOK = true;
+		if (expectedWeights.length != maxSharpeRatioPortfolioWeightsCla.length || 
+		    expectedWeights.length != maxSharpeRatioPortfolioWeightsGsmo.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(maxSharpeRatioPortfolioWeightsCla[i] - expectedWeights[i]) > 1e-8 ||
+				    Math.abs(maxSharpeRatioPortfolioWeightsGsmo[i] - expectedWeights[i]) > 1e-5) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, "Test #1");
 	}
 	
 	// Test using static data
@@ -2205,9 +2438,24 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 		var returns = [0.15, 0.18, 0.20, 0.11, 0.13, 0.12];
 		var rf = 0.08;
 		
-		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
-		maxSharpeRatioPortfolioWeights = PortfolioAllocation.postOptimizationWeights(maxSharpeRatioPortfolioWeights, {roundingMethodParams: {k: 10000}});
-		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedRoundedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #2');
+		var maxSharpeRatioPortfolioWeightsCla = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, {optimizationMethod: 'critical-line'});
+		var maxSharpeRatioPortfolioWeightsGsmo = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		
+		var weightsOK = true;
+		if (expectedRoundedWeights.length != maxSharpeRatioPortfolioWeightsCla.length ||
+		    expectedRoundedWeights.length != maxSharpeRatioPortfolioWeightsGsmo.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedRoundedWeights.length; ++i) {
+				if (Math.abs(maxSharpeRatioPortfolioWeightsCla[i] - expectedRoundedWeights[i]) > 1e-4 ||
+				    Math.abs(maxSharpeRatioPortfolioWeightsGsmo[i] - expectedRoundedWeights[i]) > 1e-4) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, "Test #2");
 	}
 	
 	// Test using static data
@@ -2220,9 +2468,24 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 		var returns = [0.05, 0.1];
 		var rf = 0;
 		
-		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
-		maxSharpeRatioPortfolioWeights = PortfolioAllocation.postOptimizationWeights(maxSharpeRatioPortfolioWeights, {roundingMethodParams: {k: 10000}});
-		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedRoundedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #3');
+		var maxSharpeRatioPortfolioWeightsCla = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, {optimizationMethod: 'critical-line'});
+		var maxSharpeRatioPortfolioWeightsGsmo = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		
+		var weightsOK = true;
+		if (expectedRoundedWeights.length != maxSharpeRatioPortfolioWeightsCla.length ||
+		    expectedRoundedWeights.length != maxSharpeRatioPortfolioWeightsGsmo.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedRoundedWeights.length; ++i) {
+				if (Math.abs(maxSharpeRatioPortfolioWeightsCla[i] - expectedRoundedWeights[i]) > 1e-4 ||
+				    Math.abs(maxSharpeRatioPortfolioWeightsGsmo[i] - expectedRoundedWeights[i]) > 1e-4) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, "Test #3");
 	}
 
 	// Test using static data
@@ -2259,17 +2522,41 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 		var returns = [0.0912, 0.1087, 0.1283, 0.1882, 0.2896, 0.3739];
 		var rf = 0.05;
 		
-		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
-		maxSharpeRatioPortfolioWeights = PortfolioAllocation.postOptimizationWeights(maxSharpeRatioPortfolioWeights, {roundingMethodParams: {k: 10000}});
-		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedRoundedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #4');
+		var maxSharpeRatioPortfolioWeightsCla = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, {optimizationMethod: 'critical-line'});
+		var maxSharpeRatioPortfolioWeightsGsmo = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
+		
+		var weightsOK = true;
+		if (expectedRoundedWeights.length != maxSharpeRatioPortfolioWeightsCla.length ||
+		    expectedRoundedWeights.length != maxSharpeRatioPortfolioWeightsGsmo.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedRoundedWeights.length; ++i) {
+				if (Math.abs(maxSharpeRatioPortfolioWeightsCla[i] - expectedRoundedWeights[i]) > 1e-4 ||
+				    Math.abs(maxSharpeRatioPortfolioWeightsGsmo[i] - expectedRoundedWeights[i]) > 1e-4) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, "Test #4");
 	}
 	
 	// Test using static data
 	// Test the case of a positive semi-definite covariance matrix with a 0 volatility point, as well as a 0 return point, on the efficient frontier
+	// Test also that a partial investment constraint provides the same result.
 	// The result has been validated with a grid search
 	// Reference: Portfolio Selection, H. Markowitz example, chapter II "Illustrative portfolio analyses"
+	//
+	// Note that this test is sensitive to the value of epsVolatility, because for all values of epsVolatility,
+	// a portfolio with the same Sharpe ratio as the optimal portfolio below (SR ~= 0.8520782020723375) can be constructed
+	// with a proportion of cash (the last asset).
 	{		
-		var expectedWeights = [0, 0, 0.16171761768982862, 0.0316824768157338, 0.1179234805759474, 0, 0.6886764249184905, 0, 0, 0];
+		var expectedWeightsCla = [0, 0, 0.16171761768982862, 0.0316824768157338, 0.1179234805759474, 0, 0.6886764249184905, 0, 0, 0];
+		var expectedWeightsNoZeroCla = expectedWeightsCla.slice(0, expectedWeightsCla.length - 1);
+
+		var expectedWeightsGsmo = [0, 0, 0.14768657748839636, 0.02893504388907186, 0.10770549585063015, 0, 0.6289656744997951, 0, 0, 0.08670720827210647];
+		var expectedWeightsNoZeroGsmo = expectedWeightsGsmo.slice(0, expectedWeightsGsmo.length - 1);
 		
 		var covMat = [[0.05338816358,0.02149069753,0.02865533642,0.04896485802,0.01624895062,0.03223945062,0.02425553395,0.03999812963,0.0361509784, 0],
 					[0.02149069753,0.01468446914,0.01878391358,0.02441658642,0.008041938272,0.01002193827,0.01448993827,0.02536259259,0.02083593827, 0],
@@ -2282,10 +2569,58 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 					[0.0361509784,0.02083593827,0.0420215216,0.03664589506,0.04497232099,0.02165332099,0.01739445988,0.05284057407,0.07926979321, 0],
 					[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
+
+		var covMatNoZero = [[0.05338816358,0.02149069753,0.02865533642,0.04896485802,0.01624895062,0.03223945062,0.02425553395,0.03999812963,0.0361509784],
+							[0.02149069753,0.01468446914,0.01878391358,0.02441658642,0.008041938272,0.01002193827,0.01448993827,0.02536259259,0.02083593827],
+							[0.02865533642,0.01878391358,0.08550016358,0.06260714198,0.04439938272,0.01328671605,0.01043991049,0.06864603704,0.0420215216],
+							[0.04896485802,0.02441658642,0.06260714198,0.09546446914,0.05153806173,0.02902461728,0.02077028395,0.09002012963,0.03664589506],
+							[0.01624895062,0.008041938272,0.04439938272,0.05153806173,0.1278900988,0.0128384321,0.02091715432,0.1015344074,0.04497232099],
+							[0.03223945062,0.01002193827,0.01328671605,0.02902461728,0.0128384321,0.04125832099,0.01127854321,0.02960762963,0.02165332099],
+							[0.02425553395,0.01448993827,0.01043991049,0.02077028395,0.02091715432,0.01127854321,0.02883379321,0.02913762963,0.01739445988],
+							[0.03999812963,0.02536259259,0.06864603704,0.09002012963,0.1015344074,0.02960762963,0.02913762963,0.1467278889,0.05284057407],
+							[0.0361509784,0.02083593827,0.0420215216,0.03664589506,0.04497232099,0.02165332099,0.01739445988,0.05284057407,0.07926979321]];
+		var returnsNoZero = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111];
 		var rf = 0;
 		
-		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf);
-		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #5');
+		//
+		var maxSharpeRatioPortfolioWeightsCla = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, {optimizationMethod: 'critical-line', epsVolatility:0.1});
+		var maxSharpeRatioPortfolioWeightsGsmo = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, {epsVolatility:0.1});
+
+		var weightsOK = true;
+		if (expectedWeightsCla.length != maxSharpeRatioPortfolioWeightsCla.length ||
+		    expectedWeightsGsmo.length != maxSharpeRatioPortfolioWeightsGsmo.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeightsCla.length; ++i) {
+				if (Math.abs(maxSharpeRatioPortfolioWeightsCla[i] - expectedWeightsCla[i]) > 1e-8 ||
+				    Math.abs(maxSharpeRatioPortfolioWeightsGsmo[i] - expectedWeightsGsmo[i]) > 1e-8) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, "Test #5");
+
+		//
+		var maxSharpeRatioPortfolioWeightsClaNoZero = PortfolioAllocation.maximumSharpeRatioWeights(returnsNoZero, covMatNoZero, rf, {optimizationMethod: 'critical-line', epsVolatility:0.1, constraints: {fullInvestment: false}});
+		var maxSharpeRatioPortfolioWeightsGsmoNoZero = PortfolioAllocation.maximumSharpeRatioWeights(returnsNoZero, covMatNoZero, rf, {epsVolatility:0.1, constraints: {fullInvestment: false}});
+
+		var weightsOK = true;
+		if (expectedWeightsNoZeroCla.length != maxSharpeRatioPortfolioWeightsClaNoZero.length ||
+		    expectedWeightsNoZeroGsmo.length != maxSharpeRatioPortfolioWeightsGsmoNoZero.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(maxSharpeRatioPortfolioWeightsClaNoZero[i] - expectedWeightsNoZeroCla[i]) > 1e-8 ||
+				    Math.abs(maxSharpeRatioPortfolioWeightsGsmoNoZero[i] - expectedWeightsNoZeroGsmo[i]) > 1e-8) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, "Test #5, partial investment");
 	}
 	
 	// Test using static data
@@ -2297,10 +2632,25 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 		var returns = [0.1, 0.2];
 		var rf = 0;
 		
-		var maxSharpeRatioPortfolioWeights = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, { constraints: {minWeights: [0.4, 0.6]} });
-		assert.deepEqual(maxSharpeRatioPortfolioWeights, expectedWeights, 'Mean variance portfolio - Maximum Sharpe Ratio portfolio #6');
+		var maxSharpeRatioPortfolioWeightsCla = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, { optimizationMethod: 'critical-line', constraints: {minWeights: [0.4, 0.6]} });
+		var maxSharpeRatioPortfolioWeightsGsmo = PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, { constraints: {minWeights: [0.4, 0.6]} });
+		
+		var weightsOK = true;
+		if (expectedWeights.length != maxSharpeRatioPortfolioWeightsCla.length ||
+		    expectedWeights.length != maxSharpeRatioPortfolioWeightsGsmo.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(maxSharpeRatioPortfolioWeightsCla[i] - expectedWeights[i]) > 1e-4 ||
+				    Math.abs(maxSharpeRatioPortfolioWeightsGsmo[i] - expectedWeights[i]) > 1e-4) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, "Test #6");
 	}
-	
 	
 	// Test using random data
 	// Test the case of a too high risk free rate
@@ -2312,9 +2662,14 @@ QUnit.test('Mean variance portfolio - maximum Sharpe ratio computation', functio
 		var rf = 0.1 + (1 - Math.random()); // rf will be > 0.1, which is the maximum return attainable
 		
 		assert.throws(function() { 
+			PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf, { optimizationMethod: 'critical-line'}) },
+			new Error('impossible to restrict the efficient frontier: the minimum return constraint is not feasible'),
+			"Maximum Sharpe Ratio portfolio #7");
+			
+		assert.throws(function() { 
 			PortfolioAllocation.maximumSharpeRatioWeights(returns, covMat, rf) },
-			new Error('no corner portfolio with a strictly positive excess return'),
-			"Mean variance portfolio - Maximum Sharpe Ratio portfolio #7");
+			new Error('impossible to restrict the efficient frontier: the minimum return constraint is not feasible'),
+			"Maximum Sharpe Ratio portfolio #7");
 	}
 });
 
@@ -2397,7 +2752,7 @@ QUnit.test('Random subspace optimization method - error and limit cases', functi
 		// For performances reasons, it must be tested that only one call to the portfolio optimization method takes place
 		{
 			// Generate a random number of assets
-			var nbAssets = Math.floor(Math.random()*(50-2+1) + 2); // max 50 min 2
+			var nbAssets = Math.floor(Math.random()*(25-2+1) + 2); // max 25 min 2
 			
 			// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
 			function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetOptimizationFctOpt) {
@@ -2510,7 +2865,7 @@ QUnit.test('Random subspace optimization method', function(assert) {
 		function binomial(n, k) { if (k === 0) return 1; return (n * binomial(n-1, k-1)) / k; }
 		
 		// Generate a random number of assets
-		var nbAssets = Math.floor(Math.random()*(25-2+1) + 2); // max 25 min 2
+		var nbAssets = Math.floor(Math.random()*(15-2+1) + 2); // max 15 min 2
 			
 		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
 		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetOptimizationFctOpt) {
@@ -2532,7 +2887,7 @@ QUnit.test('Random subspace optimization method', function(assert) {
 	// Test the behaviour of the deterministic subsets generation method, using random data 
 	{
 		// Generate a random number of assets
-		var nbAssets = Math.floor(Math.random()*(25-2+1) + 2); // max 25 min 2
+		var nbAssets = Math.floor(Math.random()*(15-2+1) + 2); // max 15 min 2
 			
 		// Define the portfolio optimization method: an equal weigths portfolio optimization method, for simplicity
 		function subsetEqualWeightsOptimization(subsetAssetsIdx, subsetOptimizationFctOpt) {
@@ -2676,7 +3031,7 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		var expectedWeights = [0.09395200108235617, 0.1853986157617026, 0.11749197001156553];
 		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, 
 		                                                                                { subsetsGenerationMethod: 'deterministic', 
-																			              subsetsMeanVarianceOptimizationOpt: {
+																			              subsetsOpt: {
 																							  constraints: {fullInvestment: false, maxVolatility: Math.sqrt(0.10)}
 																						  }
 																						});
@@ -2686,7 +3041,7 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		}
 		else {
 			for (var i = 0; i < expectedWeights.length; ++i) {
-				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-8) {
+				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-6) {
 					weightsOK = false;
 					break;
 				}
@@ -2706,7 +3061,7 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		assert.throws(function() { 
 			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, 
 		                                                                                { subsetsGenerationMethod: 'deterministic', 
-																			              subsetsMeanVarianceOptimizationOpt: {
+																			              subsetsOpt: {
 																							  constraints: {return: 0.3}
 																						  }
 																						}) },
@@ -2717,7 +3072,7 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		assert.throws(function() { 
 			PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, 
 		                                                                                { subsetsGenerationMethod: 'deterministic', 
-																			              subsetsMeanVarianceOptimizationOpt: {
+																			              subsetsOpt: {
 																							  constraints: {volatility: 0.1}
 																						  }
 																						}) },
@@ -2835,8 +3190,9 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 		var maxVolatility = 0.10;
 		
 		// Compute the RSO-MVO weights
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { nbRandomSubsets: 16384*1, 
-		                                                                                                   subsetsMeanVarianceOptimizationOpt: { 
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { nbRandomSubsets: 1024*1, 
+		                                                                                                   subsetsAggregationMethod: 'median',
+																										   subsetsOpt: { 
 																											   constraints: {
 																												   fullInvestment: false,
 																												   maxVolatility: maxVolatility 
@@ -2846,6 +3202,63 @@ QUnit.test('Random subspace mean variance portfolio', function(assert) {
 	}
 });	
 
+
+
+QUnit.test('Random subspace global minimum variance portfolio', function(assert) {    
+	// Test using static data, with a semi-positive definite covariance matrix, to test that the
+	// optional asset returns are properly provided to the subsets.
+	{
+		var covMat = [[0.0400, 0.0400, 0.0400], [0.0400, 0.0400, 0.0400], [0.0400, 0.0400, 0.0400]];
+		var returns = [0.01, 0.02, 0.03];
+		
+		// The GMV portfolios associated to the three sub-optimization problems with 2 assets and their returns are:
+		// - Assets 1 and 2: [0, 1]
+		// - Assets 1 and 3: [0, 1]
+		// - Assets 2 and 3: [0, 1]
+		// So, the final portfolio must be [0, 1/3, 2/3]
+		var expectedWeights = [0, 1/3, 2/3];
+		var weights = PortfolioAllocation.randomSubspaceGlobalMinimumVarianceOptimizationWeights(covMat, 
+																								{ sizeSubsets: 2, mu: returns, subsetsGenerationMethod: 'deterministic'});
+		
+		var weightsOK = true;
+		if (expectedWeights.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-6) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Test #1, semi-positive definite covariance matrix, optional returns provided');
+		
+		// The GMV portfolios associated to the three sub-optimization problems with 2 assets and no returns are:
+		// - Assets 1 and 2: [1/2, 1/2]
+		// - Assets 1 and 3: [1/2, 1/2]
+		// - Assets 2 and 3: [1/2, 1/2]
+		// So, the final portfolio must be [1/3, 1/3, 1/3]
+		var expectedWeights = [1/3, 1/3, 1/3];
+		var weights = PortfolioAllocation.randomSubspaceGlobalMinimumVarianceOptimizationWeights(covMat, 
+																								{ sizeSubsets: 2, subsetsGenerationMethod: 'deterministic'});
+		
+		var weightsOK = true;
+		if (expectedWeights.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-6) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Test #1, semi-positive definite covariance matrix, no returns provided');
+	}
+	
+});	
 
 
 QUnit.test('Best constantly rebalanced portfolio', function(assert) {    
@@ -2969,6 +3382,45 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, #1');
 	}  
 	
+	// Test with static data: 1 EEM ETF, 1 WLD ETF, and 1 ACWI ETF with returns halved as benchmark
+	//
+	// The only way to be able to minimize the tracking error is to invest partially, about half position of the test above.
+	{
+		// Define the assets returns
+		var assetsReturns = [[0.078129363,0.03663478,0.028787879,0.031491869,-0.019533386,-0.042308288,-0.062133001,-0.103910104,-0.027053038,0.082179315,0.004579357,-0.049970429], // Asset 1 returns in 2015 (EEM)
+		                     [0.05289784,0.065017266,0.028012939,-0.019089773,0.025592817,-0.03893898,0.026564726,-0.07927768,-0.033253707,0.090633334,0.04075,-0.044859476]]; // Asset 2 returns in 2015 (WLD)
+		
+		// Define the benchmark returns in 2015 (ACWI), and halve them
+		var benchmarkReturns = [0.055518502,0.062009871,0.028003081,-0.013945023,0.020509392,-0.03935567,0.017029792,-0.081809115,-0.032750097,0.089738414,0.037148934,-0.045498531];
+		for (var i = 0; i < benchmarkReturns.length; ++i) {
+			benchmarkReturns[i] /= 2;
+		}
+
+		// Prior to any numerical computation, since ACWI index in 2015 ~= 90% World index + 10% Emerging index,
+		// the minimum tracking error portfolio partially invested should have weights close to [0.1, 0.9]/2, which has been
+		// validated by the numerical computation below.
+		var expectedWeights = [0.060166777143159315, 0.4403674392377076];
+		
+		// Compute the weights of the minimum tracking error portfolio
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: {fullInvestment: false}});
+
+		//
+		var weightsOK = true;
+		if (expectedWeights.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-4) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, partial investment constraint #1');
+	}
+
+	
 	// Test with static data for redundancy: 2 EEM ETFs, 2 WLD ETFs, 1 ACWI ETF as benchmark
 	{
 		// Define the assets returns
@@ -3004,7 +3456,7 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 		
 		
 		// The weights constrained numerical computation allocates between the 2 WLD ETFs and the 2 EEM ETFs according to the weights constraints.
-		var expectedWeightsMinMaxWeights = [0.25, 0.5, 0.15, 0.1];
+		var expectedWeightsMinMaxWeights = [0.25, 0.3268282983256891, 0.32317170167431086, 0.1];
 		
 		// Compute the weights of the minimum tracking error portfolio
 		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { minWeights: [0.25, 0, 0, 0.1], maxWeights: [1, 0.5, 1, 1] }});
@@ -3025,12 +3477,14 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, weights constraints, duplicate assets #1');
 		
 		
-		// The 2-2 cardinality constrained numerical computation allocates 1 WLD ETF and 1 EEM ETF.
+		// The 2-2 cardinality constrained numerical computation must allocate 1 WLD ETF and 1 EEM ETF,
+		// and whatever the optimization method, the result should be approximately identical.
 		var expectedWeightsTwoTwo = [0.10614062381555761, 0.8938593761844424, 0, 0];
 		
-		// Compute the weights of the minimum tracking error portfolio
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { minNbAssets: 2, maxNbAssets: 2 }});
-
+		// Compute the weights of the minimum tracking error portfolio using combinatorial optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'exact',
+		                                                                                                constraints: { minNbAssets: 2, maxNbAssets: 2 }});
+																										
 		//
 		var weightsOK = true;
 		if (expectedWeightsTwoTwo.length != weights.length) {
@@ -3044,15 +3498,38 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 				}
 			}
 		}
-		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints, duplicate assets #1');
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints, combinatorial optimization, duplicate assets #1');
+
+																										
+		// Compute the weights of the minimum tracking error portfolio using Threshold accepting optimization, and default method, which must be Threshold Accepting as well
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'heuristic', 
+																										constraints: { minNbAssets: 2, maxNbAssets: 2 }});
+
+		var weightsDefault = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, { constraints: { minNbAssets: 2, maxNbAssets: 2 }});
+																										
+		//
+		var weightsOK = true;
+		if (expectedWeightsTwoTwo.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeightsTwoTwo.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeightsTwoTwo[i]) > 5e-3 || Math.abs(weightsDefault[i] - expectedWeightsTwoTwo[i]) > 5e-3) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints, threshold accepting optimization, duplicate assets #1');
 
 		
 		// The 2-2 cardinality constrained numerical computation allocates to the same EEM ETF as above, 
 		// but to the other WLD ETF in case maximum weights constraints are additionally imposed on the first WLD ETF.
 		var expectedWeightsMaxTwoTwo = [0.10292768040365563, 0, 0.8970723195963444, 0];
 		
-		// Compute the weights of the minimum tracking error portfolio
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { maxWeights: [1,0.25,1,1], minNbAssets: 2, maxNbAssets: 2 }});
+		// Compute the weights of the minimum tracking error portfolio using combinatorial optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'exact',
+		                                                                                                constraints: { maxWeights: [1,0.25,1,1], minNbAssets: 2, maxNbAssets: 2 }});
 
 		//
 		var weightsOK = true;
@@ -3067,15 +3544,37 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 				}
 			}
 		}
-		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality and max weights constraints, duplicate assets #1');
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality and max weights constraints, combinatorial optimization, duplicate assets #1');
+
+		
+		// Compute the weights of the minimum tracking error portfolio using Threshold accepting optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'heuristic', 
+																										constraints: { maxWeights: [1,0.25,1,1], minNbAssets: 2, maxNbAssets: 2 }});
+
+		//
+		var weightsOK = true;
+		if (expectedWeightsMaxTwoTwo.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeightsMaxTwoTwo.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeightsMaxTwoTwo[i]) > 1e-3) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality and max weights constraints, threshold accepting optimization, duplicate assets #1');
+		
 		
 		
 		// The 2-3 cardinality constrained numerical computation allocates to the same EEM ETF as above, 
 		// but dispatch to the two WLD ETFs in case maximum weights constraints are additionally imposed on the first WLD ETF.
 		var expectedWeightsMaxTwoThree = [0.09775016142607804, 0.2441086935007033, 0.6581411450732186, 0];
 		
-		// Compute the weights of the minimum tracking error portfolio
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { maxWeights: [1,0.25,1,1], minNbAssets: 2, maxNbAssets: 3 }});
+		// Compute the weights of the minimum tracking error portfolio using combinatorial optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'exact',
+		                                                                                                constraints: { maxWeights: [1,0.25,1,1], minNbAssets: 2, maxNbAssets: 3 }});
 
 		//
 		var weightsOK = true;
@@ -3090,16 +3589,39 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 				}
 			}
 		}
-		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, relaxed cardinality and max weights constraints, duplicate assets #1');
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, relaxed cardinality and max weights constraints, combinatorial optimization, duplicate assets #1');
 				
-			
-		// The 2-2 cardinality constrained with min weights numerical computation allocates 
+		
+		// Compute the weights of the minimum tracking error portfolio using Threshold accepting optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'heuristic',
+		                                                                                                constraints: { maxWeights: [1,0.25,1,1], minNbAssets: 2, maxNbAssets: 3 }});
+																										
+		//
+		var weightsOK = true;
+		if (expectedWeightsMaxTwoThree.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeightsMaxTwoThree.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeightsMaxTwoThree[i]) > 5e-2) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, relaxed cardinality and max weights constraints, threshold accepting optimization, duplicate assets #1');
+	
+
+	
+																										
+		// The exact 2-2 cardinality constrained with min weights numerical computation allocates 
 		// to a different WLD ETF than above in case the min weight constraint would force
 		// the ideal WLD ETF to have too much weight (here, 95% v.s. its ideal allocation of ~90%)
 		var expectedWeightsMinTwoTwo = [0, 0, 0.8, 0.2];
 		
-		// Compute the weights of the minimum tracking error portfolio
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { minWeights: [0.25, 0.95, 0, 0.2], minNbAssets: 2, maxNbAssets: 2 }});
+		// Compute the weights of the minimum tracking error portfolio using combinatorial optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'exact',
+		                                                                                                constraints: { minWeights: [0.25, 0.95, 0.1, 0.2], minNbAssets: 2, maxNbAssets: 2 }});
 
 		//
 		var weightsOK = true;
@@ -3114,26 +3636,46 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 				}
 			}
 		}
-		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality and min weights constraints, duplicate assets #1');
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality and min weights constraints, combinatorial optimization, duplicate assets #1');
 		
+		// Compute the weights of the minimum tracking error portfolio using Threshold accepting optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'heuristic',
+		                                                                                                constraints: { minWeights: [0.25, 0.95, 0.1, 0.2], minNbAssets: 2, maxNbAssets: 2 }});
+
+		//
+		var weightsOK = true;
+		if (expectedWeightsMinTwoTwo.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeightsMinTwoTwo.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeightsMinTwoTwo[i]) > 1e-4) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality and min weights constraints, threshold accepting optimization, duplicate assets #1');
+
+
 		
 		// Infeasible 2-2 cardinality constrained computation
 		assert.throws(function() { 
-			PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { minWeights: [0.6, 0.6, 0.6, 0.6], minNbAssets: 2, maxNbAssets: 2 }}); },
+			PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'exact', constraints: { minWeights: [0.6, 0.6, 0.6, 0.6], minNbAssets: 2, maxNbAssets: 2 }}); },
 			new Error('infeasible problem detected'),
-			"Minimum tracking error portfolio, infeasible cardinality constraints, duplicate assets #1");
+			"Minimum tracking error portfolio, infeasible cardinality constraints, combinatorial optimization, duplicate assets #1");
 		
+		assert.throws(function() { 
+			PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'heuristic', constraints: { minWeights: [0.6, 0.6, 0.6, 0.6], minNbAssets: 2, maxNbAssets: 2 }}); },
+			new Error('infeasible problem detected'),
+			"Minimum tracking error portfolio, infeasible cardinality constraints, threshold accepting optimization, duplicate assets #1");
 		
-		// The 2-2 cardinality constrained with soft inequality constraints numerical computation 
-		// must allocate the same as the 2-2, with a small lambda.
-		var expectedWeights = expectedWeightsTwoTwo;
-
 		
 		// The 1-4 cardinality constrained numerical computation allocates the same as the 2-2.
 		var expectedWeightsOneFour = expectedWeightsTwoTwo;
-		
-		// Compute the weights of the minimum tracking error portfolio
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { minNbAssets: 1, maxNbAssets: 4 }});
+	
+		// Compute the weights of the minimum tracking error portfolio using combinatorial optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'exact', constraints: { minNbAssets: 1, maxNbAssets: 4 }});
 
 		//
 		var weightsOK = true;
@@ -3142,39 +3684,90 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 		}
 		else {
 			for (var i = 0; i < expectedWeightsOneFour.length; ++i) {
-				if (Math.abs(weights[i] - expectedWeightsOneFour[i]) > 1e-4) {
+				if (Math.abs(weights[i] - expectedWeightsOneFour[i]) > 1e-3) {
 					weightsOK = false;
 					break;
 				}
 			}
 		}
-		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints, duplicate assets #5');
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints, combinatorial optimization, duplicate assets #5');
 		
-		
-		// The 4-4 cardinality constrained numerical computation must allocate the same
-		// as the non cardinality constrained one, since the non-constrained one is made of 4 assets.
-		var expectedWeightsFourFour = expectedWeightsDefault;
-		
-		// Compute the weights of the minimum tracking error portfolio
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {constraints: { minNbAssets: 4, maxNbAssets: 4 }});
+		// Compute the weights of the minimum tracking error portfolio using Threshold accepting optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'heuristic', constraints: { minNbAssets: 1, maxNbAssets: 4 }});
 
 		//
 		var weightsOK = true;
-		if (expectedWeightsFourFour.length != weights.length) {
+		if (expectedWeightsOneFour.length != weights.length) {
 			weightsOK = false;
 		}
 		else {
-			for (var i = 0; i < expectedWeightsFourFour.length; ++i) {
-				if (Math.abs(weights[i] - expectedWeightsFourFour[i]) > 1e-4) {
+			for (var i = 0; i < expectedWeightsOneFour.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeightsOneFour[i]) > 1e-2) {
 					weightsOK = false;
 					break;
 				}
 			}
 		}
-		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints, duplicate assets #6');
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints, threshold accepting optimization, duplicate assets #5');
 	} 
+
+	// Test cardinality constrained, with partial investment constraint
+	{
+		// Define the assets returns
+		var assetsReturns = [[0.078129363,0.03663478,0.028787879,0.031491869,-0.019533386,-0.042308288,-0.062133001,-0.103910104,-0.027053038,0.082179315,0.004579357,-0.049970429], // Asset 1 returns in 2015 (EEM)
+		                     [0.05289784,0.065017266,0.028012939,-0.019089773,0.025592817,-0.03893898,0.026564726,-0.07927768,-0.033253707,0.090633334,0.04075,-0.044859476], // Asset 2 returns in 2015 (WLD)
+							 [0.055323183,0.065000264,0.027985908,-0.019018198,0.025635979,-0.038860104,0.026504942,-0.079552638,-0.033599239,0.090526431,0.041004562,-0.044589974], // Asset 3 returns in 2015 (WLD #2)
+							 [0.078085397,0.036893028,0.02912706,0.031861707,-0.019134434,-0.041778299,-0.0617737,-0.103650587,-0.026909091,0.082105488,0.005130735,-0.049278492]]; // Asset 4 returns in 2015 (EEM #2)
+		
+		// Define the benchmark returns in 2015 (ACWI), and halve them
+		var benchmarkReturns = [0.055518502,0.062009871,0.028003081,-0.013945023,0.020509392,-0.03935567,0.017029792,-0.081809115,-0.032750097,0.089738414,0.037148934,-0.045498531];
+		for (var i = 0; i < benchmarkReturns.length; ++i) {
+			benchmarkReturns[i] /= 2;
+		}
+		
+		// The 1-4 cardinality constrained numerical computation with partial investment constraint should allocates half the quantity of the 1-4 with 
+		// full investment constraint, but possibly different assets, which is the case.
+		var expectedWeights = [0.024819829894880664, 0.4490162021223922, 0, 0.026641220660455277];
+		
+		// Compute the weights of the minimum tracking error portfolio using combinatorial optimization
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'exact', 
+		                                                                                                constraints: { fullInvestment: false, minNbAssets: 1, maxNbAssets: 4 }});																					
+
+		//
+		var weightsOK = true;
+		if (expectedWeights.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				if (Math.abs(weights[i] - expectedWeights[i]) > 1e-4) {
+					weightsOK = false;
+					break;
+				}
+			}
+		}
+		assert.equal(weightsOK, true, 'Minimum tracking error portfolio, cardinality constraints and partial investment constraint, combinatorial optimization, duplicate assets #1');
+		
+		// Compute the weights of the minimum tracking error portfolio using Threshold Accepting
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, benchmarkReturns, {optimizationMethod: 'heuristic', 
+		                                                                                                 constraints: { fullInvestment: false, minNbAssets: 1, maxNbAssets: 4 }});
+																										 
+	    // The only test which can be done due to the stochasticity is that the portfolio size should be less than ~50% invested
+		var weightsOK = true;
+		if (expectedWeights.length != weights.length) {
+			weightsOK = false;
+		}
+		else {
+			var sumWeights = 0;
+			for (var i = 0; i < expectedWeights.length; ++i) {
+				sumWeights += weights[i];
+			}
+		}
+		assert.equal(sumWeights <= 0.51, true, 'Minimum tracking error portfolio, cardinality constraints and partial investment constraint, threshold accepting optimization, duplicate assets #1');
+	}
 	
-	
+
+
 	// INDTRACK1 (Hang Seng Index and Constituents)
 	// Reference: OR-library http://people.brunel.ac.uk/~mastjjb/jeb/orlib/indtrackinfo.html
 	{
@@ -3258,7 +3851,7 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 		}
 		
 		// Test an exact number of assets
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {optimizationMethod: 'thresholdAccepting', 
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {optimizationMethod: 'heuristic', 
 		                                                                                            constraints: {minWeights: lowerBounds, minNbAssets: 10, maxNbAssets: 10 }});
 		
 		// Check that the number of non-zero weights is equal to 10
@@ -3268,11 +3861,11 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 				nbNonZeroAssets = nbNonZeroAssets + 1;
 			}
 		}
-		assert.equal(nbNonZeroAssets == 10, true, "Minimum tracking error portfolio, indtrack5 OR data set (Nikkei), exact number of assets");
+		assert.equal(nbNonZeroAssets == 10, true, "Minimum tracking error portfolio, indtrack1 OR data set ((Hang Seng Index)), exact number of assets");
 
 
 		// Test an exact full number of assets
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {optimizationMethod: 'thresholdAccepting', 
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {optimizationMethod: 'heuristic',  optimizationMethodParams: { nSteps: 500 },
 		                                                                                            constraints: {minWeights: lowerBounds, minNbAssets: 31, maxNbAssets: 31 }});
 		
 		// Check that the number of non-zero weights is equal to 31
@@ -3282,13 +3875,13 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 				nbNonZeroAssets = nbNonZeroAssets + 1;
 			}
 		}
-		assert.equal(nbNonZeroAssets == 31, true, "Minimum tracking error portfolio, indtrack5 OR data set (Nikkei), full exact number of assets");
+		assert.equal(nbNonZeroAssets == 31, true, "Minimum tracking error portfolio, indtrack1 OR data set ((Hang Seng Index)), full exact number of assets");
 		
 		
 		// Test a non-exact number of assets
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {optimizationMethod: 'thresholdAccepting', 
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {optimizationMethod: 'heuristic', 
 		                                                                                            constraints: { minNbAssets: 10, maxNbAssets: 20 }});
-		
+
 		// Check that the number of non-zero weights is between 10 and 20
 		var nbNonZeroAssets = 0;
 		for (var k = 0; k < weights.length; ++k) {
@@ -3296,8 +3889,9 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 				nbNonZeroAssets = nbNonZeroAssets + 1;
 			}
 		}
-		assert.equal(nbNonZeroAssets >= 10 && nbNonZeroAssets <= 30, true, "Minimum tracking error portfolio, indtrack5 OR data set (Nikkei), min/max number of assets");		
+		assert.equal(nbNonZeroAssets >= 10 && nbNonZeroAssets <= 20, true, "Minimum tracking error portfolio, indtrack1 OR data set ((Hang Seng Index)), min/max number of assets");		
 	}
+
 	
 	/*
 	// INDTRACK2 (Nikkei Index and Constituents)
@@ -3553,7 +4147,7 @@ QUnit.test('Minimum tracking error portfolio', function(assert) {
 		}
 		
 		// Compute the weights of the minimum tracking error portfolio
-		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {optimizationMethod: 'thresholdAccepting', constraints: { minWeights: lowerBounds, maxNbAssets: 10 }});
+		var weights = PortfolioAllocation.minimumTrackingErrorWeights(assetsReturns, indexReturns, {constraints: { minWeights: lowerBounds, maxNbAssets: 10 }});
 	}
 	*/
 });

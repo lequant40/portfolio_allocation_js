@@ -6,20 +6,138 @@ QUnit.module('Simplex internal module', {
 });
 
 
+
+QUnit.test('Simplex linear program solve', function(assert) {    
+  // Test with static data
+  {
+	  var c = [1, 1, 2];
+	  assert.deepEqual(PortfolioAllocation.simplexLpSolve_(c), [[1, 0, 0], 1], 'Simplex linear program solve - No upper no lower bounds'); // [0,1,0] is also a solution
+	  assert.deepEqual(PortfolioAllocation.simplexLpSolve_(c, null, [0, 1, 1]), [[0, 1, 0], 1], 'Simplex linear program solve - Upper bounds, unique solution'); 
+	  assert.deepEqual(PortfolioAllocation.simplexLpSolve_(c, null, [0.5, 1, 1]), [[0.5, 0.5, 0], 1], 'Simplex linear program solve - Upper bounds, non-unique solution'); // [0,1,0] is also a solution
+	  assert.deepEqual(PortfolioAllocation.simplexLpSolve_(c, null, [0.5, 0.5, 1]), [[0.5, 0.5, 0], 1], 'Simplex linear program solve - Upper bounds degenerate');
+	  assert.deepEqual(PortfolioAllocation.simplexLpSolve_(c, [0, 0, 0.5]), [[0.5, 0, 0.5], 1.5], 'Simplex linear program solve - Lower bounds');
+	  assert.deepEqual(PortfolioAllocation.simplexLpSolve_(c, [0, 0, 0.25], [0.5, 1, 1]), [[0.5, 0.25, 0.25], 1.25], 'Simplex linear program solve - Upper and lower bounds, non unique solution'); // [0,0.75,0.25] is also a solution
+  }
+
+  // Test with random data and comparison with projection solve (function value only)
+  {	
+		// Setup static parameters of the random test
+		var nbTests = 10;
+		var minDimension = 2;
+		var maxDimension = 50;
+
+		//
+		for (var i = 0; i < nbTests; ++i) {
+			// Random dimension
+			var n = Math.floor(Math.random()*(maxDimension - minDimension + 1) + minDimension);
+			
+			// Definition of lower and upper bounds of the restricted simplex
+			var p = new PortfolioAllocation.Matrix(new PortfolioAllocation.simplexRandomSampler_(n).sample());
+			var l = null;
+			if (Math.random() >= 0.5) {
+				l = p.elemMap(function(i,j,val) { return val/4;});
+			}
+			var u = null;
+			if (Math.random() >= 0.5) {
+				u = p.elemMap(function(i,j,val) { return Math.min(1,  4 * val);});
+			}
+
+			// Definition of the linear function <c/x>
+			var c = PortfolioAllocation.Matrix.fill(n, 1, 
+														function(i,j) { 
+															return Math.random();
+														});
+
+			// Definitions for the computation of the solution using FISTA algorithm
+			var f = function(x) {
+				return PortfolioAllocation.Matrix.vectorDotProduct(x, c);
+			}
+			var gradf = function(x) {
+				return new PortfolioAllocation.Matrix(c);
+			}
+			var g = function(x) {
+				if (l && u) {
+					return PortfolioAllocation.simplexCharacteristicFunction_(x.toArray(), l.toArray(), u.toArray());
+				}
+				else if (u) {
+					return PortfolioAllocation.simplexCharacteristicFunction_(x.toArray(), null, u.toArray());
+				}
+				else if (l) {
+					return PortfolioAllocation.simplexCharacteristicFunction_(x.toArray(), l.toArray());
+				}
+				else {
+					return PortfolioAllocation.simplexCharacteristicFunction_(x.toArray());
+				}
+			}
+			var proxg = function(x, mu) {
+				if (l && u) {
+					return new PortfolioAllocation.Matrix(PortfolioAllocation.simplexEuclidianProjection_(x.toArray(), l.toArray(), u.toArray()));
+				}
+				else if (u) {
+					return new PortfolioAllocation.Matrix(PortfolioAllocation.simplexEuclidianProjection_(x.toArray(), null, u.toArray()));
+				}
+				else if (l) {
+					return new PortfolioAllocation.Matrix(PortfolioAllocation.simplexEuclidianProjection_(x.toArray(), l.toArray()));
+				}
+				else {
+					return new PortfolioAllocation.Matrix(PortfolioAllocation.simplexEuclidianProjection_(x.toArray()));
+				}
+			}
+			var x0 = proxg(PortfolioAllocation.Matrix.zeros(n, 1));
+
+			// Compute the minimum of the function f on the restricted unit simplex using FISTA algorithm
+			var sol = PortfolioAllocation.ccpsolveFISTA_(f, gradf, g, proxg, x0);
+			var solValue = sol[1];
+
+			// Compute the solution using the simplexLpSolve method
+			var expectedSol;
+			if (l && u) {
+				expectedSol = PortfolioAllocation.simplexLpSolve_(c.toArray(), l.toArray(), u.toArray());
+			}
+			else if (u) {
+				expectedSol = PortfolioAllocation.simplexLpSolve_(c.toArray(), undefined, u.toArray());
+			}
+			else if (l) {
+				expectedSol = PortfolioAllocation.simplexLpSolve_(c.toArray(), l.toArray());
+			}
+			else {
+				expectedSol = PortfolioAllocation.simplexLpSolve_(c.toArray());
+			}
+			var expectedSolValue = expectedSol[1];
+
+			
+			// Make sure the two computed solution values are identical
+			assert.equal(Math.abs(solValue - expectedSolValue) <= 1e-6, true, 'Simplex linear program solve - Random test #' + i);
+		}
+  }
+});
+
+
 QUnit.test('Simplex characteristic function computation', function(assert) {    
   // Test with static data
   {
 	  // Point belonging to the unit simplex
 	  var x = [0.1, 0.9];
-	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x), 0, 'Simplex characteristic function computation - Test 1');
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x), 0, 'Point belonging to unit simplex');
+
+	  // Point belonging to the unit full simplex
+	  var x = [0.1, 0.8];
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x), Number.POSITIVE_INFINITY, 'Point belonging to unit full simplex 1/2');
+	  assert.equal(PortfolioAllocation.fullSimplexCharacteristicFunction_(x), 0, 'Point belonging to unit full simplex 2/2');
 
 	  // Point belonging to a restricted unit simplex
 	  var x = [0.3, 0.4, 0.3];
-	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x, null, [0.5, 0.5, 0.5]), 0, 'Simplex characteristic function computation - Test 2');
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x, null, [0.5, 0.5, 0.5]), 0, 'Point belonging to a restricted unit simplex');
 
-	  // Point NOT belonging to the unit simplex
+	  // Point belonging to a restricted unit full simplex
+	  var x = [0.3, 0.4, 0.2];
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x, null, [0.5, 0.5, 0.5]), Number.POSITIVE_INFINITY, 'Point belonging to a restricted unit full simplex 1/2');
+	  assert.equal(PortfolioAllocation.fullSimplexCharacteristicFunction_(x, null, [0.5, 0.5, 0.5]), 0, 'Point belonging to a restricted unit full simplex 2/2');
+
+	  // Point NOT belonging to the unit simplex nor to the unit full simplex
 	  var x = [0.1, 1.9];
-	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x), Number.POSITIVE_INFINITY, 'Simplex characteristic function computation - Test 3');
+	  assert.equal(PortfolioAllocation.simplexCharacteristicFunction_(x), Number.POSITIVE_INFINITY, 'Point NOT belonging to the unit simplex nor to the unit full simplex 1/2');
+	  assert.equal(PortfolioAllocation.fullSimplexCharacteristicFunction_(x), Number.POSITIVE_INFINITY, 'Point NOT belonging to the unit simplex nor to the unit full simplex 2/2');
   }
   
   // Test with random data
@@ -131,6 +249,27 @@ QUnit.test('Simplex euclidean projection computation', function(assert) {
 	  for (var i = 0; i < testValues.length; ++i) {
 	      assert.deepEqual(PortfolioAllocation.simplexEuclidianProjection_(testValues[i]), expectedValues[i], 'Simplex euclidean projection - Test 1 #' + i);
       } 
+  }
+  
+  // Test with static data projection on both the unit simplex and the unit full simplex
+  // Reference: https://sites.google.com/site/fomsolver/orthogonal-projection-functions
+  {
+	  var x = [0,0.5,-0.1];
+	  
+	  var expectedPx = [0.19999999999999998, 0.7, 0.09999999999999998];
+	  assert.deepEqual(PortfolioAllocation.simplexEuclidianProjection_(x), expectedPx, "Simplex euclidean projection - Test #2, unit simplex");
+
+	  var expectedPx = [0, 0.5, 0];
+	  assert.deepEqual(PortfolioAllocation.fullSimplexEuclidianProjection_(x), expectedPx, "Simplex euclidean projection - Test #2, unit full simplex");	  
+  }
+  
+  // Test with static data a point which was posing problems in the quality of the approximation
+  {
+	  var x = [-904980651.6026702, -299585983.6790553, -1295433363.718275];
+	  var expectedPx = [0.09049806519360036, 0.7799585984012389, 0.12954333640516083];
+	  
+	  var px = PortfolioAllocation.simplexEuclidianProjection_(x, [0.09049806519360036, 0.029958598401238858, 0.12954333640516083]);
+	  assert.deepEqual(px, expectedPx, "Simplex euclidean projection - Test #3, unit simplex, extra precision");
   }
 });
 
