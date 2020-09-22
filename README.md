@@ -119,7 +119,7 @@ var w = PortfolioAllocation.riskBudgetingWeights([[0.1,0], [0,0.2]], [0.25, 0.75
   Discovered by [David Varadi](https://cssanalytics.wordpress.com/) and formally studied by Benjamin J. Gillen in the research paper [Subset Optimization for Asset Allocation](https://authors.library.caltech.edu/79336/), the RSO-MVO portfolio combines the usage of a [random subspace method](https://en.wikipedia.org/wiki/Random_subspace_method) with a mean-variance optimization method.
 
 - Minimum tracking error portfolio, a.k.a. index tracking portfolio  
-  The index tracking portfolio aims at replicating the performances of a given stock market index, or more generally of a given benchmark, with a limited number of its constituents.
+  The index tracking portfolio aims at replicating the performances of a given stock market index, or more generally of a given benchmark, with a limited number of its constituents thanks to cardinality constraints.
   
 - Best constantly rebalanced portfolio (BCRP)  
   The BCRP portfolio is a portfolio determined in hindsight to benchmark the performances of online portfolio selection algorithms.

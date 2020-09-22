@@ -63,7 +63,7 @@ self.randomCorrelationMatrix = function(n, opt) {
 * @param {object} opt optional parameters for the algorithm.
 * @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-6, and in case it is set to 0, force convergence to full precision, which can be time consuming.
 * @param {number} opt.maxIter the maximum number of iterations of the alternating projections algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 100.
-* @param {number} opt.minEigenvalue lower bound on the smallest eigenvalue(s) of the nearest correlation matrix, a positive real number belonging to [0,1]; defaults to 1e-12.
+* @param {number} opt.minEigenvalue lower bound on the smallest eigenvalue(s) of the nearest correlation matrix, a positive real number belonging to [0,1]; defaults to 1e-8.
 *
 * Note: The usual minimum value of opt.minEigenvalue is 1e-8, which does not seem to impact the number of iterations of the algorithm (c.f. the second reference); values
 * greater than 0.1 are more impacting. 
@@ -143,7 +143,7 @@ self.nearestCorrelationMatrix = function(mat, opt) {
 	}
 	var minEigenvalue = opt.minEigenvalue
 	if (minEigenvalue == undefined) {
-		minEigenvalue = 1e-12;
+		minEigenvalue = 1e-8;
 	}
 	
 	
@@ -250,7 +250,7 @@ self.nearestCorrelationMatrix = function(mat, opt) {
 * @param {number} opt.minEigenvalue in case opt.method is either equal to "linear-shrinkage" or to "nearest-correlation-matrix", a lower bound on the smallest eigenvalue(s) of the repaired correlation matrix, a positive real number belonging to [0,1]; defaults to 0.
 * @param {Matrix_|Array.<Array.<number>>} opt.shrinkageTarget in case opt.method is equal to "linear-shrinkage", the target correlation matrix towards which to shrink 
 * the input correlation matrix, whose smallest eigenvalue(s) must satisfy the opt.minEigenvalue lower bound; default to the identity matrix.
-* @param {number} opt.epsNcm in case opt.method is equal to "nearest-correlation-matrix", tolerance for the convergence of the associated algorithm, a strictly positive real number; defaults to 1e-6.
+* @param {number} opt.epsNcm in case opt.method is equal to "nearest-correlation-matrix", tolerance for the convergence of the associated algorithm, a strictly positive real number or 0 to force converge to full machine precision; defaults to 1e-6.
 * @param {number} opt.epsSymmetric tolerance for the numerical symmetry of the input matrix corrMat, a strictly positive real number; defaults to 1e-12.
 * @param {number} opt.epsUnitDiagonal tolerance for the numerical unit diagonal of the input matrix corrMat, a strictly positive real number; defaults to 1e-12.
 *
@@ -459,10 +459,12 @@ self.repairCorrelationMatrix = function(corrMat, opt) {
 * @param {number} opt.noiseLevelMax in case opt.method is equal to "additive-noise", the maximum noise level, a positive real number; defaults to 0.01
 * @param {number} opt.noiseSpaceDimension in case opt.method is equal to "additive-noise", the dimension of the noise space, a positive integer; 
 * defaults to 3 to perturb all the elements uniformly, c.f. the third reference.
-* @param {number} opt.epsNcm in case pt.method is equal to "multiplicative-noise" or to "additive-noise", the generated correlation matrix might not be semidefinite positive, and
-* requires the computation of the nearest correlation matrix; if so, tolerance for the convergence of the associated algorithm, a strictly positive real number; defaults to 1e-6.
-* @param {number} opt.maxIterNcm in case pt.method is equal to "multiplicative-noise" or to "additive-noise", the generated correlation matrix might not be semidefinite positive, and
-* requires the computation of the nearest correlation matrix; if so, maximum number of iterations for the convergence of the associated algorithm, a strictly positive real number; defaults to 100.
+* @param {number} opt.epsNcm in case opt.method is equal to "multiplicative-noise" or to "additive-noise", the generated correlation matrix might not be semidefinite positive, and
+* requires the computation of the nearest correlation matrix; if so, tolerance for the convergence of the associated algorithm, a strictly positive real number or 0 to force convergence to full
+* machine precision; defaults to 1e-6.
+* @param {number} opt.maxIterNcm in case opt.method is equal to "multiplicative-noise" or to "additive-noise", the generated correlation matrix might not be semidefinite positive, and
+* requires the computation of the nearest correlation matrix; if so, maximum number of iterations for the convergence of the associated algorithm, a strictly positive real number or -1
+* to allow an infinite number of iterations; defaults to 100.
 
 * @param {number} opt.epsCorrMat tolerance for the numerical symmetry and unit diagonal of the input matrix corrMat, a strictly positive real number; defaults to 1e-12.
 *
@@ -2385,6 +2387,108 @@ Matrix_.prototype = {
     },
 	
 	/**
+	* @function swapRows
+	*
+	* @description This function swaps the two rows p and q of the original matrix (a_ij),i=1..m,j=1..n, 
+	* with 1 <= p <= m and 1 <= q <= m.
+	*
+	* @memberof Matrix_
+	* @param {number} p the first row index to swap, with 1 <= p <= m
+	* @param {number} q the second row index to swap, with 1 <= q <= m
+	* @param {Object} opt optional parameters
+	* @param {boolean} opt.inPlace true to modify the input matrix in place, false to modify a copy of the input matrix; defaults to false
+	*
+	* @return {Matrix_} the original matrix (opt.inPlace true) or a copy of the original matrix (opt.inPlace false) with rows p and q swapped
+	*
+	* @example
+	* Matrix_([[1,2], [4,5]]).swapRows(1, 2);
+	* // Matrix_([4,5], [1,2])
+	*/
+    swapRows: function (p, q, opt) {
+    	// Checks
+		if (!(1 <= p && p <= this.nbRows) || !(1 <= q && q <= this.nbRows)) {
+			throw new Error('incorrect rows indexes: (' + p + ',' + q + ')');
+		}
+		
+		// Result matrix allocation
+		var out;
+		if (opt && opt.inPlace) {
+			out = this;
+		}
+		else {
+			out = new Matrix_(this);
+		}
+		
+		// Limit case
+		if (p == q) {
+			return out;
+		}
+    	    	
+    	// Swap rows p and q
+		var p = p - 1;
+		var q = q - 1;
+		for (var j = 0; j < out.nbColumns; ++j) {
+			var tmp = out.data[p * out.nbColumns + j];
+			out.data[p * out.nbColumns + j] = out.data[q * out.nbColumns + j];
+			out.data[q * out.nbColumns + j] = tmp;
+		}
+    	
+    	// Return the computed matrix
+        return out;
+    },
+	
+	/**
+	* @function swapColumns
+	*
+	* @description This function swaps the two columns p and q of the original matrix (a_ij),i=1..m,j=1..n, 
+	* with 1 <= p <= n and 1 <= q <= n.
+	*
+	* @memberof Matrix_
+	* @param {number} p the first column index to swap, with 1 <= p <= m
+	* @param {number} q the second column index to swap, with 1 <= q <= m
+	* @param {Object} opt optional parameters
+	* @param {boolean} opt.inPlace true to modify the input matrix in place, false to modify a copy of the input matrix; defaults to false
+	*
+	* @return {Matrix_} the original matrix (opt.inPlace true) or a copy of the original matrix (opt.inPlace false) with columns p and q swapped
+	*
+	* @example
+	* Matrix_([[1,2], [4,5]]).swapColumns(1, 2);
+	* // Matrix_([2,1], [5,4])
+	*/
+    swapColumns: function (p, q, opt) {
+    	// Checks
+		if (!(1 <= p && p <= this.nbColumns) || !(1 <= q && q <= this.nbColumns)) {
+			throw new Error('incorrect columns indexes: (' + p + ',' + q + ')');
+		}
+		
+		// Result matrix allocation
+		var out;
+		if (opt && opt.inPlace) {
+			out = this;
+		}
+		else {
+			out = new Matrix_(this);
+		}
+		
+		// Limit case
+		if (p == q) {
+			return out;
+		}
+    	    	
+    	// Swap columns p and q
+		var p = p - 1;
+		var q = q - 1;
+		for (var i = 0; i < out.nbRows; ++i) {
+			var tmp = out.data[i * out.nbColumns + p];
+			out.data[i * out.nbColumns + p] = out.data[i * out.nbColumns + q];
+			out.data[i * out.nbColumns + q] = tmp;
+		}
+    	
+    	// Return the computed matrix
+        return out;
+    },
+	
+	/**
 	* @function matrixNorm
 	*
 	* @summary Returns a matrix norm of the matrix.
@@ -3706,6 +3810,128 @@ Matrix_.choleskyDecomposition = function(A, opt) {
 
 
 /**
+* @function luDecomposition
+*
+* @description This function computes a LU decomposition of an n by n matrix A, 
+* using the complete pivoting algorithm as described in the algorithm 3.4.3 of the first reference.
+* 
+* @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
+*
+* @param {Matrix_} A an n by n matrix.
+* @param {object} opt optional parameters for the algorithm.
+* @param {string} opt.permutationsOutputForm equal to "matrix" to return n by n permutation matrices, equal to "vector" to return 
+* n by 1 permutation vectors; defaults to "matrix"
+*
+* @returns {Object} obj The computed LU decomposition
+* @returns {Matrix} obj.lowerTriangular The computed n by n L matrix, lower unit triangular with |l_ij| <= 1
+* @returns {Matrix} obj.upperTriangular The computed n by n U matrix, upper triangular
+* @returns {Matrix} obj.rowPermutation The computed n by n row permutation matrix (opt.permutationsOutputForm equals "matrix") 
+* or n by 1 row permutation vector (opt.permutationsOutputForm equals "vector") P 
+* @returns {Matrix} obj.columnPermutation The computed n by n row permutation matrix (opt.permutationsOutputForm equals "matrix") 
+* or n by 1 row permutation vector (opt.permutationsOutputForm equals "vector") Q
+*
+* The returned matrices satisfy  P * A * Q = L*U
+* 
+*/
+Matrix_.luDecomposition = function(A, opt) {
+	// Decode options
+	if (opt === undefined) {
+		opt = {};
+	}
+	var permutationsOutputForm = opt.permutationsOutputForm;
+	if (permutationsOutputForm == undefined) {
+		permutationsOutputForm = "matrix";
+	}
+	if (permutationsOutputForm != "vector" && permutationsOutputForm != "matrix") {
+		throw new Error("unknown permutation output form value");
+	}
+	
+	
+	// Checks
+	if (!(A instanceof Matrix_)) {
+		throw new Error('input must be a matrix');
+	}
+	if (!A.isSquare()) {
+		throw new Error('input must be square');
+	}
+
+	// Initializations
+	var n = A.nbRows;
+	var rowpiv = Matrix_.fill(n, 1, function(i,j) { return i;});
+	var colpiv = Matrix_.fill(n, 1, function(i,j) { return i;});
+
+	// Create a copy of A so that it is not overwritten
+	var AA = new Matrix_(A);
+	
+	// Core loop, described in algorithm 3.4.3 of the reference
+	for (var k = 1; k <= n-1; ++k) {
+		// Determine mu and lambda (i.e., the coordinates of the pivot of the input matrix)
+		var mu = -1;
+		var lambda = -1;
+		var a_max = -1;
+		for (var i = k; i <= n; ++i) {
+			for (var j = k; j <= n; ++j) {
+				var a_ij_abs = Math.abs(AA.data[(i-1) * AA.nbColumns + (j-1)]);
+				
+				if (a_ij_abs > a_max) {
+					mu = i;
+					lambda = j;
+					a_max = a_ij_abs;
+				}
+			}
+		}
+		
+		
+		// Pivot the rows and the columns of the input matrix
+		// Rows pivoting
+		rowpiv.swapRows(k, mu, {inPlace: true}); // to have a proper permutation vector
+		AA.swapRows(k, mu, {inPlace: true});
+
+		// Columns pivoting
+		colpiv.swapRows(k, lambda, {inPlace: true}); // to have a proper permutation vector
+		AA.swapColumns(k, lambda, {inPlace: true});
+		
+		
+		// Update the pivoted rows / columns
+		var a_kk = AA.data[(k-1) * AA.nbColumns + (k-1)];
+		if (a_kk != 0) {
+			for (var i = k+1; i <= n; ++i) {
+				AA.data[(i-1) * AA.nbColumns + (k-1)] /= a_kk;
+				
+				for (var j = k+1; j <= n; ++j) {
+					AA.data[(i-1) * AA.nbColumns + (j-1)] -= AA.data[(i-1) * AA.nbColumns + (k-1)] * AA.data[(k-1) * AA.nbColumns + (j-1)];
+				}
+			}
+		}
+	}
+	
+	// Format and return the computed decomposition
+	var L = Matrix_.fill(n, n, function(i,j) { if (i > j) { return AA.data[(i-1) * AA.nbColumns + (j-1)]; } else if (i == j) { return 1; } else { return 0; }});
+	var U = Matrix_.fill(n, n, function(i,j) { if (j >= i) { return AA.data[(i-1) * AA.nbColumns + (j-1)]; } else { return 0; }});
+	var P;
+	var Q;
+	if (permutationsOutputForm == "vector") {
+		P = rowpiv;
+		Q = colpiv;
+	}
+	else if (permutationsOutputForm == "matrix") {
+		P = Matrix_.fill(n, n, function(i,j) { if (j == rowpiv.data[i-1]) { return 1; } else { return 0; }});
+		Q = Matrix_.fill(n, n, function(i,j) { if (i == colpiv.data[j-1]) { return 1; } else { return 0; }});
+	}
+	else {
+		throw new Error("internal error: unknown permutation output form value");
+	}
+
+	return {
+			lowerTriangular: L,
+			upperTriangular: U,
+			rowPermutation: P,
+			columnPermutation: Q 
+			};
+}
+
+
+/**
 * @function qrDecomposition
 *
 * @summary Returns a QR decomposition of a matrix, using Givens rotations.
@@ -4553,41 +4779,41 @@ Matrix_.nullSpace = function(A, opt) {
 
 
 /**
-* @function linsolveBackwardSubstitution
+* @function linsolveBackSubstitution
 *
 * @summary Returns the solution of an upper triangular square system of linear equations.
 *
-* @description This function computes the solution of an upper triangular square system of linear equations Ax = b,
+* @description This function computes the solution of an upper triangular square system of linear equations Ux = b,
 * as described in the algorithm 3.1.2 of the reference.
 * 
-* To be noted that the system of linear equations must be solvable (i.e., no zero elements must be present on the matrix A diagonal).
+* To be noted that the system of linear equations must be solvable (i.e., no zero elements must be present on the matrix U diagonal).
 *
 * @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
 *
-* @param {Matrix_} A a n by n matrix.
+* @param {Matrix_} U a n by n matrix.
 * @param {Matrix_} b a n by 1 matrix.
-* @return {<Matrix_} an n by 1 matrix x^* satisfying Ax^* = b.
+* @return {<Matrix_} an n by 1 matrix x^* satisfying Ux^* = b.
 *
 * @example
 * linsolveBackSubstitution(Matrix_([[1,2], [0,1]]), Matrix_([3,1]));
 * // Matrix_([1,1])
 */
-Matrix_.linsolveBackSubstitution = function(A, b, out) {
+Matrix_.linsolveBackSubstitution = function(U, b) {
 	// ------
 	
 	// Misc. checks
-	if (!(A instanceof Matrix_)) {
+	if (!(U instanceof Matrix_)) {
 		throw new Error('first input must be a matrix');
 	}
 	if (!(b instanceof Matrix_)) {
 		throw new Error('second input must be a matrix');
 	}
 	
-	if (!A.isSquare()) {
-		throw new Error('matrix is not square: ' + '(' + A.nbRows + ',' + A.nbColumns + ')');
+	if (!U.isSquare()) {
+		throw new Error('matrix is not square: ' + '(' + U.nbRows + ',' + U.nbColumns + ')');
 	}
-	if (A.nbRows !== b.nbRows) {
-		throw new Error('matrix and second member sizes do not match: ' + '(' + A.nbRows + ',' + A.nbColumns + 
+	if (U.nbRows !== b.nbRows) {
+		throw new Error('matrix and second member sizes do not match: ' + '(' + U.nbRows + ',' + U.nbColumns + 
 		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
 	}
 	if (b.nbColumns !== 1) {
@@ -4597,33 +4823,103 @@ Matrix_.linsolveBackSubstitution = function(A, b, out) {
 	// ------
 	
 	// Initializations
-	var n = A.nbColumns;
+	var n = U.nbColumns;
 
 	// Result matrix allocation
-	var x = allocateMatrix_(n, 1, out); // the solution vector
+	var x = new Matrix_(b); // the solution vector
 
 	// ------
 	
-	// Compute the solution to Ax = b, with a a square invertible upper triangular matrix,
+	// Compute the solution to Ax = b, with a square invertible upper triangular matrix,
 	// using the row-oriented back substitution algorithm described in section 3.1.2 of the reference.
 	for (var i = n; i >= 1; --i) {
-		x.data[i-1] = b.data[i-1];
-		for (var j = i + 1; j <= n; ++j) {
-			x.data[i-1] = x.data[i-1] - A.data[(i-1) * A.nbColumns + (j-1)] * x.data[j-1];
-		}
-		var a_ii = A.data[(i-1) * A.nbColumns + (i-1)];
-		if (a_ii == 0) {
+		//
+		var u_ii = U.data[(i-1) * U.nbColumns + (i-1)];
+		if (u_ii == 0) {
 			throw new Error('input matrix is not invertible: zero diagonal coefficient at index ' + i);
 		}
-		else {
-			x.data[i-1] = x.data[i-1] / a_ii;
+
+		for (var j = i + 1; j <= n; ++j) {
+			x.data[i-1] -= U.data[(i-1) * U.nbColumns + (j-1)] * x.data[j-1];
 		}
+		x.data[i-1] /= u_ii;
 	}
 
 	// Return the computed solution
 	return x;
 }
 
+
+
+/**
+* @function linsolveForwardSubstitution
+*
+* @summary Returns the solution of a lower triangular square system of linear equations.
+*
+* @description This function computes the solution of a lower triangular square system of linear equations Lx = b,
+* as described in the algorithm 3.1.1 of the reference.
+* 
+* To be noted that the system of linear equations must be solvable (i.e., no zero elements must be present on the matrix L diagonal).
+*
+* @see G.H. Golub and C.F. Van Loan, Matrix Computations, 4th Edition, Johns Hopkins Studies in the Mathematical Sciences
+*
+* @param {Matrix_} L a n by n matrix.
+* @param {Matrix_} b a n by 1 matrix.
+*
+* @return {<Matrix_} an n by 1 matrix x^* satisfying Lx^* = b.
+*
+*/
+Matrix_.linsolveForwardSubstitution = function(L, b) {
+	// ------
+	
+	// Misc. checks
+	if (!(L instanceof Matrix_)) {
+		throw new Error('first input must be a matrix');
+	}
+	if (!(b instanceof Matrix_)) {
+		throw new Error('second input must be a matrix');
+	}
+	
+	if (!L.isSquare()) {
+		throw new Error('matrix is not square: ' + '(' + L.nbRows + ',' + L.nbColumns + ')');
+	}
+	if (L.nbRows !== b.nbRows) {
+		throw new Error('matrix and second member sizes do not match: ' + '(' + L.nbRows + ',' + L.nbColumns + 
+		') - ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+	if (b.nbColumns !== 1) {
+		throw new Error('b is not a vector: ' + '(' + b.nbRows + ',' + b.nbColumns + ')');
+	}
+
+	// ------
+	
+	// Initializations
+	var n = L.nbColumns;
+
+	// Result matrix allocation
+	var x = new Matrix_(b); // the solution vector
+
+	// ------
+	
+	// Compute the solution to Lx = b, with a square invertible lower triangular matrix,
+	// using the row-oriented forward substitution algorithm described in section 3.1.1 of the reference.
+	for (var i = 1; i <= n; ++i) {
+		//
+		var l_ii = L.data[(i-1) * L.nbColumns + (i-1)];
+		if (l_ii == 0) {
+			throw new Error('input matrix is not invertible: zero diagonal coefficient at index ' + i);
+		}
+
+		//
+		for (var j = 1; j <= i - 1; ++j) {
+			x.data[i-1] -= L.data[(i-1) * L.nbColumns + (j-1)] * x.data[j-1];
+		}
+		x.data[i-1] /= l_ii;
+	}
+
+	// Return the computed solution
+	return x;
+}
 
 
 /**
@@ -9903,9 +10199,6 @@ function goldenSectionSearch_(f, x_min, x_max, opt) {
 * @example
 * bisection_(function (x) { return x*x - 2; }, 0, 2);
 * // ~1.414
-* bisection_(function (x) { return x*x - 2; }, 0, 2, {outputInterval: true});
-* // ~[] TODO
-*
 */
 function bisection_(f, x_min, x_max, opt) {
 	// Decode options
@@ -10814,6 +11107,7 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 * @param {object} opt optional parameters for the algorithm.
 * @param {number} opt.eps tolerance for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
 * @param {number} opt.maxIter maximum number of iterations of the algorithm, a strictly positive natural integer or -1 to force an infinite number of iterations; defaults to 10000.
+* @param {boolean} opt.antiCycling activate an anti cycling rule (true), at the expense of execution time and stochasticity of the result; defaults to false.
 * @return {Array<Object>} an array arr containing two elements: 
 * - arr[0] an n by 1 matrix containing the unique optimal solution x^* (in case Q is positive definite) 
 * or an optimal solution x^* (in case Q is positive semi-definite) to the quadratic program
@@ -10832,6 +11126,10 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 	}
 	var eps = opt.eps || 1e-04;
 	var maxIterations = opt.maxIter || 10000;
+	var antiCycling = opt.antiCycling;
+	if (antiCycling == undefined) {
+		antiCycling = false;
+	}
 	
 	
 	// ------
@@ -10931,11 +11229,25 @@ function qksolveBS_(d, a, b, r, l, u, opt) {
 		//
 		// To be noted that the first reference does not describe this particular 
 		// choice in details, because the GSMO algorithm described is more generic.
+		//
+		// To also be noted that to avoid cycling, the iterations on the indices i
+		// is not done in the same order at each core iteration, but in a random cyclic
+		// order.
 		var i_low = -1;
 		var F_i_low = -Infinity;
 		var i_up = -1;
 		var F_i_up = Infinity;
-		for (var i = 0; i < n; ++i) {
+		var indexes;
+		if (antiCycling == true) {
+			indexes = new randomPermutationsIterator_(n, undefined, true).next();
+		}
+		for (var j = 0; j < n; ++j) {
+			//
+			var i = j;
+			if (antiCycling == true) {
+				i = indexes[j] - 1;
+			}
+
 			// Compute F_i, c.f. formula 1 of the first reference.
 			F_i = grad_f_x.data[i] / b.data[i];
 			
@@ -13442,7 +13754,7 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 * of n assets with equal risk bounding, defined as the portfolio for which the contribution of each asset 
 * included in the portfolio to the risk of the portfolio is equal, c.f. the reference.
 *
-* A property of the equal risk bounding portfolio is that it is either equal to the equal risk contribution portfolio
+* A property of the equal risk bounding portfolio with no bounds contraints is that it is either equal to the equal risk contribution portfolio
 * (if all the assets are included in the portfolio), or to a portfolio with a smaller variance than the 
 * equal risk contribution portfolio and for which the risk contribution of each asset included in the 
 * portfolio is strictly smaller than in the equal risk contribution portfolio (if some assets are not included
@@ -13458,12 +13770,20 @@ self.clusterRiskParityWeights = function (sigma, opt) {
 * This approach is expected to produce a solution within a reasonable amount of time for small n (e.g. n <= 20),
 * but due to the combinatorial nature of the problem, the computation for greater values of n will not be tractable.
 *
+* To be noted that in case minimum/maximum weights are provided, they are to be understood as applying only to
+* the assets selected by the optimization algorithm to be included in the portfolio, due to the combinatorial nature of
+* the algorithm.
+* So, for example, in case a minimum weight constraint is defined for a non-selected asset,
+* this minimum weight constraint is discarded.
+*
 * @see <a href="https://doi.org/10.1007/s10898-016-0477-6">Cesarone, F. & Tardella F., Equal Risk Bounding is better than Risk Parity for portfolio selection, J Glob Optim (2017) 68: 439</a>
 * 
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
-* @param {number} opt.eps the tolerance parameter for the convergence of the underlying ERC algorithm, a strictly positive real number; defaults to 1e-8.
-* @param {number} opt.maxIter the maximum number of iterations of the underlying ERC algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.eps the tolerance parameter for the convergence of the underlying ERC algorithm, a strictly positive real number; defaults to 1e-10.
+* @param {Array.<number>} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+*
 * @return {Array.<number>} the weights corresponding to the equal risk bounding portfolio, array of n real numbers.
 *
 * @example
@@ -13477,7 +13797,9 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 	if (opt === undefined) {
 		opt = {};
 	}
-	opt.outputPortfolioVolatility = true;
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
 	
 	// Convert sigma to matrix format
 	var sigma = new Matrix_(sigma);
@@ -13500,29 +13822,65 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 	while (nextSubset != -1) {	
 		// Extract the selected assets indexes
 		var subsetAssetsIdx = nextSubset;
+		var sizeSubset = subsetAssetsIdx.length;
 		
 		// Extract the covariance matrix of the selected assets
 		var subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx);
-		
-		// Compute ERC weights for the selected assets
-		var sol = self.equalRiskContributionWeights(subsetSigma, opt);
-		var subsetAssetsWeights = sol[0];
-		var subsetPortfolioVolatility = sol[1];
 
-		// Compute lambda_erc, c.f. the formula following the formula 3 of the reference.
-		var rcValue = subsetPortfolioVolatility * subsetPortfolioVolatility / subsetAssetsIdx.length;
-		
-		// If the risk contribution of the current subset is lower than the current minimum risk contribution, it
-		// becomes the new minimum risk contribution and the current subset becomes the new list of selected assets.
-		if (rcValue < minRCValue) {
-			minRCValue = rcValue;
-			minRCAssetsIndexes = subsetAssetsIdx;
-			minRCAssetsWeights = subsetAssetsWeights;
+		// Extract the lower/upper bounds constraints of the selected assets, if applicable
+		var subsetMinWeights;
+		if (opt.constraints.minWeights) {
+			subsetMinWeights = typeof Float64Array === 'function' ? new Float64Array(sizeSubset) : new Array(sizeSubset);
+			for (var i = 0; i < sizeSubset; ++i) {
+				subsetMinWeights[i] = opt.constraints.minWeights[subsetAssetsIdx[i]-1];
+			}
 		}
-		// Otherwise, nothing needs to be done
+		
+		var subsetMaxWeights;
+		if (opt.constraints.maxWeights) {
+			subsetMaxWeights = typeof Float64Array === 'function' ? new Float64Array(sizeSubset) : new Array(sizeSubset);
+			for (var i = 0; i < sizeSubset; ++i) {
+				subsetMaxWeights[i] = opt.constraints.maxWeights[subsetAssetsIdx[i]-1];
+			}
+		}
+
+		// Compute ERC weights for the selected assets, taking into account possible
+		// subset non feasibility.
+		try {
+			var sol = self.equalRiskContributionWeights(subsetSigma, {eps: opt.eps,
+			                                                          maxCycles: -1, 
+																	  outputPortfolioVolatility: true,
+			                                                          constraints: {minWeights:subsetMinWeights, maxWeights:subsetMaxWeights}});
+			var subsetAssetsWeights = sol[0];
+			var subsetPortfolioVolatility = sol[1];
+
+			// Compute lambda_erc, c.f. the formula following the formula 3 of the reference.
+			var rcValue = subsetPortfolioVolatility * subsetPortfolioVolatility / sizeSubset;
+			
+			// If the risk contribution of the current subset is lower than the current minimum risk contribution, it
+			// becomes the new minimum risk contribution and the current subset becomes the new list of selected assets.
+			//
+			// Otherwise, nothing needs to be done.
+			if (rcValue < minRCValue) {
+				minRCValue = rcValue;
+				minRCAssetsIndexes = subsetAssetsIdx;
+				minRCAssetsWeights = subsetAssetsWeights;
+			}
+		}
+		catch (e) {
+			if (e.message !== 'infeasible problem detected: the restricted simplex is empty' && 
+			    e.message !== 'internal error: maximum number of iterations reached when searching for a bracketing interval, the problem might be infeasible') {
+					throw (e);
+				}
+		}
 	
 		// Generate a new subset	
 		var nextSubset = nextSubsetIterator.next();
+	}
+	
+	// In case no feasible portfolio has been generated, throw an error
+	if (minRCValue == Infinity) {
+		throw new Error('no feasible portfolio generated');
 	}
 	
 	// Compute the original assets weights, following formula 22 of the reference
@@ -13566,7 +13924,7 @@ self.equalRiskBoundingWeights = function (sigma, opt) {
 * - Maximum weight of each asset that is included in the portfolio
 *
 * To be noted that in case weights constraints are defined, the concept of "equal risk contribution"
-* does not make any sense, c.f. the third reference.
+* does not make any sense, c.f. the third reference, and the associated optimization problem might not have any solution.
 *
 * The algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is semi-definite positive.
@@ -13677,15 +14035,26 @@ self.equalWeights = function (nbAssets, opt) {
 * This portfolio is unique and is mean-variance efficient when the covariance matrix 
 * of the assets is definite positive.
 * 
+* To be noted that when opt.optimizationMethod is set to "critical-line", an error might be raised in certain cases
+* when the covariance matrix is not definite positive.
+*
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
 * 
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.mu the returns of the n assets in the considered universe, array of n real numbers; defaults to an array of zeroes.
+* @param {string} opt.optimizationMethod the optimization method to use in order to compute the portfolio, a string either equals to:
+* - 'critical-line': usage of the critical line algorithm from Markowitz, c.f. the reference.
+* - 'gsmo': usage of  generalized sequential minimization optimization algorithm
+* - 'automatic': automatic selection of the optimization method to use
+; defaults to 'automatic'.
+* @param {number} opt.optimizationMethodParams.maxIterCriticalLine the maximum number of iterations of the critical line algorithm in case opt.optimizationMethod is set to "critical-line",
+* a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.optimizationMethodParams.epsGsmo the convergence tolerance of the GSMO algorithm used to solve the minimum-variance optimization problem, 
 * a strictly positive number; defaults to 1e-6.
 * @param {number} opt.optimizationMethodParams.maxIterGsmo the maximum number of iterations of the GSMO algorithm used to solve the minimum-variance optimization problem, 
 * a strictly positive natural integer; defaults to 10000.
+* @param {boolean} opt.optimizationMethodParams.antiCyclingGsmo activate an anti cycling rule in the algorithm used to solve the mean-variance optimization problem, at the expense of execution time and stochasticity of the result; defaults to false.
 * @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
 * by a partial investment constraint; defaults to true.
 * @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
@@ -13719,8 +14088,33 @@ self.globalMinimumVarianceWeights = function (sigma, opt) {
 		mu = new Matrix_(opt.mu);
 	}
 
-	// Initialize the efficient frontier, using null returns by default
-	var efficientFrontier = new MeanVarianceEfficientFrontierGsmo(mu, sigma, opt);
+	// Decode the optimization algorithm to use
+	var optimizationMethod = opt.optimizationMethod;
+	if (optimizationMethod === undefined) {
+		optimizationMethod = 'automatic';
+	}
+	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo' && optimizationMethod != 'automatic') {
+		throw new Error('unsupported optimisation method');
+	}
+	
+	
+	// ----
+	
+	
+	// Compute the efficient frontier
+	var efficientFrontier;
+	if (optimizationMethod == "automatic") {
+		efficientFrontier = new MeanVarianceEfficientFrontierWrapper(mu, sigma, opt);
+	}
+	else if (optimizationMethod == "critical-line") {
+		 efficientFrontier = new MeanVarianceEfficientFrontierCla(mu, sigma, opt);
+	}
+	else if (optimizationMethod == "gsmo") {
+		efficientFrontier = new MeanVarianceEfficientFrontierGsmo(mu, sigma, opt);
+	}
+	else {
+		throw new Error('internal error: unsupported optimisation method');
+	}
 	
 	// Return the portfolio with the lowest volatility on the computed 
 	// efficient frontier.
@@ -13805,8 +14199,8 @@ self.inverseVolatilityWeights = function (sigma, opt) {
 *
 * When it exists, this portfolio is mean-variance efficient and is unique if the covariance matrix is positive definite.
 *
-* To be noted that when opt.optimizationMethod is set to "critical-line", it is required that the provided assets
-* returns are all different; otherwise, an error will be raised.
+* To be noted that when opt.optimizationMethod is set to "critical-line", an error might be raised in certain cases
+* when the covariance matrix is not definite positive.
 *
 * @see <a href="https://doi.org/10.1111/j.1540-6261.1976.tb03217.x">Elton, E. J., Gruber, M. J. and Padberg, M. W. (1976), SIMPLE CRITERIA FOR OPTIMAL PORTFOLIO SELECTION. The Journal of Finance, 31: 1341-1357</a>
 * @see <a href="http://dx.doi.org/10.1080/13504860701255292">S. V. Stoyanov , S. T. Rachev & F. J. Fabozzi (2007) Optimal Financial Portfolios, Applied Mathematical Finance, 14:5, 401-436</a>
@@ -13819,12 +14213,14 @@ self.inverseVolatilityWeights = function (sigma, opt) {
 * @param {string} opt.optimizationMethod the optimization method to use in order to compute the portfolio, a string either equals to:
 * - 'critical-line': usage of the critical line algorithm from Markowitz, c.f. the reference.
 * - 'gsmo': usage of  generalized sequential minimization optimization algorithm
-; defaults to 'gsmo'.
+* - 'automatic': automatic selection of the optimization method to use
+; defaults to 'automatic'.
 * @param {number} opt.optimizationMethodParams.maxIterCriticalLine the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.optimizationMethodParams.epsGsmo in case opt.optimizationMethod is set to "gsmo", the convergence tolerance of the GSMO algorithm used to 
 * solve the mean-variance optimization problem, a strictly positive number; defaults to 1e-6.
 * @param {number} opt.optimizationMethodParams.maxIterGsmo in case opt.optimizationMethod is set to "gsmo", the maximum number of iterations of the GSMO algorithm 
 * used to solve the mean-variance optimization problem, a strictly positive natural integer; defaults to 10000.
+* @param {boolean} opt.optimizationMethodParams.antiCyclingGsmo activate an anti cycling rule in the algorithm used to solve the mean-variance optimization problem, at the expense of execution time and stochasticity of the result; defaults to false.
 * @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
 * by a partial investment constraint; defaults to true.
 * @param {number} opt.constraints.minWeights an array of size n (l_i),i=1..n containing the minimum weights for the assets to include in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
@@ -13850,9 +14246,9 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 	// Decode the optimization algorithm to use
 	var optimizationMethod = opt.optimizationMethod;
 	if (optimizationMethod === undefined) {
-		optimizationMethod = 'gsmo';
+		optimizationMethod = 'automatic';
 	}
-	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo') {
+	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo' && optimizationMethod != 'automatic') {
 		throw new Error('unsupported optimisation method');
 	}
 	
@@ -13868,7 +14264,10 @@ self.maximumSharpeRatioWeights = function(mu, sigma, rf, opt) {
 
 	// Compute the efficient frontier
 	var efficientFrontier;
-	if (optimizationMethod == "critical-line") {
+	if (optimizationMethod == "automatic") {
+		efficientFrontier = new MeanVarianceEfficientFrontierWrapper(mu, sigma, opt);
+	}
+	else if (optimizationMethod == "critical-line") {
 		 efficientFrontier = new MeanVarianceEfficientFrontierCla(mu, sigma, opt);
 	}
 	else if (optimizationMethod == "gsmo") {
@@ -13954,7 +14353,6 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 	}
 	else {
 		var that = this;
-		
 		this.alteredCornerPortfolios = computeCornerPortfolios(this.alteredMu, this.alteredSigma, this.alteredLowerBounds, this.alteredUpperBounds, opt);
 		
 		this.cornerPortfolios = new Array(this.alteredCornerPortfolios.length);
@@ -13981,6 +14379,7 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 	
 	// ------
 
+
 	/**
 	* @function computeCornerPortfolios
 	*
@@ -13993,7 +14392,7 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 	* The algorithm used internally is the Markowitz critical line algorithm, c.f. the first reference.
 	*
 	* @see Harry M. Markowitz, Mean-Variance Analysis in Portfolio Choice and Capital Markets, Revised issue (2000), McGraw-Hill Professional;
-	* @see <a href="https://doi.org/10.1007/978-0-387-77439-8_12">Niedermayer A., Niedermayer D. (2010) Applying Markowitz’s Critical Line Algorithm. In: Guerard J.B. (eds) Handbook of Portfolio Construction. Springer, Boston, MA</a>
+	* @see <a href="https://www.hudsonbaycapital.com/documents/FG/hudsonbay/research/599440_paper.pdf">Harry Markowitz, David Starer, Harvey Fram, Sander Gerber, Avoiding the Downside: A Practical Review of the Critical Line Algorithm for Mean-Semivariance Portfolio Optimization</a>
 	*
 	* @param {Matrix_} mu the returns of the n assets in the considered universe, a n by 1 matrix.
 	* @param {Matrix_} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square n by n matrix.
@@ -14004,12 +14403,12 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 	* @return {Array<Array.<Object>>} the list of all corner portfolios as well as their associated risk aversion parameter, an array made of arrays of two elements:
 	* - The corner portfolio weights, a n by 1 Matrix_ of n real numbers
 	* - The corner portfolio risk aversion parameter, a positive real number
-	*/
+	*/	
 	function computeCornerPortfolios(mu, sigma, lowerBounds, upperBounds, opt) {	
 		var eps = 1e-8; // the numerical zero
 		
 		// Internal object managing the statuses of the asset and lambda variables
-		function variablesStatusManager_(nbAssets, nbEqualityConstraints) {
+		function variablesStatusManager_(nbAssets) {
 			// Variables statuses constants
 			this.STATUS_UNDEF = -1;
 			this.STATUS_IN = 0;
@@ -14018,52 +14417,32 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 			
 			// The structure holding the variables status
 			this.nbAssets = nbAssets;
-			this.nbEqualityConstraints = nbEqualityConstraints;
 			
 			this.varIn = new BitSet_();
-			this.varIn.resize(nbAssets + nbEqualityConstraints);
-			this.varOut = new BitSet_();
-			this.varOut.resize(nbAssets + nbEqualityConstraints);
+			this.varIn.resize(nbAssets);
 			this.varLow = new BitSet_();
-			this.varLow.resize(nbAssets + nbEqualityConstraints);
+			this.varLow.resize(nbAssets);
 			this.varUp = new BitSet_();
-			this.varUp.resize(nbAssets + nbEqualityConstraints);
+			this.varUp.resize(nbAssets);
 				
 			// Public functions to set the status of variables
 			this.setIn = function(idx) {
 				this.varIn.set(idx);
-				this.varOut.unset(idx);
 				this.varLow.unset(idx);
 				this.varUp.unset(idx);
 			}
 			this.setOnLowerBound = function(idx) {
 				this.varLow.set(idx);
-				this.varOut.set(idx);
 				this.varIn.unset(idx);
 				this.varUp.unset(idx);
 			}
 			this.setOnUpperBound = function(idx) {
 				this.varUp.set(idx);
-				this.varOut.set(idx);
 				this.varIn.unset(idx);
 				this.varLow.unset(idx);
 			}
-			this.setLambdasIn = function() {
-				for (var i = this.nbAssets + 1; i <= this.nbAssets + this.nbEqualityConstraints; ++i) {
-					this.varIn.set(i);
-					this.varOut.unset(i);
-					this.varLow.unset(i);
-					this.varUp.unset(i);
-				}
-			}
-			
+
 			// Public functions to get the status of a variable
-			this.isAsset = function(idx) {
-				return (idx >= 1) && (idx <= this.nbAssets);
-			}
-			this.isLambda = function(idx) {
-				return (idx >= this.nbAssets + 1) && (idx <= this.nbAssets + this.nbEqualityConstraints);
-			}
 			this.isIn = function(idx) {
 				return this.varIn.get(idx);
 			}
@@ -14074,7 +14453,7 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 				return this.varUp.get(idx);
 			}
 			this.isOut = function(idx) {
-				return this.varOut.get(idx);
+				return this.varLow.get(idx) || this.varUp.get(idx);
 			}
 			
 			// Public functions to iterate over the different sets.
@@ -14082,10 +14461,103 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 				return this.varIn.toArray();
 			}
 			this.getOutIndexes = function() {
-				return this.varOut.toArray();
+				return this.varLow.toArray().concat(this.varUp.toArray());
 			}
 		}
+		
+		// Internal function to compute the maximum return efficient portfolio, as well as the status
+		// status LOW, IN, UP of the different assets constituting it.
+		//
+		// To be noted that if there is more than one E-maximizing portfolio, the critical line 
+		// algorithm does not support this case "by the book", c.f. chapter 8 of the first reference.
+		//
+		// A practical workaround to this issue, suggested in chapter 9 of the first reference, 
+		// is to slightly alter the assets returns and to relaunch the algorithm.
+		//
+		// Nevertheless, in function below, the E-maximizing portfolio with minimum variance is computed,
+		// so that the starting portfolio is always efficient.
+		function computeMaxReturnEfficientPortfolio(mu, sigma, lowerBounds, upperBounds) {
+			//
+			var nbAssets = sigma.nbRows;
+			
+			
+			// Determine if all assets have different returns, in order to continue 
+			// with the determination of the unique efficient max return portfolio with a linear solver,
+			// or with a quadratic solver.
+			var mu_idx = typeof Uint32Array === 'function' ? new Uint32Array(nbAssets) : new Array(nbAssets);
+			for (var j = 0; j < nbAssets; ++j) {		
+				mu_idx[j] = j + 1;
+			}
+			mu_idx.sort(function(a, b) {  // Order the assets in descending order w.r.t. their returns
+				return mu.getValue(b, 1) - mu.getValue(a, 1);
+			});
 
+			var returnsDifferent = true;
+			for (var i = 1; i < nbAssets; ++i) {
+				if (mu.getValue(mu_idx[i], 1) == mu.getValue(mu_idx[i-1], 1)) {
+					returnsDifferent = false;
+					break;
+				}
+			}
+
+			
+			// Compute the maximum return portfolio
+			var maxReturnPortfolioWeights;
+			if (returnsDifferent == true) {
+				var maxReturnSolution = simplexLpSolve_(mu.elemMap(function(i,j,val) { return -val;}), lowerBounds, upperBounds);
+				maxReturnPortfolioWeights = new Matrix_(maxReturnSolution[0]);
+			}
+			else {
+				var efficientFrontierGsmo = new MeanVarianceEfficientFrontierGsmo(mu, sigma, {optimizationMethodParams: {antiCyclingGsmo: true,
+				                                                                                                         maxIterGsmo: -1}, 
+				                                                                              constraints: {minWeights: lowerBounds,  maxWeights: upperBounds}});
+				maxReturnPortfolioWeights = efficientFrontierGsmo.getHighestReturnPortfolio();
+			}
+			
+			
+			// Note: Tests for equality of lower/upper bounds below can be done numerically with a high
+			// precision due to the near exact bounds computation of the maxReturnPortfolioWeights above.
+			var epsBounds = 1e-14;
+			
+			
+			//
+			var nbAssetsIn = 0;
+			var nbAssetsLow = 0;
+			var nbAssetsUp = 0;
+			var variablesStatusManager = new variablesStatusManager_(nbAssets);
+			for (var i = 1; i <= nbAssets; ++i) {
+				if (Math.abs(maxReturnPortfolioWeights.getValue(i, 1) - lowerBounds.getValue(i, 1)) <= epsBounds) {
+					variablesStatusManager.setOnLowerBound(i);
+					++nbAssetsLow;
+				}
+				else if (Math.abs(maxReturnPortfolioWeights.getValue(i, 1) - upperBounds.getValue(i, 1)) <= epsBounds) {
+					if (upperBounds.getValue(i, 1) < 1 - epsBounds) { // True UP
+						variablesStatusManager.setOnUpperBound(i);
+						++nbAssetsUp;
+					}
+					else { // False UP: upper bound numerically equal to 1
+						variablesStatusManager.setIn(i);
+						++nbAssetsIn;
+					}
+				}
+				else {
+					variablesStatusManager.setIn(i);
+					++nbAssetsIn;
+				}
+			}
+			
+			
+			// Return the computed portfolio weights, as well as associated data
+			return {
+					weights: maxReturnPortfolioWeights,
+					variablesStatusManager: variablesStatusManager,
+					nbAssetsLow: nbAssetsLow,
+					nbAssetsIn: nbAssetsIn,
+					nbAssetsUp: nbAssetsUp,
+					};
+		}
+
+		
 		// ------
 		
 		
@@ -14110,7 +14582,11 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 
 		// Initializations	
 		var nbAssets = sigma.nbColumns;
-		
+		var lb = lowerBounds;
+		var ub = upperBounds;
+
+		var cornerPortfoliosWeights = [];
+
 
 		// ------
 		
@@ -14121,270 +14597,75 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 		var nbEqualityConstraints = A.nbRows; // the number of equality constraints 
 		var b = Matrix_.ones(1, 1); // the vector holding the right member of the equality constraints
 		
-		var lb = lowerBounds;
-		var ub = upperBounds;
-		
-		var cornerPortfoliosWeights = [];
-		var currentCornerPortfolioWeights = null;
-		
-		var variablesStatusManager = new variablesStatusManager_(nbAssets, nbEqualityConstraints);
-		
+		var P = Matrix_.fill(nbAssets, nbAssets + nbEqualityConstraints, 
+									function(i,j) { 
+										if (j <= nbAssets) {
+											return sigma.data[(i-1)*sigma.nbColumns + (j-1)]; // Sigma(i, j)
+										}
+										else {
+											return A.data[(j-nbAssets-1)*A.nbColumns + (i-1)]; // A(j-nbAssets, i) == A(i-nbAssets, j)^t
+										}
+									});
+				
 		// ----	
-		
-		
-		// Step 0: Determine if all assets have different returns, in order to continue 
-		// with the determination of the unique efficient max return portfolio.
-		var mu_idx = typeof Uint32Array === 'function' ? new Uint32Array(nbAssets) : new Array(nbAssets);
-		for (var j = 0; j < nbAssets; ++j) {		
-			mu_idx[j] = j + 1;
-		}
-		mu_idx.sort(function(a, b) {  // Order the assets in descending order w.r.t. their returns
-			return mu.getValue(b, 1) - mu.getValue(a, 1);
-		});
-
-		for (var i = 1; i < nbAssets; ++i) {
-			if (mu.getValue(mu_idx[i], 1) == mu.getValue(mu_idx[i-1], 1)) {
-				throw new Error('unsupported problem: equal returns are not supported by the critical line algorithm');
-			}
-		}
 
 		
-		// Step 1: compute the rightmost corner portfolio, corresponding to the E-maximizing 
-		// portfolio (i.e., the portfolio achieving the maximum return), c.f. chapter 8 of the
-		// first reference and paragraph 12.3.1 of the second reference.
+		// Step 1: - Compute the rightmost corner portfolio, corresponding to the E-maximizing 
+		// portfolio (i.e., the efficient portfolio achieving the maximum return), c.f. chapter 8
+		// of the first reference and paragraph 12.3.1 of the second reference.
 		//
-		// To be noted that if there is more than one E-maximizing portfolio, the critical line 
-		// algorithm does not support this case "by the book", c.f. chapter 8 of the first reference.
-		//
-		// To avoid such non-uniqueness, the efficient frontier computation is limited to the case 
-		// when all assets have different returns.
-		//
-		// Note: A practical workaround to this issue, suggested in chapter 9 of the first reference, 
-		// is to slightly alter the assets returns and to relaunch the algorithm.
-		var maxReturnSolution = simplexLpSolve_(mu.elemMap(function(i,j,val) { return -val;}), lb, ub);
-		currentCornerPortfolioWeights = new Matrix_(maxReturnSolution[0]);
+		//         - Compute as well the status of the different assets constituting it.
+		var maxReturnPortfolio = computeMaxReturnEfficientPortfolio(mu, sigma, lb, ub);
+		var currentCornerPortfolioWeights = maxReturnPortfolio.weights;
+		var variablesStatusManager = maxReturnPortfolio.variablesStatusManager;
 		
-		
-		// Step 1 bis: compute the status of the different assets constituting the max return 
-		// efficient portfolio.
-		//
-		// Note: Tests for equality of lower/upper bounds can be done numerically with a high
-		// precision due to the exact bounds computation of the computeMaxReturnPortfolio_
-		// method above.
-		var epsBounds = 1e-14;
-		var cptIn = 0;
-		var cptLow = 0;
-		var cptUp = 0;
-		for (var i = 1; i <= nbAssets; ++i) {
-			if (Math.abs(currentCornerPortfolioWeights.data[i-1] - lb.data[i-1]) <= epsBounds) {
-				variablesStatusManager.setOnLowerBound(i);
-				++cptLow;
-			}
-			else if (Math.abs(currentCornerPortfolioWeights.data[i-1] - ub.data[i-1]) <= epsBounds) {
-				variablesStatusManager.setOnUpperBound(i);
-				++cptUp;
-			}
-			else {
-				variablesStatusManager.setIn(i);
-				++cptIn;
-			}
-		}
-		
-		
-		// Step 1 ter: manage degeneracy in the max return efficient portfolio computation.
+
+		// Step 1 bis: manage degeneracy (no asset IN, that is, no asset strictly between its bounds)
+		// in the max return efficient portfolio computation.
 		//
 		// Three cases can occur:
-		// - All assets are on their lower bounds
-		// - All assets are on their upper bounds
-		// - There is a mix of assets on their lower and upper bounds
+		// - All assets are on LOW (on their lower bounds)
+		// - All assets are on UP (on their upper bounds)
+		// - All assets are either LOW or UP
 		//
 		// In the first two cases, the whole efficient frontier 
 		// consists of only one portfolio, and it means lower bounds or upper bounds
 		// constraints are tight (i.e., they sum to one).
 		//
-		// In the last case, it means that the last asset which is UP (in order of decreasing returns) 
-		// is actually IN, but appears as UP due to its upper bound constraint corresponding exactly 
-		// to the "sum to 1" budget constraint.
-		if (cptLow == nbAssets || cptUp == nbAssets) {
+		// In the last case, it means that one or several UP assets are actually IN, but appear UP 
+		// due to the "sum to 1" constraint.
+		//
+		// In order to determine which is (are) this (these) asset(s), the max return portfolio is computed
+		// again, with slightly increased upper bounds, so that the "sum to 1" constraint is not binding anymore.
+		if (maxReturnPortfolio.nbAssetsLow == nbAssets || maxReturnPortfolio.nbAssetsUp == nbAssets) {
 			var weights = new Matrix_(currentCornerPortfolioWeights);
 			cornerPortfoliosWeights.push([weights, 0]);
 
 			return cornerPortfoliosWeights;
 		}
-		else if (cptIn == 0) {
-			// Determine the last UP asset (in order of decreasing returns), and set it to IN
-			for (var i = 1; i <= nbAssets - 1; ++i) {
-				//
-				var idx_i = mu_idx[i-1];
-				var idx_ip = mu_idx[i];
-				
-				//
-				if (variablesStatusManager.isOnUpperBound(idx_i) && variablesStatusManager.isOnLowerBound(idx_ip)) {
-					variablesStatusManager.setIn(idx_i);
-				}
-			}
-		}
-		
-		
-		// Step 2: Initialization of the critical line algorithm, c.f. chapter 13 of the 
-		// first reference, paragraph "The Critical Line Algorithm, Setting Up for the CLA",
-		// and chapter 13 of the first reference, paragraph 
-		// "The Critical Line Algorithm, Appendix A, Module CLA, <C1>-<C6>".	
-
-		// Get the new IN/OUT variables indexes
-		//
-		// At this stage, only assets variables are set
-		var assetsInIdx = variablesStatusManager.getInIndexes();
-		var assetsOutIdx = variablesStatusManager.getOutIndexes();
-
-
-		// Initialize of the xi vector
-		var xi = Matrix_.zeros(nbAssets + nbEqualityConstraints, 1);
-
-		
-		// Initialize the OUT elements of alpha and beta vectors,
-		// c.f. formula 13.16 of the first reference:
-		// - alpha(out) = X(out)
-		// - beta(out) = 0	
-		var alpha = Matrix_.zeros(nbAssets + nbEqualityConstraints, 1);
-		for (var i = 1; i <= assetsOutIdx.length; ++i) {
-			var out_idx_i = assetsOutIdx[i-1];
+		else if (maxReturnPortfolio.nbAssetsIn == 0) {
+			// To be noted that upper bounds which are already at 1 cannot be increased.
+			//
+			// Nevertheless, this case has already been managed before, because an asset
+			// on its upper bound equal to 1 is actually IN.
+			var epsUpperBounds = 1e-8;
+			var ubb = ub.elemMap(function(i,j,val) { return Math.min(val + epsUpperBounds, 1);});
 			
-			alpha.setValue(out_idx_i, 1, 
-						   currentCornerPortfolioWeights.getValue(out_idx_i, 1));
-		}
-		var beta = Matrix_.zeros(nbAssets + nbEqualityConstraints, 1);
-
-			
-		// Construct the matrix M, with M = [[Sigma A^t], [A 0]],
-		// c.f. formula 13.8 of the first reference.
-		//
-		// Note: the memory used for allocating matrix M is suboptimal,
-		// as the matrices Sigma and A are already allocated.
-		//
-		// This "problem" could be solved through defining M as a matrix
-		// defined through a function.
-		var M = Matrix_.fill(nbAssets + nbEqualityConstraints, nbAssets + nbEqualityConstraints, 
-									function(i,j) { 
-										if (i <= nbAssets && j <= nbAssets) {
-											return sigma.data[(i-1)*sigma.nbColumns + (j-1)]; // Sigma(i, j)
-										}
-										else if (i >= nbAssets + 1 && j <= nbAssets) {
-											return A.data[(i-nbAssets-1)*A.nbColumns + (j-1)]; // A(i-nbAssets, j)
-										}
-										else if (i <= nbAssets && j >= nbAssets + 1) {
-											return A.data[(j-nbAssets-1)*A.nbColumns + (i-1)]; // A(j-nbAssets, i) == A(i-nbAssets, j)^t
-										}
-										else {
-											return 0;
-										}
-									});	
-
-
-		// Construct the Mi matrix, c.f. formula 13.19 of the first reference,
-		// Mi = [0 Ai], [Ai^t -Ai^t * Sigma(IN, IN) * Ai]].
-		//
-		// Because the only equality constraint supported by the algorithm below is
-		// that the sum of the assets weights must be equal to 1, and because the returns
-		// of the assets are all different, there is only one asset IN at this step, 
-		// and the matrices A_in and Ai of the first reference are then both equal to (1).
-		//
-		// To be noted, though, that the code below is generic, so that A_in and Ai 
-		// are supposed to be nbEqualityConstraints by nbEqualityConstraints matrices since
-		// there is nbEqualityConstraints assets IN at this step.
-		//
-		// As a consequence of this genericity, and for ease of subsequent computations, 
-		// a full matrix is allocated for storing Mi instead of a 
-		// (nbEqualityConstraints+1) by (nbEqualityConstraints+1) matrix.
-		var Ai = Matrix_.ones(1, 1);
-		var Mi = Matrix_.zeros(nbAssets + nbEqualityConstraints, nbAssets + nbEqualityConstraints);
-			
-		// Copy the matrix Ai in the upper right portion of the matrix Mi
-		// Copy the matrix Ai^t into the lower left portion of the matrix Mi
-		// Copy the matrix -Ai^t * Sigma(IN, IN) * Ai into the lower right portion of the matrix Mi
-		var T = Matrix_.atxy(-1, Ai, Matrix_.xy(sigma.submatrix(assetsInIdx, assetsInIdx), Ai));
-		for (var j = 1; j <= assetsInIdx.length; ++j) {
-			for (var k = 1; k <= assetsInIdx.length; ++k) {
-				var var_in_idx_j = assetsInIdx[j-1];
-				
-				var Ai_j_k = Ai.getValue(j, k);
-				Mi.setValue(nbAssets + k, var_in_idx_j, 
-							Ai_j_k);		
-				Mi.setValue(var_in_idx_j, nbAssets + k, 
-							Ai_j_k);
-				
-				Mi.setValue(nbAssets + j, nbAssets + k, 
-							T.getValue(j, k)); 
+			// Compute a slightly relaxed max return efficient portfolio, and update the 
+			// statuses of the assets accordingly (but not the weights, since the weights
+			// computed initially are perfectly fine).
+			//
+			// In case there is still no asset IN, this is an internal error, since
+			// the "sum to 1" constraint cannot be binding anymore due to the updated upper
+			// bounds constraints.
+			var maxReturnPortfolioB = computeMaxReturnEfficientPortfolio(mu, sigma, lb, ubb);
+			variablesStatusManager = maxReturnPortfolioB.variablesStatusManager;
+			if (maxReturnPortfolioB.nbAssetsIn == 0) {
+				throw new Error("internal error: impossible to determine the IN variables associated to the maximum return portfolio");
 			}
 		}
 
-			
-		// Add the lambda variables to the IN set
-		variablesStatusManager.setLambdasIn();
-
-		
-		// Construct the b_bar vector, c.f. formula 13.14 of the first reference,
-		// b_bar(in) = [0 b]^t - M(in, out) * X(out)
-		
-		// Construct the b_bar vector for the assets variables IN
-		var b_bar = Matrix_.zeros(nbAssets + nbEqualityConstraints, 1);
-		for (var i = 1; i <= assetsInIdx.length; ++i) {
-			var in_idx_i = assetsInIdx[i-1];
-			
-			// Initialization of b_bar(idx_in(i)) with [0 b]^t(idx_in(i))
-			var b_bar_in_idx_i = 0;
-
-			// Computation of the remaining part of b_bar(idx_in(i))
-			for (var j = 1; j <= assetsOutIdx.length; ++j) {
-				var out_idx_j = assetsOutIdx[j-1];
-				
-				b_bar_in_idx_i -= M.getValue(in_idx_i, out_idx_j) * currentCornerPortfolioWeights.getValue(out_idx_j, 1);
-			}
-			b_bar.setValue(in_idx_i, 1, 
-						   b_bar_in_idx_i);
-		}
-		
-		// Construct the b_bar vector for the lambda variables IN (with indexes from
-		// nbAssets + 1 to nbAssets + nbEqualityConstraints), which have been
-		// added to the IN set just before the b_bar vector computation step.
-		for (var i = nbAssets + 1; i <= nbAssets + nbEqualityConstraints; ++i) {
-			var in_idx_i = i;
-			
-			// Initialization of b_bar(idx_in(i)) with [0 b]^t(idx_in(i))
-			var b_bar_in_idx_i = b.getValue(in_idx_i-nbAssets, 1);
-			
-			// Computation of the remaining part of b_bar(idx_in(i))
-			for (var j = 1; j <= assetsOutIdx.length; ++j) {
-				var out_idx_j = assetsOutIdx[j-1];
-				
-				b_bar_in_idx_i -= M.getValue(in_idx_i, out_idx_j) * currentCornerPortfolioWeights.getValue(out_idx_j, 1);
-			}
-			b_bar.setValue(in_idx_i, 1, 
-						   b_bar_in_idx_i);
-		}	
-		
-		
-		// Step 3: Main loop of the critical line algorithm, c.f. chapter 13 of the 
-		// first reference, paragraph "The Critical Line Algorithm, CLA Iteration",
-		// and chapter 13 of the first reference, paragraph 
-		// "The Critical Line Algorithm, Appendix A, Module CLA, <C10>-<C14>".
-
-		// In each iteration (except the first one), the asset that was determined 
-		// by the previous iteration to become IN or to become OUT is done so.
-		//
-		// The different lambdas (lambda_out and lambda_in) are then updated in order 
-		// to compute the value of lambda_e corresponding to the next corner portfolio.
-		//
-		// Once lambda_e is known, the weights of the next corner portfolio can be
-		// computed, and the process continues until the value of lambda_e becomes
-		// null or negative.
 		var iter = 0;
-		var lambda_e = 0;	
-		var idx_out = -1;
-		var lambda_out = 0;
-		var status_out = variablesStatusManager.STATUS_UNDEF;
-		var idx_in = -1;
-		var lambda_in = 0;
 		while (true) {
 			// Check the number of iterations
 			if (maxIterations !== -1 && iter >= maxIterations) {
@@ -14396,259 +14677,203 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 			++iter;
 			
 			
-			// In case this iteration is not the first one, set the new status of the assets
-			// determined by the previous iteration.
-			if (iter >= 2) {
-				if (lambda_out >= lambda_in) { // an asset IN goes OUT
-					// Update the vectors alpha and beta for the asset idx_out going OUT,
-					// c.f. formula 13.16 of the first reference:
-					// - alpha(idx_out) = X(idx_out)
-					// - beta(idx_out) = 0
-					alpha.setValue(idx_out, 1, 
-								   currentCornerPortfolioWeights.getValue(idx_out, 1));
-					beta.setValue(idx_out, 1, 
-								  0);
-					
-					
-					// Set the asset idx_out to OUT, with the proper LOW or UP status
-					if (status_out == variablesStatusManager.STATUS_LOW) {
-						variablesStatusManager.setOnLowerBound(idx_out);
-					}
-					else {
-						variablesStatusManager.setOnUpperBound(idx_out);
-					}
+			// Step 2: (A13 to A15) of the second reference
+			// - Get the current IN/LOW/UP sets
+			// - Construct the KKT matrix and related vectors associated to the current IN/LOW/UP sets
+			
+			// Get the current IN/LOW/UP sets
+			var assetsInIdx = variablesStatusManager.getInIndexes();
+			var assetsOutIdx = variablesStatusManager.getOutIndexes();
+			
+			// Construct the matrix Mbar, with Mbar = [[Cbar Abar^t], [Abar 0]],
+			// c.f. formula 12 of the second reference, which is incorret, c.f. the accompanying 
+			// code and text for the proper formula.
+			var Mbar = Matrix_.fill(nbAssets + nbEqualityConstraints, nbAssets + nbEqualityConstraints, 
+										function(i,j) { //Cbar
+											if (i <= nbAssets && j <= nbAssets) {
+												/* 
+												This is the incorrect formula, kept for reference
+												if (variablesStatusManager.isIn(i) && variablesStatusManager.isIn(j)) {
+													return sigma.data[(i-1)*sigma.nbColumns + (j-1)]; // Sigma(i, j)
+												}
+												else if (!variablesStatusManager.isIn(i) && i == j) {
+													return 1;
+												}
+												else {
+													return 0;
+												}
+												*/
+												if (!variablesStatusManager.isIn(i)) {
+													if (i == j) {
+														return 1;
+													}
+													else {
+														return 0;
+													}
+												}
+												else {
+													return sigma.data[(i-1)*sigma.nbColumns + (j-1)]; // Sigma(i, j)
+												}									
+											}
+											else if (i >= nbAssets + 1 && j <= nbAssets) { //Abar
+												if (!variablesStatusManager.isIn(j)) {
+													return 0;
+												}
+												else {
+													return A.data[(i-nbAssets-1)*A.nbColumns + (j-1)]; // A(i-nbAssets, j)
+												}
+											}
+											else if (i <= nbAssets && j >= nbAssets + 1) { //Abar^t
+												if (!variablesStatusManager.isIn(i)) {
+													return 0;
+												}
+												else {
+													return A.data[(j-nbAssets-1)*A.nbColumns + (i-1)]; // A(j-nbAssets, i) == A(i-nbAssets, j)^t
+												}
+											}
+											else { // 0
+												return 0;
+											}
+										});	
 
-					
-					// Get the new IN variables indexes
-					var variablesInIdx = variablesStatusManager.getInIndexes();
-					
-					
-					// Update the matrix Mi for the asset idx_out going OUT,
-					// c.f. formula 13.20 of the reference, reversed:
-					// Mi(NEW_IN,NEW_IN) -= Mi(NEW_IN, idx_out) * Mi(idx_out, NEW_IN) / Mi(idx_out, idx_out), with NEW_IN = IN \ {idx_out}
-					//
-					// Numerical note: C.f. chapter 13 of the reference, paragraph "Deleting a variable",
-					// the element Mi_out_idx_out_idx below is such that 1/Mi_out_idx_out_idx is strictly positive.
-					//
-					//                 So, in case it becomes numerically negative or zero (covariance matrix numerically
-					// not semi-definite positive, ill-conditioned...), it is needed to truncate it.
-					var Mi_out_idx_out_idx = Mi.getValue(idx_out, idx_out);				
-					if (Mi_out_idx_out_idx <= eps) {
-						Mi_out_idx_out_idx = eps;
-					}
-					for (var i = 1; i <= variablesInIdx.length; ++i) {
-						var in_idx_i = variablesInIdx[i-1];
-						
-						for (var j = 1; j <= variablesInIdx.length; ++j) {
-							var in_idx_j = variablesInIdx[j-1];
-							
-							Mi.setValue(in_idx_i, in_idx_j, 
-										Mi.getValue(in_idx_i, in_idx_j) - Mi.getValue(in_idx_i, idx_out) * Mi.getValue(idx_out, in_idx_j) / Mi_out_idx_out_idx);
-						}
-						
-					}
-					
-					
-					// Update the b_bar vector, c.f. formula 13.22 of the 
-					// first reference, reversed:
-					// - b_bar(NEW_IN) -= M(NEW_IN, idx_out) * X(idx_out), with NEW_IN = IN \ {idx_out}
-					for (var i = 1; i <= variablesInIdx.length; ++i) {
-						var in_idx_i = variablesInIdx[i-1];
-						
-						b_bar.setValue(in_idx_i, 1, 
-									   b_bar.getValue(in_idx_i, 1) - M.getValue(in_idx_i, idx_out) * currentCornerPortfolioWeights.getValue(idx_out, 1));
-					}
-				}
-				else { // an asset OUT goes IN				
-					// Get the current IN variables indexes
-					var variablesInIdx = variablesStatusManager.getInIndexes();
+			// Construct the right hand side vectors associated to alpha and beta vectors,
+			// which requires computing the vectors mubar and k, c.f. formulas 11, 12 and 13 of the second reference.
+			//
+			// To be noted that formula 11 is incorrect, c.f. the associated code and text for the proper formula.
+			
+			// Right hand side vector associated to alpha
+			var k = Matrix_.fill(nbAssets, 1, 
+									  function(i,j) {
+										  if (variablesStatusManager.isOnUpperBound(i)) {
+											  return ub.data[i-1];
+										  }
+										  else if (variablesStatusManager.isOnLowerBound(i)) {
+											  return lb.data[i-1];
+										  }
+										  else {
+											  return 0;
+										  }
+									  });
+			var Ak = Matrix_.xy(A, k);
+			var rhsalpha = Matrix_.fill(nbAssets + nbEqualityConstraints, 1, 
+											function(i,j) { 
+												if (i <= nbAssets) {  
+													return k.data[i-1]; /* Incorrect formula is return 0; */
+												}
+												else {
+													return b.data[i-nbAssets-1] - Ak.data[i-nbAssets-1];
+												}
+											});
+			
+			// Right hand side vector associated to beta
+			var mubar = mu.elemMap(function(i,j,val) { if (!variablesStatusManager.isIn(i)) { return 0; } else { return val; }})
+			var rhsbeta = Matrix_.fill(nbAssets + nbEqualityConstraints, 1, 
+											function(i,j) { 
+												if (i <= nbAssets) {
+													return mubar.data[i-1];
+												}
+												else {
+													return 0;
+												}
+											});
+			
+			
+			// Step 3: (A16) of the second reference
+			// - Solve the KKT linear equations in order to compute alpha and beta vectors
+			// - Compute gamma and delta vectors
+			
+			// Compute an LU decomposition of the Mbar matrix
+			// 
+			// It is guaranteed to be invertible per the critical line algorithm,
+			// PROVIDED the first such matrix (i.e., for the IN/LOW/UP set associated to
+			// the maximum return efficient portfolio) is invertible, which might not
+			// be the case if more than one asset is IN.
+			//
+			// If Mbar is not invertible, there will be an error at this step.
+			try {
+				var lu = Matrix_.luDecomposition(Mbar);
+				var l = lu.lowerTriangular;
+				var u = lu.upperTriangular;
+				var p = lu.rowPermutation;
+				var q = lu.columnPermutation;
 
-					
-					// Update the matrix Mi for the asset idx_in going IN,
-					// c.f. formula 13.20 of the first reference:
-					// - xi = Mi(IN,IN) * M(IN, idx_in)
-					// - xi_j = M(idx_in, idx_in) - <M(IN, idx_in)/xi>
-					//
-					// - Mi(IN, IN) += (xi * xi^t)(IN, IN) / xi_j
-					// - Mi(idx_in, IN) = Mi(IN, idx_in) = -xi(IN) / xi_j
-					// - Mi(idx_in, idx_in) = 1 / xi_j
-									
-					// Compute the vector xi
-					for (var i = 1; i <= variablesInIdx.length; ++i) {
-						var in_idx_i = variablesInIdx[i-1];
-						
-						var xi_in_idx_i = 0;
-						for (var j = 1; j <= variablesInIdx.length; ++j) {
-							var in_idx_j = variablesInIdx[j-1];
-							
-							xi_in_idx_i += Mi.getValue(in_idx_i, in_idx_j) * M.getValue(in_idx_j, idx_in);
-						}	
-						xi.setValue(in_idx_i, 1, 
-									xi_in_idx_i);
-					}
-					
-					// Compute the scalar xi_j
-					//
-					// Numerical note: C.f. chapter 13 of the reference, paragraph "Adding a variable",
-					// the element xi_j below is such that xi_j is strictly positive.
-					//
-					//                 So, in case it becomes numerically negative or zero (covariance matrix numerically
-					// not semi-definite positive, ill-conditioned...), it is needed to truncate it.
-					var xi_j = M.getValue(idx_in, idx_in);
-					for (var i = 1; i <= variablesInIdx.length; ++i) {
-						var in_idx_i = variablesInIdx[i-1];
-						
-						xi_j -= M.getValue(idx_in, in_idx_i) * xi.getValue(in_idx_i, 1);
-					}
-					if (xi_j <= eps) {
-						xi_j = eps;
-					}
-					
-					// Update the matrix Mi
-					for (var i = 1; i <= variablesInIdx.length; ++i) {
-						var in_idx_i = variablesInIdx[i-1];
-						
-						for (var j = 1; j <= variablesInIdx.length; ++j) {
-							var in_idx_j = variablesInIdx[j-1];
-							
-							Mi.setValue(in_idx_i, in_idx_j, 
-										Mi.getValue(in_idx_i, in_idx_j) + xi.getValue(in_idx_i, 1) * xi.getValue(in_idx_j, 1) / xi_j);
-						}
-						Mi.setValue(in_idx_i, idx_in, 
-									-xi.getValue(in_idx_i, 1)/xi_j);
-						Mi.setValue(idx_in, in_idx_i, 
-									-xi.getValue(in_idx_i, 1)/xi_j);
-					}
-					Mi.setValue(idx_in, idx_in, 
-								1/xi_j);
-					
-					
-					// Update the b_bar vector, c.f. formulas 13.21 and 13.22 of the 
-					// first reference:
-					// - b_bar(IN) += M(IN, idx_in) * X(idx_in)
-					// - b_bar(idx_in) = -M(idx_in, NEW_OUT) * X(NEW_OUT), with NEW_OUT = OUT \ {idx_in}
-					
-					// Update the b_bar vector for the current IN variables
-					for (var i = 1; i <= variablesInIdx.length; ++i) {
-						var in_idx_i = variablesInIdx[i-1];
-						
-						b_bar.setValue(in_idx_i, 1, 
-									   b_bar.getValue(in_idx_i, 1) + M.getValue(in_idx_i, idx_in) * currentCornerPortfolioWeights.getValue(idx_in, 1));
-					}
-									
-					// Set the asset idx_in as IN
-					variablesStatusManager.setIn(idx_in);
-					
-					// Get the new OUT variables indexes, which consists of only assets per construction
-					var assetsOutIdx = variablesStatusManager.getOutIndexes();
-					
-					// Update the b_bar vector for the new IN asset
-					var b_bar_in_idx_i = 0;
-					for (var i = 1; i <= assetsOutIdx.length; ++i) {
-						var out_idx_i = assetsOutIdx[i-1];
-						
-						b_bar_in_idx_i -= M.getValue(idx_in, out_idx_i) * currentCornerPortfolioWeights.getValue(out_idx_i, 1);
-					}
-					b_bar.setValue(idx_in, 1, 
-								   b_bar_in_idx_i);
-					
-				}
+				// Compute alpha
+				var z = Matrix_.linsolveForwardSubstitution(lu.lowerTriangular, Matrix_.xy(lu.rowPermutation, rhsalpha));
+				var y = Matrix_.linsolveBackSubstitution(lu.upperTriangular, z);
+				var alpha = Matrix_.xy(lu.columnPermutation, y);
+				
+				// Compute beta
+				z = Matrix_.linsolveForwardSubstitution(lu.lowerTriangular, Matrix_.xy(lu.rowPermutation, rhsbeta));
+				y = Matrix_.linsolveBackSubstitution(lu.upperTriangular, z);
+				var beta = Matrix_.xy(lu.columnPermutation, y);
 			}
-			
-			// Get the new IN/OUT variables indexes
-			var variablesInIdx = variablesStatusManager.getInIndexes();
-			var assetsOutIdx = variablesStatusManager.getOutIndexes(); // only assets indexes per construction
-			
-			
-			// Determine the next asset IN to be set OUT
+			catch (e) {
+				throw new Error('internal error: impossible to solve the KKT system');
+			}
 
-			// Update the alpha vector, c.f. formula 13.15 of the first reference:
-			// - alpha(IN) = Mi(IN,IN) * b_bar(IN)
-			//
-			// Update the beta vector, c.f. formula 13.16 of the first reference:
-			// - beta(IN) = Mi(IN,IN) * [mu(IN) 0]^t
-			//
-			// Compute lambda_out, c.f. formula 13.17 of the first reference:
+			// Compute gamma
+			var gamma = Matrix_.xy(P, alpha);
+			
+			// Compute delta
+			var delta = Matrix_.xmy(Matrix_.xy(P, beta), mu);
+			
+			
+			// Step 4: (A17 to A21, A23, A24, A25) of the second reference
+			// - Determine the next asset IN to be set OUT
+			// - Determine the next asset OUT to be set IN
+			// - Compute the current value of lambda_e
+			
+			// - Determine the next asset IN to be set OUT
+			// - Compute lambda_out, c.f. formula 13.17 of the first reference, OR formulas 21 and 20 of the second reference:
 			// - lambda_out = max( (L(i) - alpha(i))/beta(i), beta(i) > 0, i in IN; (U(i) - alpha(i))/beta(i), beta(i) < 0, i in IN)
-			idx_out = -1;
-			lambda_out = 0;
-			status_out = variablesStatusManager.STATUS_UNDEF;
-			for (var i = 1; i <= variablesInIdx.length; ++i) {
-				var in_idx_i = variablesInIdx[i-1];
+			var idx_out = -1;
+			var lambda_out = 0;
+			var status_out = variablesStatusManager.STATUS_UNDEF;
+			for (var i = 1; i <= assetsInIdx.length; ++i) {
+				//
+				var in_idx_i = assetsInIdx[i-1];
+				var alpha_in_idx_i = alpha.data[in_idx_i-1];
+				var beta_in_idx_i = beta.data[in_idx_i-1];
 
-				// For all variables IN, compute alpha(idx_in(i)) and beta(idx_in(i))
-				var alpha_in_idx_i = 0;
-				var beta_in_idx_i = 0;
-				for (var j = 1; j <= variablesInIdx.length; ++j) {
-					var in_idx_j = variablesInIdx[j-1];
+				// Check for asset reaching the lower limit lb
+				if (beta_in_idx_i > eps) {
+					var lb_idx_in_i = lb.data[in_idx_i-1];
 					
-					alpha_in_idx_i += Mi.getValue(in_idx_i, in_idx_j) * b_bar.getValue(in_idx_j, 1);
-				
-					if (in_idx_j <= nbAssets) {
-						beta_in_idx_i += Mi.getValue(in_idx_i, in_idx_j) * mu.getValue(in_idx_j, 1);
+					var tmp_lambda_out = (lb_idx_in_i - alpha_in_idx_i)/beta_in_idx_i;
+					if (tmp_lambda_out >= lambda_out) {
+						idx_out = in_idx_i;
+						lambda_out = tmp_lambda_out;
+						status_out = variablesStatusManager.STATUS_LOW;
 					}
 				}
-				alpha.setValue(in_idx_i, 1, 
-							   alpha_in_idx_i);
-				beta.setValue(in_idx_i, 1, 
-							  beta_in_idx_i);
 				
-				
-				// For assets variables IN, proceed with the formula 13.17
-				if (variablesStatusManager.isAsset(in_idx_i)) {
-					// Check for asset reaching the lower limit lb
-					if (beta_in_idx_i > eps) {
-						var lb_idx_in_i = lb.getValue(in_idx_i, 1);
-						
-						var tmp_lambda_out = (lb_idx_in_i - alpha_in_idx_i)/beta_in_idx_i;
-						if (tmp_lambda_out >= lambda_out) {
-							idx_out = in_idx_i;
-							lambda_out = tmp_lambda_out;
-							status_out = variablesStatusManager.STATUS_LOW;
-						}
-					}
+				// Check for asset reaching the upper limit ub
+				else if (beta_in_idx_i < -eps) {
+					var ub_idx_in_i = ub.data[in_idx_i-1];
 					
-					// Check for asset reaching the upper limit ub
-					else if (beta_in_idx_i < -eps) {
-						var ub_idx_in_i = ub.getValue(in_idx_i, 1);
-						
-						var tmp_lambda_out = (ub_idx_in_i - alpha_in_idx_i)/beta_in_idx_i;
-						if (tmp_lambda_out >= lambda_out) {
-							idx_out = in_idx_i;
-							lambda_out = tmp_lambda_out;
-							status_out = variablesStatusManager.STATUS_UP;
-						}
+					var tmp_lambda_out = (ub_idx_in_i - alpha_in_idx_i)/beta_in_idx_i;
+					if (tmp_lambda_out >= lambda_out) {
+						idx_out = in_idx_i;
+						lambda_out = tmp_lambda_out;
+						status_out = variablesStatusManager.STATUS_UP;
 					}
 				}
+
 			}
-
 
 			// Determine the next asset OUT to be set IN
-			
-			// Compute the gamma and delta vectors, c.f. formula 7.10b of the first reference:
-			// - gamma(OUT) = [C A^t](OUT, ALL) * alpha, gamma(IN) = 0
-			// - delta(OUT) = [C A^t](OUT, ALL) * beta - mu(OUT), delta(IN) = 0
-			//
-			// In parallel, compute lambda_in, c.f. formula 13.18 of the first reference:
+			// - Compute lambda_in, c.f. formula 13.18 of the first reference, OR formulas 23 and 22 of the second reference:
 			// - lambda_in = max( -gamma(i)/delta(i), delta(i) > 0, i in LO; -gamma(i)/delta(i), delta(i) < 0, i in UP)
-			idx_in = -1;
-			lambda_in = 0;
+			var idx_in = -1;
+			var lambda_in = 0;
 			for (var i = 1; i <= assetsOutIdx.length; ++i) {
+				//
 				var out_idx_i = assetsOutIdx[i-1];
-				
-				// Compute gamma(idx_out(i)) and delta(idx_out(i))
-				var gamma_out_idx_i = 0;
-				var delta_out_idx_i = -mu.getValue(out_idx_i, 1);
-				for (var j = 1; j <= nbAssets + nbEqualityConstraints; ++j) {
-					var M_out_idx_i_j = M.getValue(out_idx_i, j);
-					
-					gamma_out_idx_i += M_out_idx_i_j * alpha.getValue(j, 1);
-					delta_out_idx_i += M_out_idx_i_j * beta.getValue(j, 1);
-				}
-				
-				// Check for eta_i reaching zero
-				// Check for asset coming off lower limit
-				if (variablesStatusManager.isOnLowerBound(out_idx_i)) {
+				var gamma_out_idx_i = gamma.data[out_idx_i-1];
+				var delta_out_idx_i = delta.data[out_idx_i-1];
+			
+				// Check for asset LOW going IN
+				if (variablesStatusManager.isOnLowerBound(out_idx_i)) { 
 					if (delta_out_idx_i > eps) {
 						var tmp_lambda_in = -gamma_out_idx_i/delta_out_idx_i;
 					
@@ -14658,8 +14883,8 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 						}
 					}
 				}
-				// Check for asset coming off upper limit
-				else {
+				// Check for asset UP going IN
+				else if (variablesStatusManager.isOnUpperBound(out_idx_i)) { 
 					if (delta_out_idx_i < -eps) {
 						var tmp_lambda_in = -gamma_out_idx_i/delta_out_idx_i;
 						
@@ -14669,9 +14894,11 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 						}
 					}
 				}
+				else {
+					throw new Error("internal error: OUT variable neither on its lower of upper bound");
+				}
 			}
-
-			
+				
 			// The value of lambda_e for the next corner portfolio is the maximum of
 			// the two lambda_out and lambda_in computed above.
 			//
@@ -14679,34 +14906,56 @@ function MeanVarianceEfficientFrontierCla(mu, sigma, opt) {
 			// is decreased; otherwise, in case lambda_e == lambda_in, it means an asset
 			// first goes IN as lambda_e is decreased.
 			lambda_e = Math.max(lambda_out, lambda_in, 0);
+
 			
-			
-			// Compute the weights of the next corner portfolio
-			for (var i = 1; i <= variablesInIdx.length; ++i) {
-				var in_idx_i = variablesInIdx[i-1];
-				
-				// In case the variable IN is an asset variable, update the current corner portfolio
-				if (variablesStatusManager.isAsset(in_idx_i)) {
-					currentCornerPortfolioWeights.setValue(in_idx_i, 1, 
-														   alpha.getValue(in_idx_i, 1) + lambda_e * beta.getValue(in_idx_i, 1));
-				}
-			}
-			
-			// Save the current corner portfolio
-			var weights = new Matrix_(currentCornerPortfolioWeights);
+			// Step 5: (A27, A28) of the second reference
+			// - Compute the weights of the corner portfolio associated to the current IN/LOW/UP set
+			// - Save these weights
+			var weights = Matrix_.fill(nbAssets, 1, 
+											function(i,j) { 
+												if (i <= nbAssets) {
+													// Take into account the lower and upper bounds, in
+													// case of numerical errors.
+													var x_i = alpha.data[i-1] + lambda_e * beta.data[i-1];
+													var l_i = lb.data[i-1];
+													var u_i = ub.data[i-1];
+													
+													return Math.max(Math.min(x_i, u_i), l_i);
+												}
+											});
 			cornerPortfoliosWeights.push([weights, lambda_e]);
+
+			
+			// Step 6: (A22, A26) of the second reference
+			// - Test for the termination criteria of the critical line algorithm
+			// - Prepare for the next iteration
 			
 			// When the value of lambda_e becomes numerically null or negative, the critical
 			// line algorithm can be stopped.
 			if (lambda_e < eps) {
 				break;
 			}
+			
+			// Update the assets statuses with the new IN/OUT asset
+			if (lambda_out >= lambda_in) { // an asset IN goes OUT
+				// Set the asset idx_out to OUT, with the proper LOW or UP status
+				if (status_out == variablesStatusManager.STATUS_LOW) {
+					variablesStatusManager.setOnLowerBound(idx_out);
+				}
+				else {
+					variablesStatusManager.setOnUpperBound(idx_out);
+				}
+			}
+			else { // an asset OUT goes IN	
+				// Set the asset idx_in as IN
+				variablesStatusManager.setIn(idx_in);
+			}		
 		}
-		
 		
 		// Return the computed efficient frontier array
 		return cornerPortfoliosWeights;	
 	}
+
 };
 MeanVarianceEfficientFrontierCla.prototype = Object.create(MeanVarianceEfficientFrontier.prototype);
 MeanVarianceEfficientFrontierCla.prototype.constructor = MeanVarianceEfficientFrontierCla;
@@ -14887,9 +15136,16 @@ MeanVarianceEfficientFrontierCla.prototype.computeEfficientPortfolio = function(
 		}
 
 		// Compute the final efficient portfolio weights
-		var weights = Matrix_.fill(weights_min.nbRows, 1, 
+		var that = this;
+		var weights = Matrix_.fill(weights_min.nbRows, 1,
 							   	   function(i,j) { 
-									   return t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1); 
+										// Take into account the lower and upper bounds, in
+										// case of numerical errors.
+										var x_i = t*weights_min.getValue(i, 1) + (1-t)*weights_max.getValue(i, 1);
+										var l_i = that.lowerBounds.data[i-1];
+										var u_i = that.upperBounds.data[i-1];
+										
+										return Math.max(Math.min(x_i, u_i), l_i);
 								   });
 		
 		// Compute the associated risk tolerance parameter
@@ -15026,7 +15282,7 @@ MeanVarianceEfficientFrontierCla.prototype.restrict = function(constraintType, c
 			}
 			
 			// Compute the first efficient portfolio with a strictly positive enough return
-			var efficientPortfolio = this.computeEfficientPortfolio("return", constraintValue + this.epsEfficientPortfolioComputation);
+			var efficientPortfolio = this.computeEfficientPortfolio("return", constraintValue + 0.5 * this.epsEfficientPortfolioComputation);
 			if (efficientPortfolio.length == 0) {
 				throw new Error('internal error: no efficient portfolio with a return greater than ' + constraintValue);
 			}
@@ -15061,7 +15317,7 @@ MeanVarianceEfficientFrontierCla.prototype.restrict = function(constraintType, c
 			}
 			
 			// Compute the first efficient portfolio with a strictly positive enough volatility
-			var efficientPortfolio = this.computeEfficientPortfolio("volatility", constraintValue + this.epsEfficientPortfolioComputation);
+			var efficientPortfolio = this.computeEfficientPortfolio("volatility", constraintValue + 0.5 * this.epsEfficientPortfolioComputation);
 			if (efficientPortfolio.length == 0) {
 				throw new Error('internal error: no efficient portfolio with a volatility greater than ' + constraintValue + ': the covariance matrix might not be semi-definite positive');
 			}
@@ -15153,7 +15409,7 @@ MeanVarianceEfficientFrontierCla.prototype.computeMaximumSharpeRatioEfficientPor
 	var weights_idx = this.cornerPortfolios[idx][0];
 	var sr_idx = this.computePortfolioSharpeRatio(weights_idx, rf);
 	var candidatePortfolios = [[weights_idx, sr_idx, this.cornerPortfolios[idx][1]]];
-	
+		
 	// Compute the efficient portfolio maximizing the Sharpe ratio
 	// on the efficient segment [idx+1, idx], if existing.
 	if (idx <= this.cornerPortfolios.length - 2) {
@@ -15315,6 +15571,9 @@ MeanVarianceEfficientFrontierCla.prototype.computeMaximumSharpeRatioEfficientPor
 		var bb_p = bb/2; // reduced discriminant
 		var sign_bb_p = (bb_p >= 0) ? 1 : -1; // Math.sign is not supported everywhere plus it is mandatory that for bb_p == 0 this returns 1
 		var disc = bb_p*bb_p - aa*cc;
+		if (Math.abs(disc) <= 1e-16) { // In case of numerically semi-positive definite covariance matrix
+			disc = 0;
+		}
 		if (disc < 0) {
 			throw new Error('internal error, the covariance matrix might not be semi-definite positive');
 		}
@@ -15329,7 +15588,7 @@ MeanVarianceEfficientFrontierCla.prototype.computeMaximumSharpeRatioEfficientPor
 		if (t1 > 0 && t1 < 1) { // t1 belongs to ]0,1[
 			var weights_t1 = Matrix_.fill(weights_min.nbRows, 1, 
 										function(i,j) { 
-											return t1*weights_min.getValue(i, 1) + (1-t1)*weights_max.getValue(i, 1); 
+											return t1*weights_min.getValue(i, 1) + (1-t1)*weights_max.getValue(i, 1);
 										})
 			var sr_t1 = this.computePortfolioSharpeRatio(weights_t1, rf);
 			var lambda_t1 = t1*cornerPortfolios[idx_min][1] + (1-t1)*cornerPortfolios[idx_max][1];
@@ -15340,7 +15599,7 @@ MeanVarianceEfficientFrontierCla.prototype.computeMaximumSharpeRatioEfficientPor
 		if (t2 > 0 && t2 < 1) { // t2 belongs to ]0,1[
 			var weights_t2 = Matrix_.fill(weights_min.nbRows, 1, 
 										function(i,j) { 
-											return t2*weights_min.getValue(i, 1) + (1-t2)*weights_max.getValue(i, 1); 
+											return t2*weights_min.getValue(i, 1) + (1-t2)*weights_max.getValue(i, 1);
 										})
 			var sr_t2 = this.computePortfolioSharpeRatio(weights_t2, rf);
 			var lambda_t2 = t2*cornerPortfolios[idx_min][1] + (1-t2)*cornerPortfolios[idx_max][1];
@@ -15348,6 +15607,7 @@ MeanVarianceEfficientFrontierCla.prototype.computeMaximumSharpeRatioEfficientPor
 			candidateSharpeRatios.push([weights_t2, sr_t2, lambda_t2]);
 		}
 
+		
 		// Return the efficient portfolio which maximizes the Sharpe ratio
 		// on the efficient segment.
 		var compareSharpeRatios = function (a, b) {
@@ -15383,6 +15643,7 @@ self.MeanVarianceEfficientFrontierGsmo = MeanVarianceEfficientFrontierGsmo;
 * @param {object} opt optional parameters for the mean-variance optimization problem.
 * @param {number} opt.optimizationMethodParams.epsGsmo the convergence tolerance of the algorithm used to solve the mean-variance optimization problem, a strictly positive number; defaults to 1e-6.
 * @param {number} opt.optimizationMethodParams.maxIterGsmo the maximum number of iterations of the algorithm used to solve the mean-variance optimization problem, a strictly positive natural integer; defaults to 10000.
+* @param {boolean} opt.optimizationMethodParams.antiCyclingGsmo activate an anti cycling rule in the algorithm used to solve the mean-variance optimization problem, at the expense of execution time and stochasticity of the result; defaults to false.
 * @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
 * by a partial investment constraint; defaults to true.
 * @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
@@ -15407,6 +15668,10 @@ function MeanVarianceEfficientFrontierGsmo(mu, sigma, opt) {
 	this.maxIterationsGsmo = opt.optimizationMethodParams.maxIterGsmo;
 	if (this.maxIterationsGsmo == undefined) {
 		this.maxIterationsGsmo = 10000;
+	}
+	this.antiCyclingGsmo = opt.optimizationMethodParams.antiCyclingGsmo;
+	if (this.antiCyclingGsmo == undefined) {
+		this.antiCyclingGsmo = false;
 	}
 	
 	// Compute the minimum and maximum risk tolerance values defining the efficient frontier
@@ -15497,7 +15762,7 @@ function MeanVarianceEfficientFrontierGsmo(mu, sigma, opt) {
 			
 			// Compute the efficient portfolio associated to the risk tolerance value above,
 			// as well as its return.
-			var efficientSol = qpsolveGSMO_(Q, p, b, r, l, u, {eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
+			var efficientSol = qpsolveGSMO_(Q, p, b, r, l, u, {antiCycling: this.antiCyclingGsmo, eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
 			var ret = this.computePortfolioReturn(efficientSol[0], mu, sigma);
 		}
 		while ( Math.abs(ret - maxReturn) > epsSearch );
@@ -15570,7 +15835,7 @@ function MeanVarianceEfficientFrontierGsmo(mu, sigma, opt) {
 		var u = upperBounds;
 
 		//
-		var minVolatilitySolution = qpsolveGSMO_(Q, p, b, r, l, u, {eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
+		var minVolatilitySolution = qpsolveGSMO_(Q, p, b, r, l, u, {antiCycling: this.antiCyclingGsmo, eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
 		var minVolatility = this.computePortfolioVolatility(minVolatilitySolution[0]);
 		
 		// Determine a risk tolerance parameter rt_E such that min_w <Vw/w> - 2*rt_E*<w/e>, s.t. <w/e>=1 and l <= x <= u
@@ -15596,7 +15861,7 @@ function MeanVarianceEfficientFrontierGsmo(mu, sigma, opt) {
 			
 			// Compute the efficient portfolio associated to the risk tolerance value above,
 			// as well as its return.
-			var efficientSol = qpsolveGSMO_(Q, p, b, r, l, u, {eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
+			var efficientSol = qpsolveGSMO_(Q, p, b, r, l, u, {antiCycling: this.antiCyclingGsmo, eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
 			var vol = this.computePortfolioVolatility(efficientSol[0]);
 		}
 		while ( Math.abs(vol - minVolatility) > epsSearch );
@@ -15780,7 +16045,7 @@ MeanVarianceEfficientFrontierGsmo.prototype.computeEfficientPortfolio = function
 			riskTolerance = bisection_(function (rt) { 
 											// Compute the efficient portfolio solution to the optimization problem with a given risk tolerance parameter
 											var p = Matrix_.ax(-rt, mu);
-											var sol = qpsolveGSMO_(Q, p, b, r, l, u, {eps: that.epsGsmo, maxIter: that.maxIterationsGsmo});
+											var sol = qpsolveGSMO_(Q, p, b, r, l, u, {antiCycling: that.antiCyclingGsmo, eps: that.epsGsmo, maxIter: that.maxIterationsGsmo});
 											
 											portfolioWeights = sol[0];
 
@@ -15794,7 +16059,7 @@ MeanVarianceEfficientFrontierGsmo.prototype.computeEfficientPortfolio = function
 		// Directly compute the efficient portfolio solution to the optimization problem
 		var rt = constraintValue;
 		var p = Matrix_.ax(-rt, mu);
-		var sol = qpsolveGSMO_(Q, p, b, r, l, u, {eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
+		var sol = qpsolveGSMO_(Q, p, b, r, l, u, {antiCycling: this.antiCyclingGsmo, eps: this.epsGsmo, maxIter: this.maxIterationsGsmo});
 		
 		portfolioWeights = sol[0];
 		riskTolerance = rt;
@@ -15854,7 +16119,7 @@ MeanVarianceEfficientFrontierGsmo.prototype.restrict = function(constraintType, 
 			}
 			
 			// Compute the first efficient portfolio with a strictly positive enough return
-			var efficientPortfolio = this.computeEfficientPortfolio("return", constraintValue + this.epsEfficientPortfolioComputation);
+			var efficientPortfolio = this.computeEfficientPortfolio("return", constraintValue + 0.5 * this.epsEfficientPortfolioComputation);
 			if (efficientPortfolio.length == 0) {
 				throw new Error('internal error: no efficient portfolio with a return greater than ' + constraintValue);
 			}
@@ -15880,7 +16145,7 @@ MeanVarianceEfficientFrontierGsmo.prototype.restrict = function(constraintType, 
 			}
 			
 			// Compute the first efficient portfolio with a strictly positive enough volatility
-			var efficientPortfolio = this.computeEfficientPortfolio("volatility", constraintValue + this.epsEfficientPortfolioComputation);
+			var efficientPortfolio = this.computeEfficientPortfolio("volatility", constraintValue + 0.5 * this.epsEfficientPortfolioComputation);
 			if (efficientPortfolio.length == 0) {
 				throw new Error('internal error: no efficient portfolio with a volatility greater than ' + constraintValue + ': the covariance matrix might not be semi-definite positive');
 			}
@@ -15968,10 +16233,11 @@ MeanVarianceEfficientFrontierGsmo.prototype.computeMaximumSharpeRatioEfficientPo
 	// Core algorithm
 	var portfolioWeights;
 	var that = this;
+	
 	var riskTolerance = goldenSectionSearch_(function(rt) { 
 												  // Compute the efficient portfolio solution to the optimization problem with a given risk tolerance parameter
 												  var p = Matrix_.ax(-rt, mu);
-												  var sol = qpsolveGSMO_(Q, p, b, r, l, u, {eps: that.epsGsmo, maxIter: that.maxIterationsGsmo});
+												  var sol = qpsolveGSMO_(Q, p, b, r, l, u, {antiCycling: that.antiCyclingGsmo, eps: that.epsGsmo, maxIter: that.maxIterationsGsmo});
 														
 												  portfolioWeights = sol[0];
 													
@@ -16000,6 +16266,179 @@ MeanVarianceEfficientFrontierGsmo.prototype.computeMaximumSharpeRatioEfficientPo
 
  
 /* Start Wrapper private methods - Unit tests usage only */
+self.MeanVarianceEfficientFrontierWrapper = MeanVarianceEfficientFrontierWrapper;
+/* End Wrapper private methods - Unit tests usage only */
+
+
+
+/**
+* @function MeanVarianceEfficientFrontierWrapper
+*
+* @description Object representing a mean-variance efficient frontier computed using the
+* most efficient algorithm among the available ones, and implementing the methods of the parent virtual
+* object MeanVarianceEfficientFrontier.
+*
+* @param {Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
+* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {object} opt optional parameters for the mean-variance optimization problem.
+* @param {number} opt.optimizationMethodParams.maxIterCriticalLine the maximum number of iterations of the critical line algorithm, a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.optimizationMethodParams.epsGsmo the convergence tolerance of the algorithm used to solve the mean-variance optimization problem, a strictly positive number; defaults to 1e-6.
+* @param {number} opt.optimizationMethodParams.maxIterGsmo the maximum number of iterations of the algorithm used to solve the mean-variance optimization problem, a strictly positive natural integer; defaults to 10000.
+* @param {boolean} opt.optimizationMethodParams.antiCyclingGsmo activate an anti cycling rule in the algorithm used to solve the mean-variance optimization problem, at the expense of execution time and stochasticity of the result; defaults to false.
+* @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
+* by a partial investment constraint; defaults to true.
+* @param {Array.<number>} opt.constraints.minWeights an optional array of size n (l_i),i=1..n containing the minimum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of zeros.
+* @param {Array.<number>} opt.constraints.maxWeights an optional array of size n (u_i),i=1..n containing the maximum weights of the assets that are included in the portfolio with 0 <= l_i <= u_i <= 1, i=1..n; defaults to an array made of ones.
+*
+*/
+function MeanVarianceEfficientFrontierWrapper(mu, sigma, opt) {
+	// First try to construct an efficient frontier using the critical line algorithm,
+	// as this is the most efficient algorithm.
+	//
+	// If the construction fails due to the singularity of the first KKT system,
+	// switches to using the GSMO algorithm.
+	this.efficientFrontier = null;
+	try {
+		this.efficientFrontier = new MeanVarianceEfficientFrontierCla(mu, sigma, opt);
+		this.efficientFrontierOptimizationMethod = "critical-line";
+	}
+	catch(e) {
+		this.efficientFrontier = new MeanVarianceEfficientFrontierGsmo(mu, sigma, opt);
+		this.efficientFrontierOptimizationMethod = "gsmo";
+	}
+	
+	// Initializations
+	this.epsPortfolioVolatility = this.efficientFrontier.epsPortfolioVolatility;
+	this.epsEfficientPortfolioComputation = this.efficientFrontier.epsEfficientPortfolioComputation;
+	
+	this.mu = this.efficientFrontier.mu;
+	this.sigma = this.efficientFrontier.sigma;
+	this.nbAssets = this.efficientFrontier.mu.nbRows;
+	
+	this.fullInvestment = this.efficientFrontier.fullInvestment;
+	this.lowerBounds = this.efficientFrontier.lowerBounds;
+	this.upperBounds = this.efficientFrontier.upperBounds;
+	
+	if (this.fullInvestment == false) {
+		this.alteredMu = this.efficientFrontier.alteredMu;
+		this.alteredSigma = this.efficientFrontier.alteredSigma;
+									
+		this.alteredLowerBounds = this.efficientFrontier.alteredLowerBounds;	
+		this.alteredUpperBounds = this.efficientFrontier.alteredUpperBounds;	
+
+		this.alteredNbAssets = this.efficientFrontier.alteredNbAssets;
+	}
+	
+	// ------
+}
+MeanVarianceEfficientFrontierWrapper.prototype = Object.create(MeanVarianceEfficientFrontier.prototype);
+MeanVarianceEfficientFrontierWrapper.prototype.constructor = MeanVarianceEfficientFrontierWrapper;
+
+MeanVarianceEfficientFrontierWrapper.prototype.getHighestRiskTolerancePortfolio = function(x) {
+	return this.efficientFrontier.getHighestRiskTolerancePortfolio(x);
+};
+MeanVarianceEfficientFrontierWrapper.prototype.getHighestRiskTolerance = function(x) {
+	return this.efficientFrontier.getHighestRiskTolerance();
+};
+MeanVarianceEfficientFrontierWrapper.prototype.getLowestRiskTolerancePortfolio = function(x) {
+	return this.efficientFrontier.getLowestRiskTolerancePortfolio(x);
+};
+MeanVarianceEfficientFrontierWrapper.prototype.getLowestRiskTolerance = function(x) {
+	return this.efficientFrontier.getLowestRiskTolerance();
+};
+
+
+/**
+* @function computeEfficientPortfolio
+*
+* @description This function returns the weights w_1,...,w_n associated to a fully invested and
+* long-only efficient portfolio belonging to the mean-variance efficient frontier, subject to 
+* a return constraint, a volatility constraints or to a risk tolerance constraint.
+*
+* @memberof MeanVarianceEfficientFrontierWrapper
+*
+* @param {string} constraintType, the type of constraint, a string either equal to:
+* - "return", to specify a return constraint
+* - "volatility",  to specify a volatility constraint
+* - "riskTolerance", to specify a risk tolerance constraint
+* @param {number} constraintValue, the value of the constraint, a real number.
+*
+* @return {Array.<Object>} in case no efficient portfolio can be computed, return an empty array;
+* in case an efficient portfolio satisfying the input constraint has been computed, an array of 2 elements: 
+* -- The computed efficient portfolio weights
+* -- The risk tolerance associated to the computed portfolio
+*/
+MeanVarianceEfficientFrontierWrapper.prototype.computeEfficientPortfolio = function(constraintType, constraintValue) {
+	return this.efficientFrontier.computeEfficientPortfolio(constraintType, constraintValue);
+};
+
+/**
+* @function getCornerPortfolios
+*
+* @description This function returns the weights w_i1,...,w_in associated to the m fully invested and
+* long-only corner portfolios defining the mean-variance efficient frontier.
+*
+* @memberof MeanVarianceEfficientFrontierWrapper
+*
+* @return {Array<Array.<Object>>} the list of all corner portfolios, an array of arrays of n by 1 matrices
+*
+*/
+MeanVarianceEfficientFrontierWrapper.prototype.getCornerPortfolios = function() {
+	if (this.efficientFrontierOptimizationMethod == "critical-line") {
+		return this.efficientFrontier.getCornerPortfolios();
+	}
+	else {
+		throw new Error("internal error: unsupported method")
+	}
+};
+
+/**
+* @function restrict
+*
+* @description This function restricts the efficient frontier to portfolios satisfying 
+* a minimal return constraint or a minimal volatility constraint.
+*
+* @memberof MeanVarianceEfficientFrontierWrapper
+*
+* @param {string} constraintType, the type of constraint, a string either equal to:
+* - "minReturn", to specify a return constraint
+* - "minVolatility",  to specify a volatility constraint
+* @param {number} constraintValue, the value of the constraint, a real number.
+*
+*/
+MeanVarianceEfficientFrontierWrapper.prototype.restrict = function(constraintType, constraintValue) {
+	return this.efficientFrontier.restrict(constraintType, constraintValue);
+};
+
+
+/**
+* @function computeMaximumSharpeRatioEfficientPortfolio
+*
+* @description This function returns the weights w_1,...,w_n associated to the fully invested and 
+* long-only portfolio of n assets maximizing the Sharpe ratio, which is defined as the ratio of the 
+* portfolio excess return over a constant risk-free rate to the portfolio volatility.
+*
+* @see <a href="https://doi.org/10.1111/j.1540-6261.1976.tb03217.x">Elton, E. J., Gruber, M. J. and Padberg, M. W. (1976), SIMPLE CRITERIA FOR OPTIMAL PORTFOLIO SELECTION. The Journal of Finance, 31: 1341-1357</a>
+* @see <a href="http://dx.doi.org/10.1080/13504860701255292">S. V. Stoyanov , S. T. Rachev & F. J. Fabozzi (2007) Optimal Financial Portfolios, Applied Mathematical Finance, 14:5, 401-436</a>
+* @see <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1437644">Leonid Kopman, Scott Liu, Maximizing the Sharpe Ratio and Information Ratio in the Barra Optimizer, MSCI Barra Research</a>
+*
+* @memberof MeanVarianceEfficientFrontierWrapper
+*
+* @param {number} rf the risk-free rate, a real number.
+*
+* @return {Array.<Object>} An array of 2 elements: 
+* -- The computed efficient portfolio weights
+* -- The risk tolerance associated to the computed portfolio
+*/
+MeanVarianceEfficientFrontierWrapper.prototype.computeMaximumSharpeRatioEfficientPortfolio = function(rf) {
+	return this.efficientFrontier.computeMaximumSharpeRatioEfficientPortfolio(rf);
+};
+/**
+ * @author Roman Rubsamen <roman.rubsamen@gmail.com>
+ */
+
+ 
+/* Start Wrapper private methods - Unit tests usage only */
 /* End Wrapper private methods - Unit tests usage only */
 
 
@@ -16019,7 +16458,7 @@ MeanVarianceEfficientFrontierGsmo.prototype.computeMaximumSharpeRatioEfficientPo
 * - Assets covariance matrix
 * - Misc. constraints on the weights of the associated efficient portfolios (bounds constraints, partial investment constraint)
 *
-* If offers:
+* It offers:
 * - Methods to compute portfolios returns, volatilities, Sharpe ratios.
 * - Methods to compute the highest/lowest attainable returns, volatilities and risk tolerances
 * - Methods to compute efficient portfolios subject to a return, a volatility, a maximum volatility or a risk tolerance constraint
@@ -16383,8 +16822,8 @@ MeanVarianceEfficientFrontier.prototype.computeMaximumSharpeRatioEfficientPortfo
 * - Minimum weight of each asset that is included in the portfolio
 * - Maximum weight of each asset that is included in the portfolio
 *
-* To be noted that when opt.optimizationMethod is set to "critical-line", it is required that the provided assets
-* returns are all different; otherwise, an error will be raised.
+* To be noted that when opt.optimizationMethod is set to "critical-line", an error might be raised in certain cases
+* when the covariance matrix is not definite positive.
 *
 * @see Harry M. Markowitz, Portfolio Selection, Efficient Diversification of Investments, Second edition, Blackwell Publishers Inc.
 *
@@ -16394,13 +16833,15 @@ MeanVarianceEfficientFrontier.prototype.computeMaximumSharpeRatioEfficientPortfo
 * @param {string} opt.optimizationMethod the optimization method to use in order to compute the portfolio, a string either equals to:
 * - 'critical-line': usage of the critical line algorithm from Markowitz, c.f. the reference.
 * - 'gsmo': usage of generalized sequential minimization optimization algorithm
-; defaults to 'gsmo'.
+* - 'automatic': automatic selection of the optimization method to use
+; defaults to 'automatic'.
 * @param {number} opt.optimizationMethodParams.maxIterCriticalLine the maximum number of iterations of the critical line algorithm in case opt.optimizationMethod is set to "critical-line",
 * a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.optimizationMethodParams.epsGsmo in case opt.optimizationMethod is set to "gsmo", the convergence tolerance of the GSMO algorithm used to 
 * solve the mean-variance optimization problem, a strictly positive number; defaults to 1e-6.
 * @param {number} opt.optimizationMethodParams.maxIterGsmo in case opt.optimizationMethod is set to "gsmo", the maximum number of iterations of the GSMO algorithm 
 * used to solve the mean-variance optimization problem, a strictly positive natural integer; defaults to 10000.
+* @param {boolean} opt.optimizationMethodParams.antiCyclingGsmo activate an anti cycling rule in the algorithm used to solve the mean-variance optimization problem, at the expense of execution time and stochasticity of the result; defaults to false.
 * @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
 * by a partial investment constraint; defaults to true.
 * @param {number} opt.constraints.return, the desired value for the return of the portfolio, a real number.
@@ -16430,9 +16871,9 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	// Decode the optimization algorithm to use
 	var optimizationMethod = opt.optimizationMethod;
 	if (optimizationMethod === undefined) {
-		optimizationMethod = 'gsmo';
+		optimizationMethod = 'automatic';
 	}
-	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo') {
+	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo' && optimizationMethod != 'automatic') {
 		throw new Error('unsupported optimisation method');
 	}
 	
@@ -16460,7 +16901,10 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 	
 	// Compute the efficient frontier
 	var efficientFrontier;
-	if (optimizationMethod == "critical-line") {
+	if (optimizationMethod == "automatic") {
+		efficientFrontier = new MeanVarianceEfficientFrontierWrapper(mu, sigma, opt);
+	}
+	else if (optimizationMethod == "critical-line") {
 		 efficientFrontier = new MeanVarianceEfficientFrontierCla(mu, sigma, opt);
 	}
 	else if (optimizationMethod == "gsmo") {
@@ -16499,7 +16943,7 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 		var highestRiskTolerance = efficientFrontier.getHighestRiskTolerance();
 		var lowestRiskTolerancePortfolioWeights = efficientFrontier.getLowestRiskTolerancePortfolio();
 		var lowestRiskTolerance = efficientFrontier.getLowestRiskTolerance();
-
+		
 		// If the desired risk tolerance is greater than the highest attainable
 		// risk tolerance on the efficient frontier, the efficient portfolio is computed
 		// as the rightmost portfolio on the efficient frontier, because this portfolio 
@@ -16587,8 +17031,9 @@ self.meanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * @param {object} opt optional parameters for the algorithm.
 * @param {string} opt.optimizationMethod the optimization method to use in order to compute the portfolio, a string either equals to:
 * - 'critical-line': usage of the critical line algorithm from Markowitz, c.f. the reference.
-* - 'gsmo': usage of  generalized sequential minimization optimization algorithm
-; defaults to 'gsmo'.
+* - 'gsmo': usage of generalized sequential minimization optimization algorithm
+* - 'automatic': automatic selection of the optimization method to use
+; defaults to 'automatic'.
 * @param {number} opt.optimizationMethodParams.maxIterCriticalLine the maximum number of iterations of the critical line algorithm in case opt.optimizationMethod is set to "critical-line",
 * a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.optimizationMethodParams.epsGsmo in case opt.optimizationMethod is set to "gsmo", the convergence tolerance of the GSMO algorithm used to 
@@ -16620,9 +17065,9 @@ self.meanVarianceEfficientFrontierNearestWeights = function(inputWeights, mu, si
 	// Decode the optimization algorithm to use
 	var optimizationMethod = opt.optimizationMethod;
 	if (optimizationMethod === undefined) {
-		optimizationMethod = 'gsmo';
+		optimizationMethod = 'automatic';
 	}
-	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo') {
+	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo' && optimizationMethod != 'automatic') {
 		throw new Error('unsupported optimisation method');
 	}
 
@@ -16633,34 +17078,49 @@ self.meanVarianceEfficientFrontierNearestWeights = function(inputWeights, mu, si
 	var inputWeights = new Matrix_(inputWeights);
 
 	
-	// Compute the efficient frontier, as well as portfolios representing it.
+	// Compute the efficient frontier
+	var efficientFrontier;
+	
+	if (optimizationMethod == "automatic") {
+		efficientFrontier = new MeanVarianceEfficientFrontierWrapper(mu, sigma, opt);
+	}
+	else if (optimizationMethod == "critical-line") {
+		efficientFrontier = new MeanVarianceEfficientFrontierCla(mu, sigma, opt);
+	}
+	else if (optimizationMethod == "gsmo") {
+		efficientFrontier = new MeanVarianceEfficientFrontierGsmo(mu, sigma, opt);
+	}
+	else {
+		throw new Error('internal error: unsupported optimisation method');
+	}
+	
+	
+	// Compute the portfolios representing the efficient frontier.
 	//
 	// In case the optimization method is the critical line, these representing
 	// portfolios are the corner portfolios, and the computations below will be exact.
 	//
 	// Otherwise, these representing portfolios are equidistant points on the
 	// efficient frontier, aim being to approximate the corner portfolios.
-	var efficientFrontier;
 	var efficientFrontierPortfolios;
-	if (optimizationMethod == "critical-line") {
-		 efficientFrontier = new MeanVarianceEfficientFrontierCla(mu, sigma, opt);
-		 efficientFrontierPortfolios = efficientFrontier.getCornerPortfolios();
+	if (optimizationMethod == "critical-line" || 
+	    efficientFrontier.efficientFrontierOptimizationMethod == "critical-line") {
+		efficientFrontierPortfolios = efficientFrontier.getCornerPortfolios();
 	}
-	else if (optimizationMethod == "gsmo") {
-		efficientFrontier = new MeanVarianceEfficientFrontierGsmo(mu, sigma, opt);
-		
+	else if (optimizationMethod == "gsmo" || 
+	         efficientFrontier.efficientFrontierOptimizationMethod == "gsmo") {
 		// Decode the number of efficient portfolios to generate
 		var nbEfficientPortfolios = opt.optimizationMethodParams.nbPortfoliosGsmo;
 		if (nbEfficientPortfolios == undefined) {
 			nbEfficientPortfolios = 100;
 		}
-		
+
 		// Generate the efficient portfolios as regularly spaced portfolios
 		// on the efficient frontier with a risk tolerance value of rt_i, i=0..nbEfficientPortfolios-1
 		// with rt_i belonging to the interval [rt_min, rt_max], 
 		// using the formula rt_i = rt_min + i * (rt_max - 1)/(nbEfficientPortfolios - 1).
 		efficientFrontierPortfolios = new Array(nbEfficientPortfolios);
-		
+
 		var rt_min = efficientFrontier.getLowestRiskTolerance();
 		var rt_max = efficientFrontier.getHighestRiskTolerance();	
 		var delta_rt = (rt_max - rt_min)/(nbEfficientPortfolios - 1);	
@@ -16739,6 +17199,9 @@ self.meanVarianceEfficientFrontierNearestWeights = function(inputWeights, mu, si
 * To be noted that when opt.optimizationMethod is set to "critical-line", it is required that the provided assets
 * returns are all different; otherwise, an error will be raised.
 *
+* To be noted that when opt.optimizationMethod is set to "gsmo" and opt.discretizationType is set to "riskTolerance",
+* identical portfolios can appear in output.
+*
 * @see Harry M. Markowitz, Mean-Variance Analysis in Portfolio Choice and Capital Markets, Revised issue (2000), McGraw-Hill Professional;
 *
 * @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
@@ -16753,7 +17216,8 @@ self.meanVarianceEfficientFrontierNearestWeights = function(inputWeights, mu, si
 * @param {string} opt.optimizationMethod the optimization method to use in order to compute the portfolio, a string either equals to:
 * - 'critical-line': usage of the critical line algorithm from Markowitz, c.f. the reference.
 * - 'gsmo': usage of  generalized sequential minimization optimization algorithm
-; defaults to 'gsmo'.
+* - 'automatic': automatic selection of the optimization method to use
+; defaults to 'automatic'.
 * @param {number} opt.optimizationMethodParams.maxIterCriticalLine the maximum number of iterations of the critical line algorithm in case opt.optimizationMethod is set to "critical-line",
 * a strictly positive natural integer; defaults to 1000.
 * @param {number} opt.optimizationMethodParams.epsGsmo in case opt.optimizationMethod is set to "gsmo", the convergence tolerance of the GSMO algorithm used to 
@@ -16788,9 +17252,9 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 	// Decode the optimization algorithm to use
 	var optimizationMethod = opt.optimizationMethod;
 	if (optimizationMethod === undefined) {
-		optimizationMethod = 'gsmo';
+		optimizationMethod = 'automatic';
 	}
-	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo') {
+	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo' && optimizationMethod != 'automatic') {
 		throw new Error('unsupported optimisation method');
 	}
 
@@ -16808,7 +17272,10 @@ self.meanVarianceEfficientFrontierPortfolios = function(mu, sigma, opt) {
 		
 	// Compute the efficient frontier
 	var efficientFrontier;
-	if (optimizationMethod == "critical-line") {
+	if (optimizationMethod == "automatic") {
+		efficientFrontier = new MeanVarianceEfficientFrontierWrapper(mu, sigma, opt);
+	}
+	else if (optimizationMethod == "critical-line") {
 		 efficientFrontier = new MeanVarianceEfficientFrontierCla(mu, sigma, opt);
 	}
 	else if (optimizationMethod == "gsmo") {
@@ -17860,13 +18327,25 @@ self.minimumTrackingErrorWeights = function (assetsReturns, benchmarkReturns, op
 * 
 * This portfolio maximizes the Sharpe ratio if the Sharpe ratio of each asset is the same.
 *
+* To be noted that when opt.optimizationMethod is set to "critical-line", an error might be raised in certain cases
+* when the covariance matrix is not definite positive.
+*
 * @see <a href="https://papers.ssrn.com/sol3/papers.cfm?abstract_id=1895459">Y. Choueifaty, T. Froidure, J. Reynier, Properties of the Most Diversified Portfolio, Journal of Investment Strategies, Vol.2(2), Spring 2013, pp.49-70.</a>
 * 
 * @param {Matrix_|Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, square Matrix or array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.epsVolatility the volatility below which portfolios are not taken into account in the computation, a strictly positive real number; defaults to 1e-4.
-* @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-04.
-* @param {number} opt.maxIter the maximum number of iterations of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {string} opt.optimizationMethod the optimization method to use in order to compute the portfolio, a string either equals to:
+* - 'critical-line': usage of the critical line algorithm
+* - 'gsmo': usage of generalized sequential minimization optimization algorithm
+; defaults to 'gsmo'.
+* @param {number} opt.optimizationMethodParams.maxIterCriticalLine the maximum number of iterations of the critical line algorithm in case opt.optimizationMethod is set to "critical-line",
+* a strictly positive natural integer; defaults to 1000.
+* @param {number} opt.optimizationMethodParams.epsGsmo the convergence tolerance of the GSMO algorithm used to solve the minimum-variance optimization problem, 
+* a strictly positive number; defaults to 1e-6.
+* @param {number} opt.optimizationMethodParams.maxIterGsmo the maximum number of iterations of the GSMO algorithm used to solve the minimum-variance optimization problem, 
+* a strictly positive natural integer; defaults to 10000.
+* @param {boolean} opt.optimizationMethodParams.antiCyclingGsmo activate an anti cycling rule in the algorithm used to solve the mean-variance optimization problem, at the expense of execution time and stochasticity of the result; defaults to false.
 * @param {number} opt.epsVolatility the volatility below which portfolios are not taken into account in the maximum Sharpe Ratio computation, a strictly positive real number; defaults to 1e-4.
 * @param {boolean} opt.constraints.fullInvestment parameter set to false in case the full investment constraint of the portfolio must be replaced
 * by a partial investment constraint; defaults to true.
@@ -17887,12 +18366,24 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 	if (opt.constraints === undefined) {
 		opt.constraints = {};
 	}
+	if (opt.optimizationMethodParams === undefined) {
+		opt.optimizationMethodParams = {};
+	}
 	
 	// Decode the minimum value of the volatility, in case the covariance matrix
 	// is semi-definite positive.
 	var epsVolatility = opt.epsVolatility;
 	if (epsVolatility === undefined) {
 		epsVolatility = 1e-4;
+	}
+	
+	// Decode the optimization algorithm to use
+	var optimizationMethod = opt.optimizationMethod;
+	if (optimizationMethod === undefined) {
+		optimizationMethod = 'gsmo';
+	}
+	if (optimizationMethod != 'critical-line' && optimizationMethod != 'gsmo') {
+		throw new Error('unsupported optimisation method');
 	}
 	
 	// ------
@@ -17903,15 +18394,19 @@ self.mostDiversifiedWeights = function (sigma, opt) {
 	//
 	// So, the most diversified portfolio optimization problem will be solved below
 	// using a max Sharpe ratio optimization algorithm.
+	var vol = new Matrix_(sigma).toCovarianceMatrix().getStandardDeviations(); // assets volatilities
 	
 	// Compute the efficient frontier
-	var vol = new Matrix_(sigma).toCovarianceMatrix().getStandardDeviations(); // assets volatilities
-	var efficientFrontier = new MeanVarianceEfficientFrontierGsmo(vol, sigma, { optimizationMethodParams: { epsGsmo: opt.eps, 
-									                                                                        maxIterGsmo: opt.maxIter },
-																				constraints: { fullInvestment: opt.constraints.fullInvestment, 
-																				               minWeights: opt.constraints.minWeights, 
-																							   maxWeights: opt.constraints.maxWeights}
-																			  });
+	var efficientFrontier;
+	if (optimizationMethod == "critical-line") {
+		efficientFrontier = new MeanVarianceEfficientFrontierCla(vol, sigma, opt);
+	}
+	else if (optimizationMethod == "gsmo") {
+		efficientFrontier = new MeanVarianceEfficientFrontierGsmo(vol, sigma, opt);
+	}
+	else {
+		throw new Error('internal error: unsupported optimisation method');
+	} 
 	
 	// Restrict the efficient frontier to the domain of definition
 	// of the Sharpe ratio (the portfolios with a strictly positive volatility).
@@ -18968,9 +19463,8 @@ self.randomSubspaceMeanVarianceOptimizationWeights = function(mu, sigma, opt) {
 * @return {Array.<number>} the weights corresponding to the computed portfolio, array of n real numbers.
 *
 * @example
-* randomSubspaceGlobalMinimumVarianceOptimizationWeights([0.1, 0.2, 0.15], [[1, 0.3, -0.2], [0.3, 1, 0.6], [-0.2, 0.6, 1]], 
+* randomSubspaceGlobalMinimumVarianceOptimizationWeights([[1, 0.3, -0.2], [0.3, 1, 0.6], [-0.2, 0.6, 1]], 
 *                                   				     { subsetsGenerationMethod: 'deterministic' })
-* // ~[0.09, 0.19, 0.12] // TODO
 */
 self.randomSubspaceGlobalMinimumVarianceOptimizationWeights = function(sigma, opt) {	
 	// Initialize the options structure
@@ -19084,6 +19578,144 @@ self.randomSubspaceGlobalMinimumVarianceOptimizationWeights = function(sigma, op
 	return self.randomSubspaceOptimizationWeights(nbAssets, subsetGlobalMinimumVarianceOptimization, opt);
 }
 
+
+/**
+* @function randomSubspaceMaximumSharpeRatioWeights
+*
+* @summary Compute the weights of a portfolio using the random subspace optimization method 
+* applied to the Markowitz maximum Sharpe ratio optimization algorithm.
+*
+* @description This function returns the weights w_1,...,w_n associated to a long-only fully or partially 
+* invested portfolio of n assets, as computed by the random subspace optimization method applied 
+* to the Markowitz maximum Sharpe ratio optimization algorithm of the first reference.
+*
+* C.f. the method randomSubspaceOptimizationWeights for more details.
+*
+* @see <a href="https://doi.org/10.1111/j.1540-6261.1976.tb03217.x">Elton, E. J., Gruber, M. J. and Padberg, M. W. (1976), SIMPLE CRITERIA FOR OPTIMAL PORTFOLIO SELECTION. The Journal of Finance, 31: 1341-1357</a>
+* @see <a href="https://blog.thinknewfound.com/2018/07/machine-learning-subset-resampling-and-portfolio-optimization/">Machine Learning, Subset Resampling, and Portfolio Optimization</a>
+* @see <a href="https://aaai.org/ocs/index.php/AAAI/AAAI17/paper/view/14443">SHEN, W.; WANG, J.. Portfolio Selection via Subset Resampling. AAAI Conference on Artificial Intelligence, North America, feb. 2017.</a>
+* @see <a href="https://www.stat.berkeley.edu/~breiman/Using_random_forests_V3.1.pdf">Breiman, L (2002), Manual On Setting Up, Using, And Understanding Random Forests V3.1</a>
+*
+* @param {<Array.<number>} mu the returns of the n assets in the considered universe, array of n real numbers.
+* @param {Array.<Array.<number>>} sigma the covariance matrix (sigma_ij),i,j=1..n of the n assets in the considered universe, array of n array of n real numbers statisfying sigma[i-1][j-1] = sigma_ij.
+* @param {number} rf the risk-free rate, a real number.
+* @param {object} opt parameters for the random subspace optimization method, described in the method randomSubspaceOptimizationWeights, with 
+* opt.sizeSubsets defaulting to the floored positive solution of the equation x^2 + x - SQRT(n*(n+1)/2) = 0 if opt.mu is not provided
+* or to the floored positive solution of the equation x^2 + 3x - SQRT(n*(n+3)/2) = 0 if opt.mu is provided.
+* @param {number} opt.mu the optional returns of the n assets in the considered universe, array of n real numbers; defaults to an array of zeroes.
+* @param {number} opt.subsetsOpt optional parameters for the minimum-variance optimization algorithm used in the subsets
+* @param {number} opt.subsetsOpt.optimizationMethodParams.epsGsmo the convergence tolerance of the GSMO algorithm used to solve the subsets minimum-variance optimization problem, 
+* a strictly positive number; defaults to 1e-6.
+* @param {number} opt.subsetsOpt.optimizationMethodParams.maxIterGsmo the maximum number of iterations of the GSMO algorithm used to solve the subsets minimum-variance optimization problem, 
+* a strictly positive natural integer; defaults to 10000.
+* @param {boolean} opt.subsetsOpt.constraints.fullInvestment parameter set to false in case the full investment constraint of the subsets portfolio must be replaced
+* by a partial investment constraint; defaults to true.
+*
+* @return {Array.<number>} the weights corresponding to the computed portfolio, array of n real numbers.
+*
+* @example
+* randomSubspaceMaximumSharpeRatioWeights([0.1, 0.2, 0.15], [[1, 0.3, -0.2], [0.3, 1, 0.6], [-0.2, 0.6, 1]], 0,
+*                                   				     { subsetsGenerationMethod: 'deterministic' })
+*/
+self.randomSubspaceMaximumSharpeRatioWeights = function(mu, sigma, rf, opt) {	
+	// Initialize the options structure
+	if (opt === undefined) {
+		opt = {};
+	}
+	if (opt.constraints === undefined) {
+		opt.constraints = {};
+	}
+	if (opt.subsetsOpt === undefined) {
+		opt.subsetsOpt = {};
+	}
+	if (opt.subsetsOpt.optimizationMethodParams === undefined) {
+		opt.subsetsOpt.optimizationMethodParams = {};
+	}
+	if (opt.subsetsOpt.constraints === undefined) {
+		opt.subsetsOpt.constraints = {};
+	}
+	
+	// ------
+	
+	
+	// Initializations
+	var mu = new Matrix_(mu);
+	var sigma = new Matrix_(sigma);
+	var nbAssets = sigma.nbColumns;
+
+
+	// ------	
+	
+	
+	// Decode options
+
+	// The default size of the subsets to generate is obtained following 
+	// the sixth reference: for a random forest based on m features, the default 
+	// value of the number of sub features to use in each random tree is SQRT(m).
+	//
+	// Applied to the case of mean-variance optimization:
+	// - The number m of features is nbAssets (the number of returns to estimate) +
+	// nbAssets*(nbAssets+1)/2 (the number of variances/covariances to estimate), 
+	// which is equal to nbAssets*(nbAssets+3)/2
+	//
+	// - The number of assets X corresponding to a number of features SQRT(m)
+	// is the solution of the equation X*(X+3)/2 = SQRT(m),
+	// i.e. the solution of the equation X^2 + 3X - 2*SQRT(m) = 0.
+	if (opt.sizeSubsets === undefined) {
+		// Define the coefficients of the second order polynomial x^2 + 3x - 2*SQRT(m)
+		var a = 1;
+		var b = 3;
+		var c = -2*Math.sqrt(nbAssets*(nbAssets+3)/2);
+				
+		// Extract the strictly positive root x^* of the equation x^2 + 3x - 2*SQRT(m) = 0, using a stable numerical formula
+		var b_p = b/2; // reduced discriminant
+		var sign_b_p = 1;
+		var disc = b_p*b_p - a*c; // > 0 because a,b are positive and c is negative
+		var q = -(b_p + Math.sqrt(disc));
+		var r2 = c/q; // positive because c and q are negative
+		
+		opt.sizeSubsets = Math.max(2, Math.floor(r2));
+	}
+
+	
+	// ------
+	
+	
+	// Core process
+	
+	// Define the options for the minimum variance optimization algorithm
+	opt.subsetOptimizationFctOpt = opt.subsetsOpt;
+	
+	// Definition of the portfolio optimization algorithm to use on the subsets
+	function subsetMaximumSharpeRatioOptimization(subsetAssetsIdx, subsetOptimizationFctOpt) {
+		// Extract the returns of the selected assets
+		var subsetMu = mu.submatrix(subsetAssetsIdx, [1]);
+		
+		// Extract the covariance matrix of the selected assets
+		var subsetSigma = sigma.submatrix(subsetAssetsIdx, subsetAssetsIdx);
+
+		// Return the weights of the maximum Sharpe ratio portfolio of the selected assets
+		//
+		// Catches infeasible problem, which can be raised due to the subsetting of assets.
+		try {
+			return self.maximumSharpeRatioWeights(subsetMu, subsetSigma, rf, subsetOptimizationFctOpt);
+		}
+		catch (e) {
+			if (e.message === 'infeasible problem detected: the restricted simplex is empty' || 
+			    e.message === 'impossible to restrict the efficient frontier: the minimum return constraint is not feasible' ||
+				e.message === 'impossible to restrict the efficient frontier: the minimum volatility constraint is not feasible') {
+				throw new Error('infeasible portfolio optimization problem');
+			}
+			else {
+				throw(e);
+			}
+		}
+		
+	}
+
+	// Return the computed portfolio weights using the generic random subspace optimization method
+	return self.randomSubspaceOptimizationWeights(nbAssets, subsetMaximumSharpeRatioOptimization, opt);
+}
 /**
  * @file Functions related to random weights portfolio.
  * @author Roman Rubsamen <roman.rubsamen@gmail.com>
@@ -19368,7 +20000,7 @@ self.randomWeights = function (nbAssets, opt) {
 * - Maximum weight of each asset that is included in the portfolio
 *
 * To be noted that in case weights constraints are defined, the concept of risk budget does not make any sense, 
-* c.f. the sixth reference.
+* c.f. the sixth reference, and the associated optimization problem might not have any solution.
 *
 * The algorithm used internally is a cyclical coordinate descent, c.f. the second reference, whose convergence is guaranteed
 * if the covariance matrix of the assets is semi-definite positive.
@@ -19385,7 +20017,7 @@ self.randomWeights = function (nbAssets, opt) {
 * @param {object} opt the optional parameters for the algorithm.
 * @param {number} opt.eps the tolerance parameter for the convergence of the algorithm, a strictly positive real number; defaults to 1e-10.
 * @param {number} opt.epsSdp the tolerance parameter for testing the semi-definite positiveness of the covariance matrix, a strictly positive real number; defaults to 1e-12.
-* @param {number} opt.maxCycles the maximum number of cycles of the algorithm, a strictly positive natural integer; defaults to 10000.
+* @param {number} opt.maxCycles the maximum number of cycles of the algorithm, a strictly positive natural integer or -1 to allow an infinite number of cycles; defaults to 10000.
 * @param {number} opt.nbCycles the exact number of cycles of the algorithm, a strictly positive natural integer, in which case the values of opt.eps and opt.maxCycles are discarded,
 * or -1; defaults to -1.
 * @param {string} opt.coordinatesSampler, the type of coordinates sampler to use, a string either equal to:
@@ -19423,7 +20055,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 			sigma_x_x = 0;
 		}
 		else if (sigma_x_x < 0 && sigma_x_x < -epsSdp) {
-			throw new Error('negative volatility during iteration ' + iter + ', covariance matrix might not be semi-definite positive');
+			throw new Error('negative volatility, covariance matrix might not be semi-definite positive');
 		}
 		
 		// Compute the volatility SQRT(x'*SIGMA*x)
@@ -19475,7 +20107,7 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 			}
 
 			// Check the maximum number of cycles
-			if (nbCycles == -1 && cycle >= maxCycles) {
+			if (nbCycles == -1 && maxCycles != -1 && cycle >= maxCycles) {
 				throw new Error('maximum number of cycles reached: ' + maxCycles);
 			}
 
@@ -19971,24 +20603,84 @@ self.riskBudgetingWeights = function (sigma, rb, opt) {
 		
 
 		// Compute the initial interval for the bisection algorithm,
-		// c.f. remark 7 of the sixth reference.
+		// c.f. remark 7 of the sixth reference for the starting values of
+		// a and b.
+		//
+		// Experimentations showed that the initial interval is sometimes not
+		// a bracketing interval, so that the possibility to enlarge it has
+		// been implemented below.
+		//
+		// In addition, experimentations showed that it can be that the sum of
+		// the weights is numerically equal to 1, but with sign issues, so that the 
+		// bisection below is not usable; this specific case is managed below.
 		var volURb = computeVolatility(weightsURb, Matrix_.xy(sigma, weightsURb));
+		
 		var a = 0.5 * volURb;
+		var weights_a = coordinatesDescentSolve(a, lowerBounds, upperBounds);
+		var nbIterSearch = 0;
+		var maxNbIterSearch = 54; // The default is taken to be 54, because 2^-54 is quite close to an already unreasonable low value
+		var aEarlyStop = false;
+		while ( weights_a.sum() - 1 > 0 ) {
+			// Increment the number of iterations and check that the number of iterations stays reasonable
+			++nbIterSearch;
+			if (nbIterSearch > maxNbIterSearch) {
+				throw new Error('internal error: maximum number of iterations reached when searching for a bracketing interval, the problem might be infeasible');
+			}
+	
+			// It is possible that sum a_i is numerically equal to 1 !
+			if ( Math.abs(weights_a.sum() - 1) <= eps ) {
+				aEarlyStop = true;
+				break;
+			}
+			
+			// Halve the value of a, and compute the associated portfolio weights
+			a = 0.5 * a;
+			weights_a = coordinatesDescentSolve(a, lowerBounds, upperBounds);
+		}
+		
 		var b = 2 * volURb;
+		var weights_b = coordinatesDescentSolve(b, lowerBounds, upperBounds);
+		var nbIterSearch = 0;
+		var maxNbIterSearch = 54; // The default is taken to be 54, because 2^54 is quite close to an already unreasonable high value
+		var bEarlyStop = false;
+		while ( weights_b.sum() - 1 < 0 ) {
+			// Increment the number of iterations and check that the number of iterations stays reasonable
+			++nbIterSearch;
+			if (nbIterSearch > maxNbIterSearch) {
+				throw new Error('internal error: maximum number of iterations reached when searching for a bracketing interval, the problem might be infeasible');
+			}
+
+			// It is possible that sum b_i is numerically equal to 1 !
+			if ( Math.abs(weights_b.sum() - 1) <= eps ) {
+				bEarlyStop = true;
+				break;
+			}
+			
+			// Double the value of b, and compute the associated portfolio weights
+			b = 2 * b;
+			weights_b = coordinatesDescentSolve(b, lowerBounds, upperBounds);
+		}
 		
 		
-		// Compute the value of the penalty parameter lambda^* such that
-		// sum x(lambda^*)_i = 1, i=1..nbAssets, using the bisection algorithm.
-		var lambda_star = bisection_(function (lambda) { 
-						 		         var weights = coordinatesDescentSolve(lambda, lowerBounds, upperBounds); 
-								         return weights.sum() - 1; 
-							         }, 
-							         a, b);
-		
-		
-		// Compute the associated portfolio weights
-		x = coordinatesDescentSolve(lambda_star, lowerBounds, upperBounds);
-		
+		if (aEarlyStop) {
+			x = weights_a;
+		}
+		else if (bEarlyStop) {
+			x = weights_b;
+		}
+		else {	
+			// Compute the value of the penalty parameter lambda^* such that
+			// sum x(lambda^*)_i = 1, i=1..nbAssets, using the bisection algorithm.
+			var lambda_star = bisection_(function (lambda) { 
+											 var weights = coordinatesDescentSolve(lambda, lowerBounds, upperBounds); 
+											 return weights.sum() - 1; 
+										 }, 
+										 a, b);
+			
+			
+			// Compute the associated portfolio weights
+			x = coordinatesDescentSolve(lambda_star, lowerBounds, upperBounds);
+		}
 	}
 	else {
 		// The solution to the unconstrained risk budgeting optimization problem

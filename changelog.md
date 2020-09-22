@@ -1,3 +1,21 @@
+### 0.0.11 - xx/yy/2020
+- Cosmetic updates related correlation matrices fixing, and added a unit test to cover the infinite precision of the nearest correlation matrix computation
+- Improved the numerical stability of the Constrained Risk Budgeting algorithm: added auto-expanding bisection interval, and early stopping criterion
+- Added two methods to swap two rows or two columns of a matrix
+- Added an LU decomposition method for square matrices, with full pivoting
+- Added a method to solve lower triangular linear systems
+- Reworked the internals of the critical line algorithm, to solve the KKT linear systems with a LU decomposition with full pivoting instead, to guard against numerical issues
+- Reworked the internals of the critical line algorithm to allow for equal returns; the only case in which the CLA algorithm will not work is if the covariance matrix is not invertible, if there are more than 1 asset IN in the maximum return portfolio, and if the associated KKT matrix is also non invertible
+- Fixed a bug in the GSMO optimization method, which could seemingly lead to cycling (or at least required an unreasonably huge number of iterations before convergence)
+- Added the critical line method as additional optimization method for the GMV portfolio
+- Added the critical line method as additional optimization method for the MDP portfolio
+- Improved the numerical precision of the corner portfolios, of the mean-variance efficient portfolios, and of the maximum Sharpe ratio portfolios
+- Added a RSO-MSR optimization method
+- Redesigned the asset allocation non-regression to factorize the tests on portfolio weights using an equality function
+- Redesigned the internals of the mean-variance optimization method, to automatically selects the critical line algorithm, or the GSMO algorithm as optimization routine
+- Allowed for an infinite number of cycles in the risk budgeting computation
+- Added lower bounds and upper bounds constraints in the equal risk bounding method
+
 ### 0.0.10 - 14/09/2020
 - Added the Jacobi method in order to compute eigenvalues and eigenvectors of real symmetric matrices
 - Updated the method to generate random correlation matrices to output truly symmetric matrices, and not numerically symmetric matrices only

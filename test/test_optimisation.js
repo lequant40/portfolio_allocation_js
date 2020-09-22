@@ -1641,7 +1641,32 @@ QUnit.test('Quadratic programming solver (single linear constraint and finite bo
 			}
 			assert.equal(kkt_conditions_ok, true, 'Feasible problem ' + (k+1) + ' - 2/2');
 		}
-	}	
+	}
+	
+	// Test that the anti-cycling procedure is correctly working
+	//
+	// If is it not present, the example below will not convergence in 100 iterations
+	// There is no need to test for the result, though.
+	{
+		var n = 4;
+		
+		var Q = new PortfolioAllocation.Matrix([[1, 0.1, 0, 0], [0.1, 1, 0, 0], [0, 0, 0.2, 0.2], [0, 0, 0.2, 0.2]]);
+		var b = PortfolioAllocation.Matrix.ones(n, 1);
+		var r = 1;
+		var l = PortfolioAllocation.Matrix.zeros(n, 1);
+		var u = PortfolioAllocation.Matrix.ones(n, 1);
+		var mu = new PortfolioAllocation.Matrix([2, 2, 1, 0.9]);
+		var p = PortfolioAllocation.Matrix.ax(-0.00390625, mu);
+		
+		// No anti-cycling
+		assert.throws(function() { 
+			var sol = PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u, {maxIter: 100, eps: 1e-6}); },
+			new Error('maximum number of iterations reached: 100'),
+			"Test cycling");
+		
+		// Anti-cycling activated
+		var sol = PortfolioAllocation.qpsolveGSMO_(Q, p, b, r, l, u, {antiCycling: true, maxIter: 100, eps: 1e-6}); 
+	}
 });
 
 

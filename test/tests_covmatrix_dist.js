@@ -256,7 +256,7 @@ QUnit.test('Indefinite correlation matrix repair', function(assert) {
 		for (var i = 0; i < n; ++i) {
 			for (var j = 0; j < n; ++j) {
 				if ( Math.abs( expectedMat[i][j] - fixedCorrMat.getValueAt(i+1,j+1) ) > 1e-4 ||
-				     Math.abs( fixedCorrMatDefault.getValueAt(i+1,j+1) - fixedCorrMat.getValueAt(i+1,j+1) ) > 1e-14 ) {
+				     Math.abs( fixedCorrMat.getValueAt(i+1,j+1) - fixedCorrMatDefault.getValueAt(i+1,j+1) ) > 0 ) {
 					matrixEqual = false;
 					break;
 				}
@@ -593,8 +593,11 @@ QUnit.test('Nearest correlation matrix', function(assert) {
 		var mat = [[2, -1, 0, 0],[-1,2,-1,0],[0,-1,2,-1],[0,0,-1,2]];
 		var n = mat.length;
 		var expectedMat = [[1.0000, -0.8084, 0.1916, 0.1068], [-0.8084, 1.0000, -0.6562, 0.1916], [0.1916, -0.6562, 1.0000, -0.8084], [0.1068 ,0.1916, -0.8084, 1.000]];
-		var nearestCorrMat = PortfolioAllocation.nearestCorrelationMatrix(mat, {eps:1e-8});
 		
+		// With default precision, the generated matrix will not be a numerically exact correlation matrix
+		//
+		// Check this
+		var nearestCorrMat = PortfolioAllocation.nearestCorrelationMatrix(mat);
 		var matrixEqual = true;
 		for (var i = 0; i < n; ++i) {
 			for (var j = 0; j < n; ++j) {
@@ -604,7 +607,22 @@ QUnit.test('Nearest correlation matrix', function(assert) {
 				}
 			}
 		}
-		assert.equal(matrixEqual, true, 'Nearest correlation matrix - Test #2');
+		assert.equal(matrixEqual, true, 'Nearest correlation matrix - Test #2, default precision');
+		assert.equal(nearestCorrMat.isCorrelationMatrix(), false, 'Nearest correlation matrix - Test #2, default precision, not an exact correlation matrix');
+		
+		// Now request an infinite precision
+		var nearestCorrMat = PortfolioAllocation.nearestCorrelationMatrix(mat, {eps: 0});
+		var matrixEqual = true;
+		for (var i = 0; i < n; ++i) {
+			for (var j = 0; j < n; ++j) {
+				if ( Math.abs( expectedMat[i][j] - nearestCorrMat.getValueAt(i+1,j+1) ) > 1e-4 ) {
+					matrixEqual = false;
+					break;
+				}
+			}
+		}
+		assert.equal(matrixEqual, true, 'Nearest correlation matrix - Test #2, infinite precision');
+		assert.equal(nearestCorrMat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Test #2, infinite precision, exact correlation matrix');
 	}
 	
   // Test using static data
@@ -674,7 +692,7 @@ QUnit.test('Nearest correlation matrix', function(assert) {
 					 [-0.12, 0.09,  0.04,  0.85,  0.85,  0.85,  1]];
 		var n = mat.length;
 		
-		// When no minimum eigenvalue is provided, 0 must be the default
+		// When no minimum eigenvalue is provided, 1e-8 must be the default
 		var expectedMat =  [[1.000000, 0.183844, -0.131789, -0.251417, 0.178399, -0.247928, -0.119061],
 							 [ 0.183844, 1.000000, 0.218241, -0.131564, 0.298599, 0.162037, 0.090923],
 							 [-0.131789, 0.218241, 1.000000, 0.056073, -0.074692, 0.039052, 0.039570],
@@ -683,13 +701,13 @@ QUnit.test('Nearest correlation matrix', function(assert) {
 							 [-0.247928, 0.162037, 0.039052, 0.854548, 0.843853, 1.000000, 0.850498],
 							 [-0.119061, 0.090923, 0.039570, 0.852062, 0.847214, 0.850498, 1.000000]];
 		var nearestCorrMatDefault = PortfolioAllocation.nearestCorrelationMatrix(mat);
-		var nearestCorrMatDelta = PortfolioAllocation.nearestCorrelationMatrix(mat, {minEigenvalue: 0});
+		var nearestCorrMatDelta = PortfolioAllocation.nearestCorrelationMatrix(mat, {minEigenvalue: 1e-8});
 
 		var matrixEqual = true;
 		for (var i = 0; i < n; ++i) {
 			for (var j = 0; j < n; ++j) {
 				if ( Math.abs( expectedMat[i][j] - nearestCorrMatDefault.getValueAt(i+1,j+1) ) > 1e-4 || 
-				     Math.abs( nearestCorrMatDefault.getValueAt(i+1,j+1) - nearestCorrMatDelta.getValueAt(i+1,j+1) ) > 1e-4 ) {
+				     Math.abs( nearestCorrMatDefault.getValueAt(i+1,j+1) - nearestCorrMatDelta.getValueAt(i+1,j+1) ) > 0 ) {
 					matrixEqual = false;
 					break;
 				}

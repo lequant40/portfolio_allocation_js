@@ -172,6 +172,118 @@ QUnit.test('Matrix-matrix elementwise product', function(assert) {
 });
 
 
+QUnit.test('Matrix rows and columns swaps', function(assert) {    
+	// Test with static data
+	//
+	// Swap the same row
+	{
+		var mat = new PortfolioAllocation.Matrix([[1,2], [4,5]]);
+
+		var resMatCopy = mat.swapRows(1,1);
+		var resMatInPlace = mat.swapRows(1,1, {inPlace: true});
+		var expectedMat = new PortfolioAllocation.Matrix(mat);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatCopy, expectedMat), true, 'Swap the same row, copy');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatInPlace, expectedMat), true, 'Swap the same row, in place');
+
+		mat.touch = true;
+		assert.equal(resMatCopy.touch, undefined, 'Swap the same row, copy, original matrix not altered');
+		assert.equal(resMatInPlace.touch, true, 'Swap the same row, in place, original matrix altered');
+	} 
+
+	// Test with static data
+	//
+	// Swap two rows
+	{
+		var mat = new PortfolioAllocation.Matrix([[1,2], [4,5]]);
+
+		var resMatCopy = mat.swapRows(1,2);
+		var resMatInPlace = mat.swapRows(1,2, {inPlace: true});
+		var expectedMat = new PortfolioAllocation.Matrix([[4,5], [1,2]]);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatCopy, expectedMat), true, 'Swap two rows, copy');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatInPlace, expectedMat), true, 'Swap two rows, in place');
+
+		mat.touch = true;
+		assert.equal(resMatCopy.touch, undefined, 'Swap two rows, copy, original matrix not altered');
+		assert.equal(resMatInPlace.touch, true, 'Swap two rows, in place, original matrix altered');
+	} 
+	
+	
+	// Test with static data
+	//
+	// Swap the same column
+	{
+		var mat = new PortfolioAllocation.Matrix([[1,2], [4,5]]);
+
+		var resMatCopy = mat.swapColumns(1,1);
+		var resMatInPlace = mat.swapColumns(1,1, {inPlace: true});
+		var expectedMat = new PortfolioAllocation.Matrix(mat);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatCopy, expectedMat), true, 'Swap the same row, copy');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatInPlace, expectedMat), true, 'Swap the same row, in place');
+
+		mat.touch = true;
+		assert.equal(resMatCopy.touch, undefined, 'Swap the same row, copy, original matrix not altered');
+		assert.equal(resMatInPlace.touch, true, 'Swap the same row, in place, original matrix altered');
+	} 
+
+	// Test with static data
+	//
+	// Swap two columns
+	{
+		var mat = new PortfolioAllocation.Matrix([[1,2], [4,5]]);
+
+		var resMatCopy = mat.swapColumns(1,2);
+		var resMatInPlace = mat.swapColumns(1,2, {inPlace: true});
+		var expectedMat = new PortfolioAllocation.Matrix([[2,1], [5,4]]);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatCopy, expectedMat), true, 'Swap two columns, copy');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(resMatInPlace, expectedMat), true, 'Swap two columns, in place');
+
+		mat.touch = true;
+		assert.equal(resMatCopy.touch, undefined, 'Swap two columns, copy, original matrix not altered');
+		assert.equal(resMatInPlace.touch, true, 'Swap two columns, in place, original matrix altered');
+	}
+
+  // TODO: use random data
+});
+
+
+QUnit.test('LU decomposition', function(assert) {    
+	// Test with static data
+	{
+		var mat = new PortfolioAllocation.Matrix([[3,17, 10], [2, 4, -2], [6, 18, -12]]);
+
+		// Test the matrix format for the permutation matrices
+		var expectedL = new PortfolioAllocation.Matrix([[1, 0, 0], [0.9444444444444444, 1, 0], [0.2222222222222222, 0.031249999999999993, 1]]);
+		var expectedU = new PortfolioAllocation.Matrix([[18, -12, 6], [0, 21.333333333333332, -2.666666666666666], [0, 0, 0.75]]);
+		var expectedP = new PortfolioAllocation.Matrix([[0, 0, 1], [1 ,0 ,0], [0, 1, 0]]);
+		var expectedQ = new PortfolioAllocation.Matrix([[0, 0, 1], [1 ,0 ,0], [0, 1, 0]]);
+
+		var lu = PortfolioAllocation.Matrix.luDecomposition(mat);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.lowerTriangular, expectedL), true, 'Test #1, L');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.upperTriangular, expectedU), true, 'Test #1, U');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.rowPermutation, expectedP), true, 'Test #1, P');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.columnPermutation, expectedQ), true, 'Test #1, Q');
+
+		var mlu = PortfolioAllocation.Matrix.xy(lu.lowerTriangular, lu.upperTriangular);
+		var mpaq = PortfolioAllocation.Matrix.xy(lu.rowPermutation, PortfolioAllocation.Matrix.xy(mat, lu.columnPermutation));
+		assert.equal(PortfolioAllocation.Matrix.areEqual(mlu, mpaq), true, 'Test #1, PAQ = LU');
+
+		
+		// Test the vector format for the permutation matrices
+		var expectedPvector = new PortfolioAllocation.Matrix([3, 1, 2]);
+		var expectedQvector = new PortfolioAllocation.Matrix([2, 3, 1]);
+
+		var lu = PortfolioAllocation.Matrix.luDecomposition(mat, {permutationsOutputForm: "vector"});
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.lowerTriangular, expectedL), true, 'Test #1, L vector');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.upperTriangular, expectedU), true, 'Test #1, U vector');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.rowPermutation, expectedPvector), true, 'Test #1, P vector');
+		assert.equal(PortfolioAllocation.Matrix.areEqual(lu.columnPermutation, expectedQvector), true, 'Test #1, Q vector');
+	}
+
+	// TODO: Test with random data
+});
+
+
+
 QUnit.test('Matrix element wise function', function(assert) {    
   // Test matrix element wise function using static data
   var mat = new PortfolioAllocation.Matrix([[1,2,3], [4,5,6]]);
@@ -1081,7 +1193,7 @@ QUnit.test('Matrix row/columns norms computation', function(assert) {
 });
 
 
-QUnit.test('Linear system solver - Upper triangular system solve via back substitution', function(assert) {    
+QUnit.test('Linear system solver - Systems solve via back and forward substitution', function(assert) {    
   // Test using static data  
   {
       var A = new PortfolioAllocation.Matrix([[1, 2, 1, -1], [0, -4, 1, 7], [0, 0, -2, 1], [0, 0, 0, -1]]);
@@ -1090,6 +1202,16 @@ QUnit.test('Linear system solver - Upper triangular system solve via back substi
 	  
 	  var x = PortfolioAllocation.Matrix.linsolveBackSubstitution(A, b);
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Upper triangular linear system solve - Back substitution algorithm #1');
+  }
+  
+  // Test using static data  
+  {
+      var A = new PortfolioAllocation.Matrix([[2, 0, 0], [1, 5, 0], [7, 9, 8]]);
+	  var b = new PortfolioAllocation.Matrix([6, 2, 5]);
+      var expectedX = new PortfolioAllocation.Matrix([3, -0.2, -1.775]);
+	  
+	  var x = PortfolioAllocation.Matrix.linsolveForwardSubstitution(A, b);
+	  assert.equal(PortfolioAllocation.Matrix.areEqual(x, expectedX, 1e-14), true, 'Lower triangular linear system solve - Forward substitution algorithm #1');
   }
   
   // TODO: Test random data

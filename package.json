@@ -14,7 +14,11 @@
     "quantitative finance",
     "portfolio allocation",
     "portfolio optimization",
-    "mean variance optimization"
+    "mean variance optimization",
+	"minimum variance portfolio",
+	"maximum sharpe portfolio",
+	"mean variance efficient frontier",
+	"risk parity"
   ],
   "repository": {
     "type": "git",
