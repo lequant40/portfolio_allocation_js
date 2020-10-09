@@ -472,7 +472,8 @@ QUnit.test('Cholesky decomposition', function(assert) {
 
 	  // Computation of the Cholesky decomposition
 	  var mat = new PortfolioAllocation.Matrix([[1.005, 0.897, 0.698], [0.897, 1.003, 0.302], [0.698, 0.302, 1.001]]);
-	  var G = PortfolioAllocation.Matrix.choleskyDecomposition(mat);
+	  var chol = PortfolioAllocation.Matrix.choleskyDecomposition(mat);
+	  var G = chol.lowerTriangular;
 	  
 	  // Ensure G is lower triangular with positive diagonal elements
 	  var lowerTriangular = true;
@@ -497,6 +498,71 @@ QUnit.test('Cholesky decomposition', function(assert) {
 						 
   }
   
+	// Test using static data that semi-definite positive matrices are NOT managed with a standard
+	// Cholesky decomposition.
+	{
+		var mat = new PortfolioAllocation.Matrix([[1, -1, 1], [-1, 1, -1], [1, -1, 2]]);
+		assert.throws(function() { 
+			var chol = PortfolioAllocation.Matrix.choleskyDecomposition(mat); 
+		},
+		new Error('input matrix must be positive definite'),
+		"Cholesky decomposition - semi-definite positive KO");
+  }
+  
+	// Test using static data that semi-definite positive matrices are properly managed with a Cholesky decomposition
+	// with full pivoting.
+	{
+		var mat = new PortfolioAllocation.Matrix([[1, -1, 1], [-1, 1, -1], [1, -1, 2]]);
+		var chol = PortfolioAllocation.Matrix.choleskyDecomposition(mat, {pivoting: "complete"}); 
+		var L = chol.lowerTriangular;
+		var D = chol.diagonal;
+		var P = chol.permutation;
+		
+		// Ensure L is lower triangular
+		// Ensure D has positive elements
+		var lowerTriangular = true;
+		var positiveDiagonalElements = true;
+		for (var i = 1; i <= mat.nbRows; ++i) {
+		  if (D.getValueAt(i,1) < 0) {
+			  positiveDiagonalElements = false;
+		  }
+		  
+		  for (var j = i+1; j <= mat.nbRows; ++j) {
+			  if (L.getValueAt(i,j) != 0) {
+				  lowerTriangular = false;
+			  }
+		  }
+		}
+		assert.equal(lowerTriangular, true, 'Cholesky decomposition with complete pivoting, semi-definite positive OK - Lower triangular');
+		assert.equal(positiveDiagonalElements, true, 'Cholesky decomposition with complete pivoting, semi-definite positive OK - Positive diagonal elements');
+				
+		// Ensure P^t * A * P = L * Diag(D) * L^t
+		var ldlt = PortfolioAllocation.Matrix.xy(PortfolioAllocation.Matrix.xy(L, PortfolioAllocation.Matrix.diagonal(D)), L.transpose());
+		var patp = PortfolioAllocation.Matrix.xy(PortfolioAllocation.Matrix.txy(P, mat),P);
+		assert.equal(PortfolioAllocation.Matrix.areEqual(ldlt, patp, 1e-12), true, 'Cholesky decomposition with complete pivoting, semi-definite positive OK - P^t * A * P = L * D * L^t');
+  }
+  
+	// Test with static data the case of an indefinite matrix, which must fail
+	{
+		var mat = [[1,                    0.618421696258621  ,  0.4874298723751651,  -0.49079033902258856  , 0.11944609519358924 ,  -0.5578129586552424  , -0.4771156006785486 ,  -0.5891536415285011 ,  -0.3033661105868079 ,    0.346969569262485],
+				[0.618421696258621,                     1  ,  0.5625061910498927 ,  -0.3066061449896621 ,  0.22036065346794634 ,  -0.2995526904104299 ,  -0.2665281748643263 ,  -0.4384779718501961  ,-0.04157807243431871 ,  0.36441921116789094],
+				[0.4874298723751651 ,   0.5625061910498927  ,                   1,  -0.24898733591796773 ,  0.48207046028556727 ,  -0.3253014452697968 , -0.39490635735791035, -0.018501626749401468 , 0.034978192975079626,  -0.13605230462054563],
+				[-0.49079033902258856,   -0.3066061449896621 , -0.24898733591796773 ,                    1,    0.3523200216615302 ,   0.5874187797438452,   0.35430037283032667,   0.28094692738663546  ,  0.5704634723157168,   -0.5160250884331637],
+				[0.11944609519358924 ,  0.22036065346794634 ,  0.48207046028556727 ,   0.3523200216615302 ,                    1, -0.011807320173530558 ,  -0.1845706823452529 ,  0.48127181356733134 ,   0.5240171002774565 , -0.04905664181384413],
+				[-0.5578129586552424 ,  -0.2995526904104299,   -0.3253014452697968 ,   0.5874187797438452, -0.011807320173530558,                     1 ,   0.9395942716104612 ,   0.3019431882153892 ,   0.5712314628087278 ,  -0.5702138190028966],
+				[-0.4771156006785486,   -0.2665281748643263,  -0.39490635735791035 ,  0.35430037283032667,   -0.1845706823452529 ,   0.9395942716104612 ,                    1,    0.3594948044435324 ,  0.40258020819009377,  -0.23665358042668136],
+				[-0.5891536415285011,   -0.4384779718501961, -0.018501626749401468 ,  0.28094692738663546,   0.48127181356733134 ,   0.3019431882153892,    0.3594948044435324 ,                    1,     0.307071908776885,  -0.27512543932175526],
+				[-0.3033661105868079,  -0.04157807243431871,  0.034978192975079626 ,   0.5704634723157168,    0.5240171002774565 ,   0.5712314628087278,   0.40258020819009377,     0.307071908776885,                     1,  -0.12697231187851038],
+				[0.346969569262485,   0.36441921116789094 , -0.13605230462054563  , -0.5160250884331637 , -0.04905664181384413  , -0.5702138190028966,  -0.23665358042668136,  -0.27512543932175526 , -0.12697231187851038  ,                   1]]
+		var mat = PortfolioAllocation.Matrix(mat);
+	  
+		assert.throws(function() { 
+			var chol = PortfolioAllocation.Matrix.choleskyDecomposition(mat, {pivoting: "complete"});
+		},
+		new Error('input matrix must be semi-definite positive'),
+		"Cholesky decomposition with complete pivoting, semi-definite positive KO");
+  }
+
   // TODO: Test using random data
   
   // TODO: Test error case
@@ -560,7 +626,47 @@ QUnit.test('Functions for correlation matrices polishing and testing', function(
 		
 		var mat = new PortfolioAllocation.Matrix([[1,1], [1,1]]);
 		assert.equal(mat.isCorrelationMatrix(), true, 'Correlation matrix testing - semi definite positive');
+	}
+});
 
+QUnit.test('Functions for covariance matrices testing', function(assert) {    
+	// Test error cases
+	{
+		// Non square matrix
+		var mat = PortfolioAllocation.Matrix.normrnd(10, 8);
+		assert.equal(mat.isCovarianceMatrix(), false, 'Covariance matrix testing - non square');
+		assert.throws(function() { 
+			mat.isCovarianceMatrix(undefined, "exception");
+		},
+		 new Error('not square'),
+		 "Covariance matrix testing - non square");
+		
+		// Non symmetric
+		mat = PortfolioAllocation.Matrix.normrnd(10, 10);
+		assert.equal(mat.isCovarianceMatrix(), false, 'Covariance matrix testing - non symmetric');
+		assert.throws(function() { 
+			mat.isCovarianceMatrix(undefined, "exception");
+		},
+		 new Error('not symmetric'),
+		 "Covariance matrix testing - non symmetric");
+		
+		// Non diagonal positive
+		mat = PortfolioAllocation.Matrix.normrnd(10, 10).symmetrize().elemMap(function(i,j,val) { if (i == j) { return Math.min(-1e-16, val); } else { return val; }});
+		assert.equal(mat.isCovarianceMatrix(), false, 'Covariance matrix testing - non positive diagonal');
+		assert.throws(function() { 
+			mat.isCovarianceMatrix(undefined, "exception");
+		},
+		 new Error('not positive diagonal'),
+		 "Covariance matrix testing - non symmetric");
+		
+		// Non definite semi-positive
+		mat = PortfolioAllocation.Matrix.normrnd(10, 10).symmetrize().elemMap(function(i,j,val) { if (i == j) { return Math.max(0, val); }  else { return val; }});
+		assert.equal(mat.isCovarianceMatrix(), false, 'Covariance matrix testing - non semi definite positive (unless bad luck)');
+		assert.throws(function() { 
+			mat.isCovarianceMatrix(undefined, "exception");
+		},
+		 new Error('not positive semi-definite'),
+		 "Covariance matrix testing - non symmetric");
 	}
 });
 
@@ -569,17 +675,21 @@ QUnit.test('Eigenvalues and eigenvectors computation', function(assert) {
 	// Test error cases
 	{
 		// Non square matrix
-		var mat = PortfolioAllocation.Matrix.normrnd(10, 8);
-		assert.throws(function() { PortfolioAllocation.Matrix.eig(mat); },
-						 new Error('input matrix must be symmetric'),
-						 "Eigenvalues and eigenvectors computation - Non square matrix");
+		assert.throws(function() { 
+			var mat = PortfolioAllocation.Matrix.normrnd(10, 8);
+			PortfolioAllocation.Matrix.eig(mat); 
+		},
+		 new Error('input matrix must be symmetric'),
+		 "Eigenvalues and eigenvectors computation - Non square matrix");
 
 		
 		// Non symmetric matrix
-		var mat = PortfolioAllocation.Matrix.normrnd(10, 10);
-		assert.throws(function() { PortfolioAllocation.Matrix.eig(mat); },
-						 new Error('input matrix must be symmetric'),
-						 "Eigenvalues and eigenvectors computation - Non symmetric matrix");
+		assert.throws(function() { 
+			var mat = PortfolioAllocation.Matrix.normrnd(10, 10);
+			PortfolioAllocation.Matrix.eig(mat); 
+		},
+		 new Error('input matrix must be symmetric'),
+		 "Eigenvalues and eigenvectors computation - Non symmetric matrix");
 
 	}
 	
@@ -590,9 +700,17 @@ QUnit.test('Eigenvalues and eigenvectors computation', function(assert) {
 		var mat = PortfolioAllocation.Matrix.identity(3);
 		mat.setValueAt(1,2,1e-15);
 		
-		// Computation of the eigenvalues and eigenvectors, which must work thanks to
-		// the check on default numerical symmetry.
-		var jacobi = PortfolioAllocation.Matrix.eig(mat);
+		// Computation of the eigenvalues and eigenvectors, which must NOT work without 
+		// a tolerance value on numerical symmetry.
+		//
+		assert.throws(function() { 
+			var jacobi = PortfolioAllocation.Matrix.eig(mat);
+		},
+		 new Error('input matrix must be symmetric'),
+		 "Eigenvalues and eigenvectors computation - Numerically non symmetric matrix");
+		
+		//
+		var jacobi = PortfolioAllocation.Matrix.eig(mat, {epsSymmetric: 1e-12});
 		var V = jacobi[0];
 		var D = jacobi[1];
 		

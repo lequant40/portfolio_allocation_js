@@ -10,7 +10,7 @@ QUnit.test('Mean vector computation', function(assert) {
   // Static data
   {
 	  // Test the sample mean vector computation
-	  var meanVec = PortfolioAllocation.meanVector([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]], {method: "sample-mean"}).toArray();
+	  var meanVec = PortfolioAllocation.meanVector([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]], {regularizationMethod: "none"}).toArray();
 	  var meanVecDefault = PortfolioAllocation.meanVector([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]]).toArray();
 	  var expectedMeanVec = [0.023333333333333334, -0.010000000000000002];
 	  
@@ -26,7 +26,7 @@ QUnit.test('Mean vector computation', function(assert) {
 	  assert.equal(resultOK, true, 'Mean vector computation, default parameters #3');
 
 	  // Test the DeMiguel shrinkage mean vector computation
-	  var meanVec = PortfolioAllocation.meanVector([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]], {method: "linear-shrinkage"}).toArray();
+	  var meanVec = PortfolioAllocation.meanVector([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]], {regularizationMethod: "linear-shrinkage"}).toArray();
 	  var expectedMeanVec = [0.015659472422062354, -0.0023261390887290207];
 
 	  assert.equal(meanVec.length, expectedMeanVec.length, 'Mean vector computation, DeMiguel linear shrinkage #1');

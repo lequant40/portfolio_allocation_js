@@ -7,43 +7,86 @@ QUnit.module('Covariance matrix module', {
 
 
 QUnit.test('Covariance matrix creation', function(assert) {    
+  // Error cases
+  {
+	assert.throws(function() { 
+		var cov = PortfolioAllocation.covarianceMatrix([[0.05, 0.01, 0.01], [-0.05, 0.03]]);
+	},
+	 new Error('inconsistent input matrix dimensions'),
+	 "Covariance matrix creation, inconsistent input matrix dimensions");
+  }
+
   // Static data
   {
 	  var cov = PortfolioAllocation.covarianceMatrix([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]]);
+	  assert.equal(cov.isCovarianceMatrix(0, "exception"), true, 'Covariance matrix checks');
 	  assert.deepEqual(cov.toRowArray(), [[0.0003555555555555556,  -0.0005333333333333334], 
-	                                      [-0.0005333333333333334, 0.0010666666666666667]], 'Covariance matrix creation, population covariance');
-	  
-	  var scov = PortfolioAllocation.covarianceMatrix([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]], {method: "sample-covariance"});
-	  assert.deepEqual(scov.toRowArray(), [[0.0005333333333333335, -0.0008],  
-	                                       [-0.0008, 0.0016]], 'Covariance matrix creation, sample covariance');	  
-	  
+	                                      [-0.0005333333333333334, 0.0010666666666666667]], 'Covariance matrix creation');
+	  	  										
 	  // The computations below were verified using the Matlab script cov1para.m from Ledoit and Wolf
-	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, 3], [2, 4, 5]], {method: "linear-shrinkage", shrinkageTarget: "constant-variance-null-correlation"});
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, 3], [2, 4, 5]], {regularizationMethod: "linear-shrinkage", shrinkageTarget: "constant-variance-null-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
 	  assert.deepEqual(lwcov.toRowArray(), [[0.8193967163039326, 0.6563573883161513],  
 	                                        [0.6563573883161513, 1.4028255059182893]], 'Covariance matrix creation, Ledoit-Wolf constant covariance model');
-	  
-	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2], [2, 4], [3, 5]], {method: "linear-shrinkage" , shrinkageTarget: "constant-variance-null-correlation"});
+	  	  
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2], [2, 4], [3, 5]], {regularizationMethod: "linear-shrinkage" , shrinkageTarget: "constant-variance-null-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
 	  assert.deepEqual(lwcov.toRowArray(), [[0.25, 0.5, 0.5], 
 	                                        [0.5, 1, 1], 
 											[0.5, 1, 1]], 'Covariance matrix creation, Ledoit-Wolf constant covariance model #2');
 	  
 	  // The computations below were verified using the Matlab script covCor.m from Ledoit and Wolf
-	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {method: "linear-shrinkage", shrinkageTarget: "constant-correlation"});
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {regularizationMethod: "linear-shrinkage", shrinkageTarget: "constant-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
 	  assert.deepEqual(lwcov.toRowArray(), [[2.5000000000000004, -0.7147951569608585, -3.8283673413445896],
 	                                        [-0.7147951569608585, 2.75, -2.6768525072041105 ], 
 											[ -3.8283673413445896, -2.6768525072041105, 28.75]], 'Covariance matrix creation, Ledoit-Wolf constant correlation model');
 											
 	  // The computation below were NOT verified with code from De Nard, pending answer
-	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {method: "linear-shrinkage", shrinkageTarget: "constant-variance-correlation"});
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {regularizationMethod: "linear-shrinkage", shrinkageTarget: "constant-variance-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
 	  assert.deepEqual(lwcov.toRowArray(), [[6.525679576617755, -1.3292338224681264, -5.4112039932643725],
 	                                        [-1.3292338224681264, 6.661745248977629, -2.0095621842675007], 
 											[-5.4112039932643725, -2.0095621842675007, 20.812575174404618]], 'Covariance matrix creation, Ledoit-Wolf constant variance covariance model');
 											
 	  // The computation below were not verified with any code from Schafer
-	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {method: "linear-shrinkage", shrinkageTarget: "null-correlation"});
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {regularizationMethod: "linear-shrinkage", shrinkageTarget: "null-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
 	  assert.deepEqual(lwcov.toRowArray(), [[2.5000000000000004, 0, -4.32972972972973],
 	                                        [0, 2.75, -0.7216216216216218], 
 											[-4.32972972972973, -0.7216216216216218, 28.75]], 'Covariance matrix creation, Ledoit-Wolf null correlation model');
+  }
+  
+  // Static data with non centered data
+  {
+	  var scov = PortfolioAllocation.covarianceMatrix([[0.05, 0.01, 0.01], [-0.05, 0.03, -0.01]], {assumeZeroMean: false});
+	  assert.equal(scov.isCovarianceMatrix(), true, 'Covariance matrix checks');
+	  assert.deepEqual(scov.toRowArray(), [[0.0005333333333333335, -0.0008],  
+	                                       [-0.0008, 0.0016]], 'Covariance matrix creation, no zero mean');
+
+	  // The four linear-shrinkage regularization methods below have NOT been validated against any code
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, 3], [2, 4, 5]], {assumeZeroMean: false, regularizationMethod: "linear-shrinkage", shrinkageTarget: "constant-variance-null-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
+	  assert.deepEqual(lwcov.toRowArray(), [[1.3419243986254297, 0.7306701030927834],  
+	                                        [0.7306701030927834	, 1.9914089347079036]], 'Covariance matrix creation, Ledoit-Wolf constant covariance model, no zero mean');
+											
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {assumeZeroMean: false, regularizationMethod: "linear-shrinkage", shrinkageTarget: "constant-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
+	  assert.deepEqual(lwcov.toRowArray(), [[3.333333333333333, -0.9955990054728224, -4.8859840643561725 ],
+											[ -0.9955990054728224,   3.666666666666666,  -3.654051336659059 ],
+											[ -4.8859840643561725,  -3.654051336659059,   38.33333333333333 ]], 'Covariance matrix creation, Ledoit-Wolf constant correlation model, no zero mean');
+											
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {assumeZeroMean: false, regularizationMethod: "linear-shrinkage", shrinkageTarget: "constant-variance-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
+	  assert.deepEqual(lwcov.toRowArray(), [[   9.302812153826505, -1.9710543275213308,  -6.902628913895051 ],
+											[ -1.9710543275213308,   9.467197973372297, -2.7929834252502843 ],
+											[  -6.902628913895051, -2.7929834252502843 , 26.563323206134523 ]], 'Covariance matrix creation, Ledoit-Wolf constant variance covariance model, no zero mean');
+											
+	  var lwcov = PortfolioAllocation.covarianceMatrix([[1, 2, -1, -2], [2, 4, 6, 2], [3, 5, 9, 17]], {assumeZeroMean: false, regularizationMethod: "linear-shrinkage", shrinkageTarget: "null-correlation"});
+	  assert.equal(lwcov.isCovarianceMatrix(), true, 'Covariance matrix checks');
+	  assert.deepEqual(lwcov.toRowArray(), [[3.333333333333333, 0,  -5.495195195195195 ],
+											[0 , 3.6666666666666665, -0.9158658658658657 ],
+											[-5.495195195195195, -0.9158658658658657, 38.33333333333333 ]], 'Covariance matrix creation, Ledoit-Wolf null correlation model, no zero mean');
   }
 
   
@@ -57,7 +100,7 @@ QUnit.test('Random correlation matrix creation', function(assert) {
 		// Generate the matrix
 		var corr = PortfolioAllocation.randomCorrelationMatrix(n);
 	
-		// Ensure the correlation matrix is a correlation matrix
+		// Ensure the correlation matrix is a correlation (and thus also covariance) matrix
 		assert.equal(corr.isCorrelationMatrix(), true, 'Random correlation matrix generation, all inclusive test');	
   }
 });
@@ -93,17 +136,17 @@ QUnit.test('Indefinite correlation matrix repair', function(assert) {
 		// Shrinking target matrix not a correlation matrix
 		var targetMatrix = [[1, 3], [2, 1]];
 		assert.throws(function() { PortfolioAllocation.repairCorrelationMatrix([[1, 2], [2, 1]], {method: "linear-shrinkage", shrinkageTarget: targetMatrix}); },
-						 new Error('shrinkage target matrix must be symmetric'),
+						 new Error('shrinkage target matrix must be a correlation matrix'),
 						 "Indefinite correlation matrix repair - shrinkage target matrix not symmetric");
 
 		var targetMatrix = [[1, 3], [3, 2]];
 		assert.throws(function() { PortfolioAllocation.repairCorrelationMatrix([[1, 2], [2, 1]], {method: "linear-shrinkage", shrinkageTarget: targetMatrix}); },
-						 new Error('shrinkage target matrix must be unit diagonal'),
+						 new Error('shrinkage target matrix must be a correlation matrix'),
 						 "Indefinite correlation matrix repair - shrinkage target matrix not unit diagonal");
 						 
 		// Shrinking target matrix not satisfying the lower bound on the smallest eigenvalue(s)
-		var targetMatrix = [[1, 2], [2, 1]];
-		assert.throws(function() { PortfolioAllocation.repairCorrelationMatrix([[1, 2], [2, 1]], {method: "linear-shrinkage", shrinkageTarget: targetMatrix}); },
+		var targetMatrix = [[1, 1], [1, 1]];
+		assert.throws(function() { PortfolioAllocation.repairCorrelationMatrix([[1, 2], [2, 1]], {method: "linear-shrinkage", shrinkageTarget: targetMatrix, minEigenvalue: 0.05}); },
 						 new Error('smallest eigenvalue of the shrinkage target matrix strictly lower than the desired lower bound on the smallest eigenvalue(s) of the correlation matrix'),
 						 "Indefinite correlation matrix repair - shrinkage target matrix not satisfying the lower bound on the smallest eigenvalue(s)");				 
 
@@ -594,7 +637,8 @@ QUnit.test('Nearest correlation matrix', function(assert) {
 		var n = mat.length;
 		var expectedMat = [[1.0000, -0.8084, 0.1916, 0.1068], [-0.8084, 1.0000, -0.6562, 0.1916], [0.1916, -0.6562, 1.0000, -0.8084], [0.1068 ,0.1916, -0.8084, 1.000]];
 		
-		// With default precision, the generated matrix will not be a numerically exact correlation matrix
+		// Even with default precision, the generated matrix will be a numerically exact correlation matrix,
+		// thanks to the congruent transformation implemented as a polishing step.
 		//
 		// Check this
 		var nearestCorrMat = PortfolioAllocation.nearestCorrelationMatrix(mat);
@@ -607,22 +651,8 @@ QUnit.test('Nearest correlation matrix', function(assert) {
 				}
 			}
 		}
-		assert.equal(matrixEqual, true, 'Nearest correlation matrix - Test #2, default precision');
-		assert.equal(nearestCorrMat.isCorrelationMatrix(), false, 'Nearest correlation matrix - Test #2, default precision, not an exact correlation matrix');
-		
-		// Now request an infinite precision
-		var nearestCorrMat = PortfolioAllocation.nearestCorrelationMatrix(mat, {eps: 0});
-		var matrixEqual = true;
-		for (var i = 0; i < n; ++i) {
-			for (var j = 0; j < n; ++j) {
-				if ( Math.abs( expectedMat[i][j] - nearestCorrMat.getValueAt(i+1,j+1) ) > 1e-4 ) {
-					matrixEqual = false;
-					break;
-				}
-			}
-		}
-		assert.equal(matrixEqual, true, 'Nearest correlation matrix - Test #2, infinite precision');
-		assert.equal(nearestCorrMat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Test #2, infinite precision, exact correlation matrix');
+		assert.equal(matrixEqual, true, 'Nearest correlation matrix - Test #2/1');
+		assert.equal(nearestCorrMat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Test #2, default precision');		
 	}
 	
   // Test using static data
@@ -791,13 +821,32 @@ QUnit.test('Nearest correlation matrix', function(assert) {
 					[   0.015032758726772899,   -0.2654284061714957,   -0.2777363372965186,  -0.23754577245707648,  0.028185866289586504,   -0.2136808201707631,      0.48416358823977,    0.1909367151944158,  -0.14950035330945455,   -0.3657930466497671,  -0.15479667043964349,    0.7351440677796907,  -0.21880328909120453,    0.0106509924685626,  0.036245329574606584,    0.2044675189510433,   0.14030243108762938,    0.6055357951557646,   -0.5621474670890907,   0.06189745043264944,   0.04945026233886099,  -0.04661921312641353,   -0.0861808614511945,   0.07439040078283819, -0.057567882682352314,   0.11821883860981837,   -0.3268740011378931,    0.2537646064466628,                     1,  -0.13226489541600775],
 					[    0.08710227399541885,    0.4730379093934179,   0.35617772156815514,    -0.275762559323563,  -0.28342265951749956,   0.07462720947319375,   0.12380359058118116,    0.0323811242415796,    0.1301184202252945,  -0.20207413829413484,   0.05214490025342785,  0.006559576479502226,   0.06500213262810271,     0.337778017544219,    0.0511825390367075,   -0.4376182613065415, -0.002452335191418184,  -0.13616091604900568,  -0.15351885400011267,   0.06933578750874124,   0.06942588225083968,    0.2660736899939656,   0.23250158080841152,   -0.3132710378563707,   0.12930985038319273,   0.03316783689365472,  0.045110047369108744,  -0.12446104070927157,  -0.13226489541600775,                     1]]
 		  
-		  var nearest_mat = PortfolioAllocation.nearestCorrelationMatrix(mat, {minEigenvalue: 1e-12});
-		  assert.equal(nearest_mat.isCorrelationMatrix(1e-6), true, 'Nearest correlation matrix - Test high number of iterations to full precision');	
+		  var nearest_mat = PortfolioAllocation.nearestCorrelationMatrix(mat, {eps: 0});
+		  assert.equal(nearest_mat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Test high number of iterations to full precision');	
 	}
 
 });
 
 QUnit.test('Covariance matrix from correlation matrix', function(assert) {    
+	// Test error cases
+	{  
+		assert.throws(function() { 
+			var stddev = [1, 2];
+			var corrMat = [[1, 0.1, 3], [0.1, 1, 2]];
+			var covMat = PortfolioAllocation.covarianceMatrixFromCorrelationMatrix(corrMat, stddev, {diagonalVectorType: "standard-deviations"});
+		},
+		 new Error('input correlation matrix dimensions not compatible with input diagonal vector dimension'),
+		 "Covariance matrix creation from correlation matrix, correlation matrix not square");
+		 
+		assert.throws(function() { 
+			var stddev = [1, 2, 2];
+			var corrMat = [[1, 0.1], [0.1, 1]];
+			var covMat = PortfolioAllocation.covarianceMatrixFromCorrelationMatrix(corrMat, stddev, {diagonalVectorType: "standard-deviations"});
+		},
+		 new Error('input correlation matrix dimensions not compatible with input diagonal vector dimension'),
+		 "Covariance matrix creation from correlation matrix, incompatible dimensions matrix - vector");
+	}
+  
   // Test using static data
   // Reference: Table 9 from the paper Constrained Risk Budgeting Portfolios https://arxiv.org/abs/1902.05710
 	{
@@ -886,6 +935,36 @@ QUnit.test('Covariance matrix from correlation matrix', function(assert) {
 			}
 		}
 		assert.equal(matrixEqual, true, 'Covariance matrix computation from correlation matrix, test #2');		   
+	}
+});
+
+QUnit.test('Covariance matrix from covariance matrix', function(assert) {    
+	// Test error cases
+	{  
+		assert.throws(function() { 
+			var covMat = [[1, 0.1], [0.1, 1, 2]];
+			var covMat = PortfolioAllocation.covarianceMatrixFromCovarianceMatrix(covMat);
+		},
+		 new Error('unsupported input type'),
+		 "Covariance matrix creation from covariance matrix, covariance matrix dimensions not consistent");
+	}
+  
+  // Test using static data
+	{
+		var n = 2;
+		var covMat = [[1, 0.1], [0.1, 1]];
+		var covMatMatrix = PortfolioAllocation.covarianceMatrixFromCovarianceMatrix(covMat);
+		
+		var matrixEqual = true;
+		for (var i = 0; i < n; ++i) {
+			for (var j = 0; j < n; ++j) {
+				if ( Math.abs( covMat[i][j] - covMatMatrix.getValueAt(i+1,j+1) ) > 0 ) {
+					matrixEqual = false;
+					break;
+				}
+			}
+		}
+		assert.equal(matrixEqual, true, 'Covariance matrix computation from covariance matrix, test #1');
 	}
 });
 

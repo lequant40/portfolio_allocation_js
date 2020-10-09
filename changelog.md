@@ -1,7 +1,9 @@
-### 0.0.11 - xx/yy/2020
+### 0.0.12 - xx/yy/2020
+
+### 0.0.11 - 09/10/2020
 - Cosmetic updates related correlation matrices fixing, and added a unit test to cover the infinite precision of the nearest correlation matrix computation
 - Improved the numerical stability of the Constrained Risk Budgeting algorithm: added auto-expanding bisection interval, and early stopping criterion
-- Added two methods to swap two rows or two columns of a matrix
+- Added methods to swap two rows or two columns of a matrix
 - Added an LU decomposition method for square matrices, with full pivoting
 - Added a method to solve lower triangular linear systems
 - Reworked the internals of the critical line algorithm, to solve the KKT linear systems with a LU decomposition with full pivoting instead, to guard against numerical issues
@@ -12,9 +14,33 @@
 - Improved the numerical precision of the corner portfolios, of the mean-variance efficient portfolios, and of the maximum Sharpe ratio portfolios
 - Added a RSO-MSR optimization method
 - Redesigned the asset allocation non-regression to factorize the tests on portfolio weights using an equality function
-- Redesigned the internals of the mean-variance optimization method, to automatically selects the critical line algorithm, or the GSMO algorithm as optimization routine
+- Redesigned the internals of the mean-variance optimization method, to automatically selects the critical line algorithm, or the GSMO algorithm, as optimization routine; this impacts all portfolio computations using MVO
 - Allowed for an infinite number of cycles in the risk budgeting computation
 - Added lower bounds and upper bounds constraints in the equal risk bounding method
+- Updated the covariance matrix computation method to be able to use Bessel's correction with Ledoit-Wolf shrinkage (= non-backward compatible change)
+- Updated the mean vector computation method to be consistent with the covariance computation method w.r.t. the regularizationMethod parameter (= non-backward compatible change)
+- Updated the returns computation method to generate an error in case of division by zero
+- Added a method to test that a matrix is a covariance matrix
+- Fixed a bug in Cholesky decomposition, which wrongly allowed for semi-definite positive matrices to be decomposed
+- Added a method to compute a Cholesky decomposition for a positive semi-definite matrix
+- Misc. checks added in the covariance matrix creation methods
+- Improved the method to check a correlation matrix by allowing details on what property the matrix is missing
+- Added a method to compute a covariance matrix from a supposed covariance matrix
+- Updated the Threshold Accepting method to enable optimization in computations of successive values of the function f, and used this optimization with the postOptimizationWeights and minimumTrackingErrorWeights methods
+- Removed partial investment constraints on MVO, Max Sharpe portfolios
+- Improved the performances of the minimum tracking error portfolio in case of cardinality constraints 
+- Removed the post optimization method "rationalizing" (= non backward compatible change), as this one is useless in practice
+- Misc. performances and randomization improvements in the post optimization method internals
+- Automatic computation of the portfolio target cash position, as well as management of levered portfolio, in the post optimization weights method
+- Fixed a numerical bug in correlation matrix extraction from covariance matrix, which was not strictly symmetric and unit diagonal
+- Polished the output of the nearest correlation matrix computation to have a strictly symmetric and unit diagonal matrix in output whatever the requested precision
+- Misc. optimizations in the critical-line algorithm when assets returns are identical
+- Misc. optimizations in the computation of efficient portfolios in case the GSMO algorithm is used
+- Added the possibility to provide an initial point to the GSMO algorithm for warm start
+- Fixed a bug in the projection on the efficient frontier in case the GSMO algorithm is used, which lead to the same efficient portfolios being computed on the efficient frontier, thus biaising the projection
+- Removed partial investment constraint support from all MV-related algorithms (= non backward compatible changes), and introduced a proper portfolio exposure management in the RSO-MV related algorithms
+- Removed partial investment constraint support from minimum tracking error algorithm, in case of no cardinality constraints (= non backward compatible changes)
+- Fixed a bug in all MV-related algorithms where in case of tight min/max weight constraints, the algorithms would loop infinitely
 
 ### 0.0.10 - 14/09/2020
 - Added the Jacobi method in order to compute eigenvalues and eigenvectors of real symmetric matrices

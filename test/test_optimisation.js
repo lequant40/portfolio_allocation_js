@@ -193,7 +193,7 @@ QUnit.test('Unidimensional root finding - Bisection method', function(assert) {
 		var sol = PortfolioAllocation.bisection_(f, -1, 1);
 		var sol2 = PortfolioAllocation.bisection_(f, -1, 1, {outputInterval: true});
 		assert.equal(Math.abs(sol - expectedSol) <= 1e-6, true, 'Limit case, bracketing interval halving point equal to a root');
-		assert.deepEqual(sol2, [0 - 1e-6, 0 + 1e-6], true, 'Limit case, bracketing interval upper bound equal to a root and output interval');
+		assert.deepEqual(sol2, [0 - 1e-6/2, 0 + 1e-6/2], true, 'Limit case, bracketing interval upper bound equal to a root and output interval');
 	}
 	
 	// Static test 1, simple root
@@ -209,12 +209,12 @@ QUnit.test('Unidimensional root finding - Bisection method', function(assert) {
 		var defaultPrecisionSol = PortfolioAllocation.bisection_(f, 0, 2);
 		var defaultPrecisionSol2 = PortfolioAllocation.bisection_(f, 0, 2, {outputInterval: true});
 		assert.equal(Math.abs(defaultPrecisionSol - expectedSol) <= 1e-6, true, 'Test function 1, default precision');
-		assert.deepEqual(defaultPrecisionSol2, [1.4142121805419923, 1.414214180541992], true, 'Test function 1, default precision output interval');
+		assert.deepEqual(defaultPrecisionSol2, [1.4142126805419921,1.4142136805419923], true, 'Test function 1, default precision output interval');
 		
 		var HighPrecisionSol = PortfolioAllocation.bisection_(f, 0, 2, {eps: 1e-12});
 		var HighPrecisionSol2 = PortfolioAllocation.bisection_(f, 0, 2, {outputInterval: true, eps: 1e-12});
 		assert.equal(Math.abs(HighPrecisionSol - expectedSol) <= 1e-12, true, 'Test function 1, high precision');
-		assert.deepEqual(HighPrecisionSol2, [1.4142135623714243, 1.4142135623734244], true, 'Test function 1, high precision output interval');
+		assert.deepEqual(HighPrecisionSol2, [1.4142135623719243, 1.4142135623729244], true, 'Test function 1, high precision output interval');
 	}
 	
 	// Static test 2, double root
@@ -230,7 +230,7 @@ QUnit.test('Unidimensional root finding - Bisection method', function(assert) {
 		var sol = PortfolioAllocation.bisection_(f, 0, 2);
 		var sol2 = PortfolioAllocation.bisection_(f, 0, 2, {outputInterval: true});
 		assert.equal(Math.abs(sol - expectedSol) <= 1e-6, true, 'Test function 2');
-		assert.deepEqual(sol2, [0.999999, 1.000001], true, 'Test function 2, output interval');		
+		assert.deepEqual(sol2, [0.9999995, 1.0000005], true, 'Test function 2, output interval');		
 	}
 	
 	// Static test 3
@@ -246,7 +246,7 @@ QUnit.test('Unidimensional root finding - Bisection method', function(assert) {
 		var sol = PortfolioAllocation.bisection_(f, 0.001, 1);
 		var sol2 = PortfolioAllocation.bisection_(f, 0.001, 1, {outputInterval: true});
 		assert.equal(Math.abs(sol - expectedSol) <= 1e-3, true, 'Test function 3');
-		assert.deepEqual(sol2, [0.9036246380081175, 0.9036266380081176], true, 'Test function 3, output interval');		
+		assert.deepEqual(sol2, [0.9036251380081176, 0.9036261380081175], true, 'Test function 3, output interval');		
 	}
 });
 
@@ -277,7 +277,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 			
 			var res = Math.exp(1) + 20 - 20*Math.exp(-0.2 * Math.sqrt(1/n * sum_x_sq)) - Math.exp(1/n * sum_cos);
 			
-			return res;
+			return {f_x: res};
 		}
 		
 		// The minimum of the function f is attained at (0,...,0) and is equal to 0
@@ -304,7 +304,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 		// Compute the minimum of the function f, with default values
 		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
 		                                                                                               upperBounds: upperBounds }});
-		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Ackley, optimal point');
+		assert.equal(Math.abs(f(sol[0]).f_x - expectedSolValue) <= 1e-2, true, 'Test function Ackley, optimal point');
 		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Ackley, optimal function value');
 	}
 	
@@ -312,7 +312,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 	{
 		// Define the function
 		var f = function(x) {
-			return -(x[1] + 47) * Math.sin(Math.sqrt(Math.abs(x[1] + x[0]/2 + 47))) - x[0] * Math.sin(Math.sqrt(Math.abs(x[0] - (x[1] + 47))));
+			return {f_x: -(x[1] + 47) * Math.sin(Math.sqrt(Math.abs(x[1] + x[0]/2 + 47))) - x[0] * Math.sin(Math.sqrt(Math.abs(x[0] - (x[1] + 47))))};
 		}
 		
 		// The minimum of the function f is attained at (512, 404.2319) and is equal to -959.6407
@@ -330,7 +330,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {nSteps: 10000, neighbourGeneratorParameters: { alpha: 0.1, 
 		                                                                                                              lowerBounds: lowerBounds, 
 		                                                                                                              upperBounds: upperBounds }});
-		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Eggholder, optimal point');
+		assert.equal(Math.abs(f(sol[0]).f_x - expectedSolValue) <= 1e-2, true, 'Test function Eggholder, optimal point');
 		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Eggholder, optimal function value');
 	}
 	
@@ -356,7 +356,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 			
 			var res = 1 + 1/4000 * sum_x_sq - prod_cos;
 			
-			return res;
+			return {f_x: res};
 		}
 		
 		// The minimum of the function f is attained at (0,...,0) and is equal to 0
@@ -383,7 +383,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 		// Compute the minimum of the function f, with default values
 		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
 		                                                                                               upperBounds: upperBounds }});
-		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Griewank, optimal point');
+		assert.equal(Math.abs(f(sol[0]).f_x - expectedSolValue) <= 1e-2, true, 'Test function Griewank, optimal point');
 		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Griewank, optimal function value');
 	}
 	
@@ -404,7 +404,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 
 			var res = 10 * n + sum;
 			
-			return res;
+			return {f_x: res};
 		}
 		
 		// The minimum of the function f is attained at (0,...,0) and is equal to 0
@@ -431,7 +431,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 		// Compute the minimum of the function f
 		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
 		                                                                                               upperBounds: upperBounds }});
-		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-1, true, 'Test function Rastrigin, optimal point');
+		assert.equal(Math.abs(f(sol[0]).f_x - expectedSolValue) <= 1e-1, true, 'Test function Rastrigin, optimal point');
 		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-1, true, 'Test function Rastrigin, optimal function value');
 	}
 	
@@ -452,7 +452,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 
 			var res = sum;
 			
-			return res;
+			return {f_x: res};
 		}
 		
 		// The minimum of the function f is attained at (1,...,1) and is equal to 0
@@ -479,7 +479,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 		// Compute the minimum of the function f
 		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
 		                                                                                               upperBounds: upperBounds }});
-		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-1, true, 'Test function Rosenbrock, optimal point');
+		assert.equal(Math.abs(f(sol[0]).f_x - expectedSolValue) <= 1e-1, true, 'Test function Rosenbrock, optimal point');
 		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-1, true, 'Test function Rosenbrock, optimal function value');
 	}
 	
@@ -498,7 +498,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 				sum -= x[i] * Math.sin(Math.sqrt(Math.abs(x[i])));
 			}
 			
-			return sum;
+			return {f_x: sum};
 		}
 		
 		// The minimum of the function f is attained at (420.9687,...,420.9687) and is equal to -418.9829 * n
@@ -526,7 +526,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { alpha: 0.1, 
 		                                                                                               lowerBounds: lowerBounds, 
 		                                                                                               upperBounds: upperBounds }});
-		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Schwefel, optimal point');
+		assert.equal(Math.abs(f(sol[0]).f_x - expectedSolValue) <= 1e-2, true, 'Test function Schwefel, optimal point');
 		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Schwefel, optimal function value');
 	}
 
@@ -534,7 +534,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 	{
 		// Define the function
 		var f = function(x) {
-			return Math.exp(Math.sin(50*x[0])) + Math.sin(60*Math.exp(x[1])) + Math.sin(70 * Math.sin(x[0])) + Math.sin(Math.sin(80 * x[1])) - Math.sin(10*(x[0] + x[1])) + 1/4 * (x[0]*x[0] + x[1] * x[1]);
+			return {f_x: Math.exp(Math.sin(50*x[0])) + Math.sin(60*Math.exp(x[1])) + Math.sin(70 * Math.sin(x[0])) + Math.sin(Math.sin(80 * x[1])) - Math.sin(10*(x[0] + x[1])) + 1/4 * (x[0]*x[0] + x[1] * x[1]) };
 		}
 		
 		// The minimum of the function f is attained at (-0.0244,0.2106) and is equal to -3.3069
@@ -552,7 +552,7 @@ QUnit.test('Optimization problems solver - Threshold Accepting', function(assert
 		// As this function is particularly difficult to optimize, restart the algorithm several times
 		var sol = PortfolioAllocation.thresholdAcceptingSolve_(f, x0, {neighbourGeneratorParameters: { lowerBounds: lowerBounds, 
 		                                                                                               upperBounds: upperBounds }});
-		assert.equal(Math.abs(f(sol[0]) - expectedSolValue) <= 1e-2, true, 'Test function Trefethen, optimal point');
+		assert.equal(Math.abs(f(sol[0]).f_x - expectedSolValue) <= 1e-2, true, 'Test function Trefethen, optimal point');
 		assert.equal(Math.abs(sol[1] - expectedSolValue) <= 1e-2, true, 'Test function Trefethen, optimal function value');
 	}
 });

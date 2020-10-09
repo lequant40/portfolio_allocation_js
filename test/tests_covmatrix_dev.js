@@ -25,9 +25,11 @@ QUnit.test('Covariance matrix functions', function(assert) {
   {
 	  var mat = new PortfolioAllocation.Matrix([[1, 1, 8.1], [1, 16, 18], [8.1, 18, 81]]).toCovarianceMatrix();
 
-	  // Test correlation matrix extraction
+	  // Test correlation matrix extraction, which must be strictly symmetric and unit diagonal
 	  var expectedCorrMat = new PortfolioAllocation.Matrix([[1, 0.25, 0.9], [0.25, 1, 0.5], [0.9, 0.5, 1]]);
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getCorrelationMatrix(), expectedCorrMat, 1e-14), true, 'Covariance matrix functions - Correlation matrix extraction');
+	  assert.equal(expectedCorrMat.isUnitDiagonal(), true, 'Covariance matrix functions - Correlation matrix extraction, 2');
+	  assert.equal(expectedCorrMat.isSymmetric(), true, 'Covariance matrix functions - Correlation matrix extraction, 3');
 	  
 	  // Test variances vector extraction
 	  var expectedVarianceMat = new PortfolioAllocation.Matrix([1, 16, 81]);
@@ -37,6 +39,24 @@ QUnit.test('Covariance matrix functions', function(assert) {
 	  var expectedStdDevMat = new PortfolioAllocation.Matrix([1, 4, 9]);
 	  assert.equal(PortfolioAllocation.Matrix.areEqual(mat.getStandardDeviations(), expectedStdDevMat, 1e-14), true, 'Covariance matrix functions - Standard deviations vector extraction');
   }
+  
+  // Test using static data that a matrix is not a covariance matrix
+  {
+	  var nonSymmetricMat = new PortfolioAllocation.Matrix([[1, 1, 8.1], [1, 16, 18], [1.8, 18, 81]]).toCovarianceMatrix();
+	  assert.equal(nonSymmetricMat.isCovarianceMatrix(), false, 'Covariance matrix checks, non symmetric');
+	  
+	  var nonSdpMat = new PortfolioAllocation.Matrix([[1, 2], [2, 1]]).toCovarianceMatrix();
+	  assert.equal(nonSymmetricMat.isCovarianceMatrix(), false, 'Covariance matrix checks, non semi-definite positive');
+	  
+	  var nonSdpMat = new PortfolioAllocation.Matrix([[-2, 1], [1, -2]]).toCovarianceMatrix();
+	  assert.equal(nonSymmetricMat.isCovarianceMatrix(), false, 'Covariance matrix checks, non strictly positive diagonal elements');
+  }
+  
+	// Test using static data that a matrix is a covariance matrix
+	{
+		var sdpMat = new PortfolioAllocation.Matrix([[1, 1], [1, 1]]).toCovarianceMatrix();
+		assert.equal(sdpMat.isCovarianceMatrix(), true, 'Covariance matrix checks, limit case: semi-definite positive');
+	}
 });
 
 
@@ -82,7 +102,7 @@ QUnit.test('Indefinite correlation matrix repair - internal tests', function(ass
   
   // Test with random data that the linear shrinkage is correctly taking into account the lower bound on eigenvalues
   {
-	 // The min eiganvalue of this matrix is ~ -0.0073
+	 // The min eigenvalue of this matrix is ~ -0.0073
 	 var brokenCorrMat = [[1, 0.9, 0.7],
 						 [0.9, 1, 0.3],
 						 [0.7, 0.3, 1]];
@@ -102,7 +122,7 @@ QUnit.test('Indefinite correlation matrix repair - internal tests', function(ass
   
   // Test with random data that the nearest correlation method is correctly taking into account the lower bound on eigenvalues
   {
-	 // The min eiganvalue of this matrix is ~ -0.0073
+	 // The min eigenvalue of this matrix is ~ -0.0073
 	 var brokenCorrMat = [[1, 0.9, 0.7],
 						 [0.9, 1, 0.3],
 						 [0.7, 0.3, 1]];
@@ -126,25 +146,31 @@ QUnit.test('Indefinite correlation matrix repair - internal tests', function(ass
 
 QUnit.test('Nearest correlation matrix - internal tests', function(assert) {     
   // Test with random data that the nearest correlation matrix is correctly taking into account the lower bound on eigenvalues
-  {
-	 // The min eiganvalue of this matrix is ~ -0.0073
+ {
+	 // The min eigenvalue of this matrix is ~ -0.0073
 	 var brokenCorrMat = [[1, 0.9, 0.7],
 						 [0.9, 1, 0.3],
 						 [0.7, 0.3, 1]];
-							 
+
+	 // Ensure the matrix is not a correlation matrix
+	 assert.equal(new PortfolioAllocation.Matrix(brokenCorrMat).isCorrelationMatrix(), false, 'Nearest correlation matrix - Internal test #1/1');
+
 	 // Generate a random lower bound on the smallest eigenvalue of the nearest correlation matrix
 	 var minEigVal = Math.random(); // belongs to ]0,1[
 	 
 	 // Compute the nearest correlation matrix to the broken correlation matrix
-	 var nearestCorrMat = PortfolioAllocation.nearestCorrelationMatrix(brokenCorrMat, {minEigenvalue: minEigVal, eps: 1e-8, maxIter: 100000})
-	
+	 var nearestCorrMat = PortfolioAllocation.nearestCorrelationMatrix(brokenCorrMat, {minEigenvalue: minEigVal, eps: 1e-8, maxIter: -1})
+  
+	 // Ensure the nearest correlation matrix is a correlation matrix
+	 assert.equal(nearestCorrMat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Internal test #1/2');
+  
 	 // Validate that the smallest eigenvalue of the nearest correlation matrix is greater than 
 	 // the lower bound
 	 var jacobi = PortfolioAllocation.Matrix.eig(nearestCorrMat, {sortedEigenvalues: true});
 	 var minEigenvalue = jacobi[1].data[2];
-	 assert.equal(Math.abs(minEigenvalue - minEigVal) <= 1e-6, true, 'Nearest correlation matrix - Internal test #1');
+	 assert.equal(Math.abs(minEigenvalue - minEigVal) <= 1e-6, true, 'Nearest correlation matrix - Internal test #1/3');
   }
-  
+
   // Test matrices whose nearest correlation matrix were initially NOT a correlation matrix (strictly negative eigenvalue) !
   //
   // The bug was due to an incorrect convergence condition.
@@ -160,17 +186,16 @@ QUnit.test('Nearest correlation matrix - internal tests', function(assert) {
 				[-0.5891536415285011,   -0.4384779718501961, -0.018501626749401468 ,  0.28094692738663546,   0.48127181356733134 ,   0.3019431882153892,    0.3594948044435324 ,                    1,     0.307071908776885,  -0.27512543932175526],
 				[-0.3033661105868079,  -0.04157807243431871,  0.034978192975079626 ,   0.5704634723157168,    0.5240171002774565 ,   0.5712314628087278,   0.40258020819009377,     0.307071908776885,                     1,  -0.12697231187851038],
 				[0.346969569262485,   0.36441921116789094 , -0.13605230462054563  , -0.5160250884331637 , -0.04905664181384413  , -0.5702138190028966,  -0.23665358042668136,  -0.27512543932175526 , -0.12697231187851038  ,                   1]]
-	  var mat = PortfolioAllocation.Matrix(mat);
-	  
-	  // Ensure the matrix is not a correlation matrix
-	  assert.equal(mat.isCorrelationMatrix(), false, 'Nearest correlation matrix - Internal test #2/1');
+
+	  // Ensure the matrix is not a correlation matrix (minimal eigenvalue is ~-0.069)
+	  assert.equal(new PortfolioAllocation.Matrix(mat).isCorrelationMatrix(), false, 'Nearest correlation matrix - Internal test #2/1');
 		
 	  // Compute the nearest correlation matrix, which must be a correlation matrix
 	  var nearest_mat = PortfolioAllocation.nearestCorrelationMatrix(mat);
-	  
-	  // Ensure the nearest correlation matrix is a correlation matrix
-	  assert.equal(nearest_mat.isCorrelationMatrix(1e-5), true, 'Nearest correlation matrix - Internal test #2/2');
-  }
+
+	  // Ensure the nearest correlation matrix is a correlation matrix (minimal eigenvalue is ~1e-9)
+	  assert.equal(nearest_mat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Internal test #2/2');
+	}
   
 
 	// Test with static data a small matrix, which needs more than 800 iterations to converge
@@ -189,19 +214,12 @@ QUnit.test('Nearest correlation matrix - internal tests', function(assert) {
 		assert.equal(mat.isCorrelationMatrix(), false, 'Nearest correlation matrix - Internal test #3/1');
 		  
 		// Compute the nearest correlation matrix at 1e-14
-		assert.throws(function() { PortfolioAllocation.nearestCorrelationMatrix(mat, {eps:1e-14}); },
+		assert.throws(function() { PortfolioAllocation.nearestCorrelationMatrix(mat, {eps:1e-6}); },
 						 new Error('maximum number of iterations reached: 100'),
 						 "Nearest correlation matrix - Internal test #3/2");
-		var nearest_mat = PortfolioAllocation.nearestCorrelationMatrix(mat, {eps:1e-14,maxIter: 900});
+		var nearest_mat = PortfolioAllocation.nearestCorrelationMatrix(mat, {eps:1e-6,maxIter: 900});
 		  
-		// Ensure the nearest correlation matrix is a correlation matrix at at least 1e-12
-		assert.equal(nearest_mat.isCorrelationMatrix(1e-12), true, 'Nearest correlation matrix - Internal test #3/2');
-		
-		
-		// Compute the nearest correlation matrix at full precision
-		var nearest_mat = PortfolioAllocation.nearestCorrelationMatrix(mat, {eps:0,maxIter: 900});
-		  
-		// Ensure the nearest correlation matrix is a strict correlation matrix
-		assert.equal(nearest_mat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Internal test #3/3');
+		// Ensure the nearest correlation matrix is a correlation matrix
+		assert.equal(nearest_mat.isCorrelationMatrix(), true, 'Nearest correlation matrix - Internal test #3/2');		
 	}
 });			

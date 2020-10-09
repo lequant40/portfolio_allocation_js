@@ -1,7 +1,7 @@
 {
   "name": "portfolio-allocation",
-  "version": "0.0.10",
-  "date": "2020-09-14",
+  "version": "0.0.11",
+  "date": "2020-10-09",
   "author": "Roman Rubsamen <roman.rubsamen@gmail.com>",
   "contributors": [],
   "description": "A JavaScript library to allocate and optimize financial portfolios.",
@@ -36,7 +36,7 @@
   "bugs": {
     "url": "https://github.com/lequant40/portfolio_allocation_js/issues"
   },
-  "main": "dist/portfolio_allocation.dist.min.js",
+  "main": "dist/portfolio_allocation.dist.js",
   "scripts": {
     "test": "grunt test-dist"
   },

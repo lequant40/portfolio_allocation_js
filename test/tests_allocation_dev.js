@@ -126,17 +126,19 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 	}
 	
 	// Test using static data that partial investment constraint is properly managed
+	// thanks to a semi definite positive matrix.
 	{
-		var expectedCornerPortfolios = [[[0, 1, 0], 4.16666666666667], 
-										[[0, 0.23479391919356143, 0.7652060808064386], 0.19184619136655556],
-										[[0, 0, 0], 0]];
+		var expectedCornerPortfolios = [[[0, 1, 0, 0], 4.16666666666667], 
+										[[0, 0.23479391919356143, 0.7652060808064386, 0], 0.19184619136655556],
+										[[0, 0, 0, 1], 0]];
 		
-		var covMat = new PortfolioAllocation.Matrix([[0.0146, 0.0187, 0.0145],
-													 [0.0187, 0.0854, 0.0104],
-													  [0.0145, 0.0104, 0.0289]]);
-		var returns = new PortfolioAllocation.Matrix([0.062, 0.146, 0.128]);
+		var covMat = new PortfolioAllocation.Matrix([[0.0146, 0.0187, 0.0145, 0],
+													 [0.0187, 0.0854, 0.0104, 0],
+													  [0.0145, 0.0104, 0.0289, 0],
+													  [0, 0, 0, 0]]);
+		var returns = new PortfolioAllocation.Matrix([0.062, 0.146, 0.128, 0]);
 		
-		var cornerPortfolios = new PortfolioAllocation.MeanVarianceEfficientFrontierCla(returns, covMat, {constraints: {fullInvestment: false}}).cornerPortfolios;
+		var cornerPortfolios = new PortfolioAllocation.MeanVarianceEfficientFrontierCla(returns, covMat).cornerPortfolios;
 		assert.deepEqual(cornerPortfoliosToArray(cornerPortfolios), expectedCornerPortfolios, 'Mean variance portfolio - Corner portfolios #2, partial investment constraint');
 	}
 	
@@ -217,7 +219,7 @@ QUnit.test('Mean variance portfolio - internal corner portfolios computation', f
 		var returns = [[-0.173,0.098,0.200,0.030,-0.183,0.067,0.300,0.103,0.216,-0.046,-0.071,0.056,0.038,0.089,0.090,0.083,0.035,0.176],
 					   [-0.318,0.285,-0.047,0.104,-0.171,-0.039,0.149,0.260,0.419,-0.078,0.169,-0.035,0.133,0.732,0.021,0.131,0.006,0.908],
 					   [-0.319,0.076,0.381,-0.051,0.087,0.262,0.341,0.227,0.352,0.153,-0.099,0.038,0.273,0.091,0.054,0.109,0.210,0.112]];
-		var covMat = PortfolioAllocation.covarianceMatrix(returns, {method: "sample-covariance"});
+		var covMat = PortfolioAllocation.covarianceMatrix(returns, {assumeZeroMean: false});
 		var returns = PortfolioAllocation.meanVector(returns);
 		var lb = [0.1, 0.1, 0.1];
 		var ub = [0.5, 0.5, 0.5];
@@ -441,13 +443,13 @@ QUnit.test('Random subspace mean variance portfolio - internal target max volati
 		var targetMaxVolatility = generateRandomValue(minVolatility, maxVolatility);
 		
 		// Compute the associated portfolio weights
-		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { subsetsOpt: { 
+		var weights = PortfolioAllocation.randomSubspaceMeanVarianceOptimizationWeights(returns, covMat, { constraints: { minExposure: 0},
+																										    subsetsOpt: { 
 																											  constraints: {
-																												  fullInvestment: false,
 																												  maxVolatility: targetMaxVolatility
 																											  }
 		                                                                                                    }} );
-		
+
 		// Compare the computed portfolio volatility with the target volatility
 		var portfolioVolatility = Math.sqrt(PortfolioAllocation.Matrix.vectorDotProduct(PortfolioAllocation.Matrix.xy(new PortfolioAllocation.Matrix(covMat), new PortfolioAllocation.Matrix(weights)), 
 																			            new PortfolioAllocation.Matrix(weights)));
@@ -579,7 +581,7 @@ QUnit.test('Mean variance optimization - computation of maximum risk tolerance p
 													[0,	0,	1]]);
 		var returns = new PortfolioAllocation.Matrix([1, 1, 1]);
 
-		var expectedPortfolio = [[0.3333333333333333, 0.3333333333333333, 0.3333333333333333], 1]; // True risk tolerance is 0
+		var expectedPortfolio = [[0.3333333333333333, 0.3333333333333333, 0.3333333333333333], 64]; // True risk tolerance is 0
 
 		var efficientFrontier = new PortfolioAllocation.MeanVarianceEfficientFrontierGsmo(returns, covMat);
 		var portfolio = efficientFrontier.getHighestRiskTolerancePortfolio();
@@ -597,7 +599,7 @@ QUnit.test('Mean variance optimization - computation of maximum risk tolerance p
 													[2.31,	39.886,	237.16]]);
 		var returns = new PortfolioAllocation.Matrix([2.8000, 6.3000, 10.8000]);
 		
-		var expectedPortfolio = [[0.2, 0.29999999999999993, 0.5], 32]; // True risk tolerance is 20.898844444444443
+		var expectedPortfolio = [[0.2, 0.29999999999999993, 0.5], 64]; // True risk tolerance is 20.898844444444443
 
 		var efficientFrontier = new PortfolioAllocation.MeanVarianceEfficientFrontierGsmo(returns, covMat, { constraints: {minWeights: [0.2, 0.2, 0.2], maxWeights: [0.5, 0.5, 0.5]} });
 		var portfolio = efficientFrontier.getHighestRiskTolerancePortfolio();
@@ -798,17 +800,6 @@ QUnit.test('Mean variance optimization - maximum Sharpe ratio internal computati
 					[0.0361509784,0.02083593827,0.0420215216,0.03664589506,0.04497232099,0.02165332099,0.01739445988,0.05284057407,0.07926979321, 0],
 					[0, 0, 0, 0, 0, 0, 0, 0, 0, 0]];
 		var returns = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111, 0];
-
-		var covMatNoZero = [[0.05338816358,0.02149069753,0.02865533642,0.04896485802,0.01624895062,0.03223945062,0.02425553395,0.03999812963,0.0361509784],
-							[0.02149069753,0.01468446914,0.01878391358,0.02441658642,0.008041938272,0.01002193827,0.01448993827,0.02536259259,0.02083593827],
-							[0.02865533642,0.01878391358,0.08550016358,0.06260714198,0.04439938272,0.01328671605,0.01043991049,0.06864603704,0.0420215216],
-							[0.04896485802,0.02441658642,0.06260714198,0.09546446914,0.05153806173,0.02902461728,0.02077028395,0.09002012963,0.03664589506],
-							[0.01624895062,0.008041938272,0.04439938272,0.05153806173,0.1278900988,0.0128384321,0.02091715432,0.1015344074,0.04497232099],
-							[0.03223945062,0.01002193827,0.01328671605,0.02902461728,0.0128384321,0.04125832099,0.01127854321,0.02960762963,0.02165332099],
-							[0.02425553395,0.01448993827,0.01043991049,0.02077028395,0.02091715432,0.01127854321,0.02883379321,0.02913762963,0.01739445988],
-							[0.03999812963,0.02536259259,0.06864603704,0.09002012963,0.1015344074,0.02960762963,0.02913762963,0.1467278889,0.05284057407],
-							[0.0361509784,0.02083593827,0.0420215216,0.03664589506,0.04497232099,0.02165332099,0.01739445988,0.05284057407,0.07926979321]];
-		var returnsNoZero = [0.06594444444,0.06155555556,0.1460555556,0.1734444444,0.1981111111,0.05511111111,0.1276111111,0.1903333333,0.1156111111];
 		var rf = 0;
 		var epsVolatility = Math.random() * (0.15 - 1e-4) + 1e-4; // generate a random minimum volatility between 1e-4 and 0.15 (portfolios with target SR are found until ~0.16) 
 		
@@ -822,17 +813,6 @@ QUnit.test('Mean variance optimization - maximum Sharpe ratio internal computati
 
 		assert.equal(Math.abs(srCla - expectedSharpeRatio) <= 1e-14, true, "Test #5, CLA");
 		assert.equal(Math.abs(srGsmo - expectedSharpeRatio) <= 1e-08, true, "Test #5, GSMO");
-
-		//
-		var efficientFrontierClaNoZero = new PortfolioAllocation.MeanVarianceEfficientFrontierCla(returnsNoZero, covMatNoZero, {optimizationMethod: 'critical-line', constraints: {fullInvestment: false}});	
-		var maxSharpeRatioPortfolioWeightsClaNoZero = PortfolioAllocation.maximumSharpeRatioWeights(returnsNoZero, covMatNoZero, rf, {optimizationMethod: 'critical-line', constraints: {fullInvestment: false}});
-		var srClaNoZero = efficientFrontierClaNoZero.computePortfolioSharpeRatio(new PortfolioAllocation.Matrix(maxSharpeRatioPortfolioWeightsClaNoZero), rf);
-		
-		var maxSharpeRatioPortfolioWeightsGsmoNoZero = PortfolioAllocation.maximumSharpeRatioWeights(returnsNoZero, covMatNoZero, rf, {constraints: {fullInvestment: false}});
-		var srGsmo = efficientFrontierClaNoZero.computePortfolioSharpeRatio(new PortfolioAllocation.Matrix(maxSharpeRatioPortfolioWeightsGsmoNoZero), rf);
-		
-		assert.equal(Math.abs(srCla - expectedSharpeRatio) <= 1e-14, true, "Test #5, partial investment, CLA");
-		assert.equal(Math.abs(srGsmo - expectedSharpeRatio) <= 1e-08, true, "Test #5, partial investment,  GSMO");
 	}
 });
 

@@ -6,7 +6,6 @@ QUnit.module('Statistics internal module', {
 });
 
 
-
 QUnit.test('Returns computation', function(assert) {    
 	// Test with static data
 	{
@@ -39,7 +38,21 @@ QUnit.test('Returns computation', function(assert) {
 		  }
 		}
 		assert.equal(resultOK, true, 'Returns computation, logarithmic returns #2');
+	}
+	
+	// Test error cases
+	{
+		assert.throws(function() { 
+			var ret = PortfolioAllocation.returns([0, 0.01], {method: "arithmetic"});
+		},
+		new Error('internal error: null input value'),
+		"Returns computation, arithmetic returns, null input value");
 		
+		assert.throws(function() { 
+			var ret = PortfolioAllocation.returns([0, 0.01], {method: "logarithmic"});
+		},
+		new Error('internal error: negative or null input value'),
+		"Returns computation, logarithmic returns, null input value");		
 	}
 });
 
