@@ -12,7 +12,7 @@ PortfolioAllocation solves this problem using mathematical optimization algorith
 
 Do not hesitate to [report any bug](https://github.com/lequant40/portfolio_allocation_js/issues) / [request additional features](https://feathub.com/lequant40/portfolio_allocation_js) !
 
-## Foreword
+## Foreword / Project Status
 
 I initially developed the PortfolioAllocation library to allow the optimization of financial portfolios within Google Sheets.
 
@@ -24,7 +24,7 @@ For these reasons, I decided to stop developing the "vanilla" PortfolioAllocatio
 
 As the integration of a Web API inside Google Sheets is much easier than the integration of a third party JavaScript library, this proved a wise choice.
 
-TL;RD: If you need a software library to optimize financial portfolios within Google Sheets, please use [the Portfolio Optimizer Web API](https://portfoliooptimizer.io/).
+**TL;RD: If you need a software library to optimize financial portfolios within Google Sheets, please use [the Portfolio Optimizer Web API](https://portfoliooptimizer.io/).**
 
 ## Features
 
